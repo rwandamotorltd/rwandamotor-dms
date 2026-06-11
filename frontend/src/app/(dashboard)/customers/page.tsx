@@ -494,7 +494,7 @@ export default function CustomersPage() {
           className="w-4 h-4 rounded border-border accent-primary cursor-pointer"
         />
       ),
-      cell: ({ row }: { row: ReturnType<typeof useReactTable<CustomerListItem>>["getRowModel"]["rows"][number] }) => (
+      cell: ({ row }: { row: ReturnType<ReturnType<typeof useReactTable<CustomerListItem>>["getRowModel"]>["rows"][number] }) => (
         <input
           type="checkbox"
           checked={row.getIsSelected()}
