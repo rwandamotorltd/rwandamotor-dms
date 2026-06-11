@@ -1,0 +1,57 @@
+using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Quartz;
+using RwandaMotor.Application.Common.Interfaces;
+using RwandaMotor.Domain.Entities;
+using RwandaMotor.Infrastructure.BackgroundJobs;
+using RwandaMotor.Infrastructure.Persistence;
+using RwandaMotor.Infrastructure.Persistence.Seed;
+using RwandaMotor.Infrastructure.Services;
+
+namespace RwandaMotor.Infrastructure;
+
+public static class DependencyInjection
+{
+    public static IServiceCollection AddInfrastructure(
+        this IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddDbContext<ApplicationDbContext>(options =>
+            options.UseNpgsql(
+                configuration.GetConnectionString("DefaultConnection"),
+                b => b.MigrationsAssembly(typeof(ApplicationDbContext).Assembly.FullName)));
+
+        services.AddScoped<IApplicationDbContext>(sp => sp.GetRequiredService<ApplicationDbContext>());
+
+        services.AddIdentity<ApplicationUser, IdentityRole>(options =>
+        {
+            options.Password.RequireDigit = true;
+            options.Password.RequiredLength = 8;
+            options.Password.RequireUppercase = true;
+            options.Password.RequireNonAlphanumeric = true;
+            options.User.RequireUniqueEmail = true;
+        })
+        .AddEntityFrameworkStores<ApplicationDbContext>()
+        .AddDefaultTokenProviders();
+
+        services.AddScoped<IJwtService, JwtService>();
+        services.AddScoped<IServiceIntervalEngine, ServiceIntervalEngine>();
+        services.AddScoped<IRetentionEngine, RetentionEngine>();
+        services.AddScoped<ApplicationDbSeeder>();
+
+        // Nightly retention evaluation — runs at 2:00 AM UTC
+        services.AddQuartz(q =>
+        {
+            var jobKey = new JobKey("RetentionEvaluationJob");
+            q.AddJob<RetentionEvaluationJob>(opts => opts.WithIdentity(jobKey));
+            q.AddTrigger(opts => opts
+                .ForJob(jobKey)
+                .WithIdentity("RetentionEvaluationJob-trigger")
+                .WithCronSchedule("0 0 2 * * ?"));
+        });
+        services.AddQuartzHostedService(q => q.WaitForJobsToComplete = true);
+
+        return services;
+    }
+}

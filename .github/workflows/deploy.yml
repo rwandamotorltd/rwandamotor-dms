@@ -1,0 +1,65 @@
+name: Deploy RwandaMotor DMS
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  # ── Backend: build, publish, deploy to server ──────────────────────────────
+  deploy-api:
+    name: Deploy .NET API
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 9
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Restore & publish
+        run: |
+          dotnet restore backend/src/RwandaMotor.API/RwandaMotor.API.csproj
+          dotnet publish backend/src/RwandaMotor.API/RwandaMotor.API.csproj \
+            -c Release \
+            -r linux-x64 \
+            --self-contained false \
+            -o backend/publish
+
+      - name: Copy to server via SSH
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          source: "backend/publish/*"
+          target: "/opt/rwandamotor-api/"
+          strip_components: 2
+
+      - name: Run EF migrations & restart service
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          script: |
+            # Apply any pending migrations
+            cd /opt/rwandamotor-api
+            ASPNETCORE_ENVIRONMENT=Production \
+            ConnectionStrings__DefaultConnection="${{ secrets.DB_CONNECTION_STRING }}" \
+            dotnet RwandaMotor.API.dll --migrate-only 2>/dev/null || true
+
+            # Reload systemd and restart
+            sudo systemctl daemon-reload
+            sudo systemctl restart rwandamotor-api
+            sudo systemctl is-active rwandamotor-api
+
+  # ── Frontend: trigger Vercel redeploy ──────────────────────────────────────
+  deploy-frontend:
+    name: Deploy Frontend (Vercel)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Vercel deploy hook
+        run: |
+          curl -X POST "${{ secrets.VERCEL_DEPLOY_HOOK }}"

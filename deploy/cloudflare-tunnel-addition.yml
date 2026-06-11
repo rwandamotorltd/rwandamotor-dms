@@ -1,0 +1,18 @@
+# Add these two lines to /etc/cloudflared/config.yml
+# Insert BEFORE the final "- service: http_status:404" catch-all line.
+#
+# Final ingress section should look like:
+#
+# ingress:
+#   - hostname: odoo.rwandamotor.com
+#     service: http://localhost:8069
+#   - hostname: n8n.rwandamotor.com
+#     service: http://localhost:5678
+#   - hostname: report.rwandamotor.com
+#     service: http://localhost:3000
+#   - hostname: api.rwandamotor.com        ← ADD THIS
+#     service: http://localhost:5000        ← ADD THIS
+#   - service: http_status:404
+
+# After editing, restart the tunnel:
+#   sudo systemctl restart cloudflared

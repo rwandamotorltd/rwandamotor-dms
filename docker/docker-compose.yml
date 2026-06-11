@@ -1,0 +1,69 @@
+version: "3.9"
+
+services:
+  # ─── SQL Server ───────────────────────────────────────────────
+  db:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: rwandamotor-db
+    environment:
+      SA_PASSWORD: "YourStrong!Passw0rd"
+      ACCEPT_EULA: "Y"
+      MSSQL_PID: "Developer"
+    ports:
+      - "1433:1433"
+    volumes:
+      - mssql_data:/var/opt/mssql
+    networks:
+      - dms-net
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P YourStrong!Passw0rd -Q 'SELECT 1'"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # ─── Backend API ──────────────────────────────────────────────
+  api:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    container_name: rwandamotor-api
+    environment:
+      ASPNETCORE_ENVIRONMENT: "Production"
+      ConnectionStrings__DefaultConnection: "Server=db,1433;Database=RwandaMotorDMS;User Id=sa;Password=YourStrong!Passw0rd;TrustServerCertificate=True;"
+      Jwt__Key: "RwandaMotorDMS_SuperSecretKey_2024_!@#$$%^&*()"
+      Jwt__Issuer: "https://api.rwandamotor.com"
+      Jwt__Audience: "https://app.rwandamotor.com"
+      Jwt__ExpiryHours: "8"
+      AllowedOrigins__0: "http://localhost:3000"
+      AllowedOrigins__1: "http://frontend:3000"
+    ports:
+      - "5000:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - dms-net
+    restart: unless-stopped
+
+  # ─── Frontend ─────────────────────────────────────────────────
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    container_name: rwandamotor-frontend
+    environment:
+      NEXT_PUBLIC_API_URL: "http://api:8080/api"
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+    networks:
+      - dms-net
+    restart: unless-stopped
+
+volumes:
+  mssql_data:
+
+networks:
+  dms-net:
+    driver: bridge

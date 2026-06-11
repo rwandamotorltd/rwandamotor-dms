@@ -1,0 +1,30 @@
+[Unit]
+Description=RwandaMotor DMS API (.NET 9)
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=simple
+User=rwandamotor
+Group=rwandamotor
+WorkingDirectory=/opt/rwandamotor-api
+ExecStart=/usr/bin/dotnet /opt/rwandamotor-api/RwandaMotor.API.dll
+
+# Environment — sensitive values set here (not in appsettings.Production.json)
+Environment=ASPNETCORE_ENVIRONMENT=Production
+Environment=ASPNETCORE_URLS=http://localhost:5000
+EnvironmentFile=/etc/rwandamotor/api.env
+
+# Auto-restart on crash
+Restart=always
+RestartSec=5
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+
+StandardOutput=append:/var/log/rwandamotor/api.log
+StandardError=append:/var/log/rwandamotor/api.log
+
+[Install]
+WantedBy=multi-user.target
