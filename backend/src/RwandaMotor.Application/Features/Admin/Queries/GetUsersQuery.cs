@@ -30,7 +30,7 @@ public class GetUsersQueryHandler : IRequestHandler<GetUsersQuery, List<UserDto>
         {
             var roles = await _users.GetRolesAsync(u);
             result.Add(new UserDto(
-                u.Id,
+                u.Id ?? "",
                 u.FullName,
                 u.Email ?? "",
                 roles.FirstOrDefault() ?? "—",
