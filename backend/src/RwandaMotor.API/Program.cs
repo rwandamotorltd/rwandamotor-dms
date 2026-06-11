@@ -116,17 +116,19 @@ builder.Services.AddSwaggerGen(c =>
 
 var app = builder.Build();
 
-// Seed database on startup
+// Run migrations and seed database on startup
 using (var scope = app.Services.CreateScope())
 {
     try
     {
+        var db = scope.ServiceProvider.GetRequiredService<RwandaMotor.Infrastructure.Persistence.ApplicationDbContext>();
+        await db.Database.MigrateAsync();
         var seeder = scope.ServiceProvider.GetRequiredService<ApplicationDbSeeder>();
         await seeder.SeedAsync();
     }
     catch (Exception ex)
     {
-        Log.Error(ex, "Database seeding failed");
+        Log.Error(ex, "Database migration/seeding failed");
     }
 }
 

@@ -37,22 +37,15 @@ jobs:
           target: "/opt/rwandamotor-api/"
           strip_components: 2
 
-      - name: Run EF migrations & restart service
+      - name: Restart service
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
           script: |
-            # Apply any pending migrations
-            cd /opt/rwandamotor-api
-            ASPNETCORE_ENVIRONMENT=Production \
-            ConnectionStrings__DefaultConnection="${{ secrets.DB_CONNECTION_STRING }}" \
-            dotnet RwandaMotor.API.dll --migrate-only 2>/dev/null || true
-
-            # Reload systemd and restart
-            sudo systemctl daemon-reload
             sudo systemctl restart rwandamotor-api
+            sleep 3
             sudo systemctl is-active rwandamotor-api
 
   # ── Frontend: trigger Vercel redeploy ──────────────────────────────────────
