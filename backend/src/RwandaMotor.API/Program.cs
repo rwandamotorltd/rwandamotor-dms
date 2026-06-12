@@ -1,6 +1,3 @@
-// Fix Npgsql 6+ DateTime UTC requirement
-AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
-
 using System.Text;
 using FluentValidation;
 using MediatR;
@@ -12,6 +9,9 @@ using RwandaMotor.Application.Common.Behaviours;
 using RwandaMotor.Infrastructure;
 using RwandaMotor.Infrastructure.Persistence.Seed;
 using Serilog;
+
+// Fix Npgsql 6+ DateTime UTC requirement — must be before any EF/Npgsql code
+AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
 
 var builder = WebApplication.CreateBuilder(args);
 
