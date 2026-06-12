@@ -182,6 +182,10 @@ export interface TechnicianItem {
   fullName: string;
   employeeCode: string;
   specialization: string | null;
+  phone: string | null;
+  email: string | null;
+  certificationLevel: string | null;
+  isActive: boolean;
 }
 
 export const techniciansApi = {
@@ -193,6 +197,9 @@ export const techniciansApi = {
 
   update: (payload: UpdateTechnicianPayload) =>
     api.put<ApiResponse<boolean>>('/technicians/' + payload.id, payload).then(r => r.data),
+
+  delete: (id: string) =>
+    api.delete<ApiResponse<boolean>>('/technicians/' + id).then(r => r.data),
 };
 
 // ============================================================

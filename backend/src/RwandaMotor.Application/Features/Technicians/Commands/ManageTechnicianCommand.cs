@@ -88,3 +88,27 @@ public class UpdateTechnicianCommandHandler : IRequestHandler<UpdateTechnicianCo
         return true;
     }
 }
+
+// ── Delete ──────────────────────────────────────────────────────────────────
+
+public record DeleteTechnicianCommand(Guid Id) : IRequest<bool>;
+
+public class DeleteTechnicianCommandHandler : IRequestHandler<DeleteTechnicianCommand, bool>
+{
+    private readonly IApplicationDbContext _db;
+
+    public DeleteTechnicianCommandHandler(IApplicationDbContext db) => _db = db;
+
+    public async Task<bool> Handle(DeleteTechnicianCommand cmd, CancellationToken ct)
+    {
+        var tech = await _db.Technicians.FirstOrDefaultAsync(t => t.Id == cmd.Id && !t.IsDeleted, ct);
+        if (tech == null) return false;
+
+        tech.IsDeleted  = true;
+        tech.DeletedAt  = DateTime.UtcNow;
+        tech.UpdatedAt  = DateTime.UtcNow;
+
+        await _db.SaveChangesAsync(ct);
+        return true;
+    }
+}

@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
-import { Wrench, Plus, Pencil, X } from "lucide-react";
+import { Wrench, Plus, Pencil, Trash2, X, AlertTriangle } from "lucide-react";
 import {
   techniciansApi,
   type TechnicianItem,
@@ -12,6 +12,7 @@ import {
 } from "@/lib/api";
 import { useAuth } from "@/contexts/auth-context";
 import { useRouter } from "next/navigation";
+import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,7 +20,22 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 
-// ─── Modal ────────────────────────────────────────────────────
+// ─── Constants ────────────────────────────────────────────────
+
+const SPECIALIZATIONS = [
+  "Electrical & Diagnostics",
+  "Engine & Transmission",
+  "Body & Suspension",
+  "General Service",
+  "Air Conditioning",
+  "Tyres & Alignment",
+  "Brakes & Suspension",
+  "Electronics",
+  "Quick Service / Lube",
+  "Bodywork & Paint",
+];
+
+// ─── Form state ───────────────────────────────────────────────
 
 interface TechFormState {
   fullName: string;
@@ -41,6 +57,8 @@ const EMPTY_FORM: TechFormState = {
   isActive: true,
 };
 
+// ─── Modal ────────────────────────────────────────────────────
+
 interface TechModalProps {
   title: string;
   form: TechFormState;
@@ -59,7 +77,7 @@ function TechModal({ title, form, isCreate, onChange, onSave, onClose, saving, e
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="relative bg-card border border-border rounded-xl shadow-2xl w-full max-w-md mx-4"
+        className="relative bg-card border border-border rounded-xl shadow-2xl w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto"
       >
         <div className="flex items-center justify-between p-5 border-b border-border">
           <h2 className="text-lg font-semibold flex items-center gap-2">
@@ -81,27 +99,63 @@ function TechModal({ title, form, isCreate, onChange, onSave, onClose, saving, e
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5 col-span-2">
               <Label>Full Name <span className="text-destructive">*</span></Label>
-              <Input value={form.fullName} onChange={e => onChange({ fullName: e.target.value })} placeholder="e.g. Jean Paul Nkurunziza" />
+              <Input
+                value={form.fullName}
+                onChange={e => onChange({ fullName: e.target.value })}
+                placeholder="e.g. Jean Paul Nkurunziza"
+              />
             </div>
+
             <div className="space-y-1.5">
               <Label>Employee Code <span className="text-destructive">*</span></Label>
-              <Input value={form.employeeCode} onChange={e => onChange({ employeeCode: e.target.value })} placeholder="e.g. TEC-001" className="font-mono" />
+              <Input
+                value={form.employeeCode}
+                onChange={e => onChange({ employeeCode: e.target.value })}
+                placeholder="e.g. TEC-005"
+                className="font-mono"
+              />
             </div>
+
             <div className="space-y-1.5">
               <Label>Phone</Label>
-              <Input value={form.phone} onChange={e => onChange({ phone: e.target.value })} placeholder="+250 7XX XXX XXX" />
+              <Input
+                value={form.phone}
+                onChange={e => onChange({ phone: e.target.value })}
+                placeholder="+250 7XX XXX XXX"
+              />
             </div>
+
             <div className="space-y-1.5 col-span-2">
               <Label>Email</Label>
-              <Input type="email" value={form.email} onChange={e => onChange({ email: e.target.value })} placeholder="tech@rwandamotor.com" />
+              <Input
+                type="email"
+                value={form.email}
+                onChange={e => onChange({ email: e.target.value })}
+                placeholder="tech@rwandamotor.com"
+              />
             </div>
-            <div className="space-y-1.5">
+
+            <div className="space-y-1.5 col-span-2">
               <Label>Specialization</Label>
-              <Input value={form.specialization} onChange={e => onChange({ specialization: e.target.value })} placeholder="e.g. Engine Repair" />
+              <select
+                value={form.specialization}
+                onChange={e => onChange({ specialization: e.target.value })}
+                className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                <option value="">— Select specialization —</option>
+                {SPECIALIZATIONS.map(s => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
             </div>
-            <div className="space-y-1.5">
+
+            <div className="space-y-1.5 col-span-2">
               <Label>Certification Level</Label>
-              <Input value={form.certificationLevel} onChange={e => onChange({ certificationLevel: e.target.value })} placeholder="e.g. Level 3" />
+              <Input
+                value={form.certificationLevel}
+                onChange={e => onChange({ certificationLevel: e.target.value })}
+                placeholder="e.g. Level 3"
+              />
             </div>
           </div>
 
@@ -134,6 +188,52 @@ function TechModal({ title, form, isCreate, onChange, onSave, onClose, saving, e
   );
 }
 
+// ─── Delete Confirm Modal ─────────────────────────────────────
+
+function DeleteConfirmModal({
+  tech,
+  onConfirm,
+  onClose,
+  deleting,
+}: {
+  tech: TechnicianItem;
+  onConfirm: () => void;
+  onClose: () => void;
+  deleting: boolean;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="relative bg-card border border-border rounded-xl shadow-2xl w-full max-w-sm mx-4"
+      >
+        <div className="p-6 space-y-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-destructive/10 flex items-center justify-center shrink-0">
+              <AlertTriangle className="w-5 h-5 text-destructive" />
+            </div>
+            <div>
+              <h3 className="font-semibold">Delete Technician</h3>
+              <p className="text-sm text-muted-foreground">This action cannot be undone.</p>
+            </div>
+          </div>
+          <p className="text-sm">
+            Are you sure you want to delete <span className="font-medium">{tech.fullName}</span> ({tech.employeeCode})?
+          </p>
+          <div className="flex justify-end gap-3 pt-2">
+            <Button variant="outline" onClick={onClose} disabled={deleting}>Cancel</Button>
+            <Button variant="destructive" onClick={onConfirm} disabled={deleting}>
+              {deleting ? "Deleting..." : "Delete"}
+            </Button>
+          </div>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
 // ─── Page ─────────────────────────────────────────────────────
 
 export default function AdminTechniciansPage() {
@@ -141,12 +241,7 @@ export default function AdminTechniciansPage() {
   const router = useRouter();
   const qc = useQueryClient();
 
-  useEffect(() => {
-    if (user && user.role !== "Admin") router.replace("/dashboard");
-  }, [user, router]);
-
-  if (user?.role !== "Admin") return null;
-
+  // All hooks declared before any early return
   const [showCreate, setShowCreate] = useState(false);
   const [createForm, setCreateForm] = useState<TechFormState>(EMPTY_FORM);
   const [createError, setCreateError] = useState<string | null>(null);
@@ -155,9 +250,17 @@ export default function AdminTechniciansPage() {
   const [editForm, setEditForm] = useState<TechFormState>(EMPTY_FORM);
   const [editError, setEditError] = useState<string | null>(null);
 
+  const [deletingTech, setDeletingTech] = useState<TechnicianItem | null>(null);
+
+  const [showAll, setShowAll] = useState(false);
+
+  useEffect(() => {
+    if (user && user.role !== "Admin") router.replace("/dashboard");
+  }, [user, router]);
+
   const { data: technicians = [], isLoading } = useQuery({
-    queryKey: ["technicians", false],
-    queryFn: () => techniciansApi.list(false),
+    queryKey: ["technicians", showAll],
+    queryFn: () => techniciansApi.list(!showAll),
   });
 
   const createMutation = useMutation({
@@ -187,7 +290,17 @@ export default function AdminTechniciansPage() {
     },
   });
 
-  const openEdit = (t: TechnicianItem & { phone?: string | null; email?: string | null; certificationLevel?: string | null; isActive?: boolean }) => {
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => techniciansApi.delete(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["technicians"] });
+      setDeletingTech(null);
+    },
+  });
+
+  if (user?.role !== "Admin") return null;
+
+  const openEdit = (t: TechnicianItem) => {
     setEditingTech(t);
     setEditForm({
       fullName: t.fullName,
@@ -196,7 +309,7 @@ export default function AdminTechniciansPage() {
       email: t.email ?? "",
       specialization: t.specialization ?? "",
       certificationLevel: t.certificationLevel ?? "",
-      isActive: t.isActive ?? true,
+      isActive: t.isActive,
     });
     setEditError(null);
   };
@@ -236,16 +349,30 @@ export default function AdminTechniciansPage() {
           </h2>
           <p className="text-muted-foreground text-sm mt-0.5">Manage workshop technicians and their details</p>
         </div>
-        <Button
-          className="gradient-primary text-white gap-2"
-          onClick={() => { setCreateForm(EMPTY_FORM); setCreateError(null); setShowCreate(true); }}
-        >
-          <Plus className="w-4 h-4" />
-          New Technician
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowAll(v => !v)}
+          >
+            {showAll ? "Active only" : "Show all"}
+          </Button>
+          <Button
+            className="gradient-primary text-white gap-2"
+            onClick={() => { setCreateForm(EMPTY_FORM); setCreateError(null); setShowCreate(true); }}
+          >
+            <Plus className="w-4 h-4" />
+            New Technician
+          </Button>
+        </div>
       </motion.div>
 
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.1 }} className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.1 }}
+        className="rounded-xl border border-border bg-card shadow-sm overflow-hidden"
+      >
         {isLoading ? (
           <div className="p-4 space-y-3">{[...Array(6)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
         ) : (
@@ -255,6 +382,7 @@ export default function AdminTechniciansPage() {
                 <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Name</TableHead>
                 <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Code</TableHead>
                 <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Specialization</TableHead>
+                <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Phone</TableHead>
                 <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Status</TableHead>
                 <TableHead />
               </TableRow>
@@ -262,7 +390,7 @@ export default function AdminTechniciansPage() {
             <TableBody>
               {technicians.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="h-32 text-center">
+                  <TableCell colSpan={6} className="h-32 text-center">
                     <div className="flex flex-col items-center gap-2 text-muted-foreground">
                       <Wrench className="w-10 h-10 opacity-30" />
                       <p className="text-sm">No technicians found</p>
@@ -273,6 +401,7 @@ export default function AdminTechniciansPage() {
                 <TableRow key={t.id} className="border-border hover:bg-muted/30 transition-colors">
                   <TableCell className="py-3">
                     <p className="font-medium text-sm text-foreground">{t.fullName}</p>
+                    {t.email && <p className="text-xs text-muted-foreground">{t.email}</p>}
                   </TableCell>
                   <TableCell className="py-3">
                     <span className="font-mono text-xs text-muted-foreground">{t.employeeCode}</span>
@@ -281,16 +410,33 @@ export default function AdminTechniciansPage() {
                     <span className="text-sm">{t.specialization ?? "—"}</span>
                   </TableCell>
                   <TableCell className="py-3">
-                    <Badge variant="secondary" className="text-xs">Active</Badge>
+                    <span className="text-sm text-muted-foreground">{t.phone ?? "—"}</span>
+                  </TableCell>
+                  <TableCell className="py-3">
+                    <Badge
+                      variant="secondary"
+                      className={`text-xs ${t.isActive ? "bg-green-500/10 text-green-600 dark:text-green-400" : "bg-muted text-muted-foreground"}`}
+                    >
+                      {t.isActive ? "Active" : "Inactive"}
+                    </Badge>
                   </TableCell>
                   <TableCell className="py-3 text-right">
-                    <button
-                      onClick={() => openEdit(t as Parameters<typeof openEdit>[0])}
-                      className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                      title="Edit technician"
-                    >
-                      <Pencil className="w-4 h-4" />
-                    </button>
+                    <div className="flex items-center justify-end gap-1">
+                      <button
+                        onClick={() => openEdit(t)}
+                        className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                        title="Edit technician"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => setDeletingTech(t)}
+                        className="p-1.5 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                        title="Delete technician"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -322,6 +468,15 @@ export default function AdminTechniciansPage() {
           onClose={() => setEditingTech(null)}
           saving={updateMutation.isPending}
           error={editError}
+        />
+      )}
+
+      {deletingTech && (
+        <DeleteConfirmModal
+          tech={deletingTech}
+          onConfirm={() => deleteMutation.mutate(deletingTech.id)}
+          onClose={() => setDeletingTech(null)}
+          deleting={deleteMutation.isPending}
         />
       )}
     </div>

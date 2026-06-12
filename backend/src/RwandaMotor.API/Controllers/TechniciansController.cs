@@ -41,4 +41,13 @@ public class TechniciansController : ControllerBase
         if (!result) return NotFound(ApiResponse<bool>.Fail("Technician not found"));
         return Ok(ApiResponse<bool>.Ok(true, "Technician updated"));
     }
+
+    [HttpDelete("{id:guid}")]
+    [Authorize(Policy = "Admin")]
+    public async Task<IActionResult> DeleteTechnician(Guid id)
+    {
+        var result = await _mediator.Send(new DeleteTechnicianCommand(id));
+        if (!result) return NotFound(ApiResponse<bool>.Fail("Technician not found"));
+        return Ok(ApiResponse<bool>.Ok(true, "Technician deleted"));
+    }
 }
