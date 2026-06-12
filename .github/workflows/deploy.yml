@@ -6,22 +6,12 @@ on:
   workflow_dispatch:
 
 jobs:
-  # ── Backend: build, publish, deploy to server ──────────────────────────────
+  # ── Backend: build & deploy (runs directly on the server) ─────────────────
   deploy-api:
     name: Deploy .NET API
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
       - uses: actions/checkout@v4
-
-      - name: Connect to Tailscale
-        uses: tailscale/github-action@v3
-        with:
-          authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
-
-      - name: Setup .NET 9
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '9.0.x'
 
       - name: Restore & publish
         run: |
@@ -30,28 +20,16 @@ jobs:
             -c Release \
             -r linux-x64 \
             --self-contained false \
-            -o backend/publish
+            -o /tmp/rwandamotor-publish
 
-      - name: Copy to server via SSH
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.SERVER_HOST }}
-          username: ${{ secrets.SERVER_USER }}
-          key: ${{ secrets.SERVER_SSH_KEY }}
-          source: "backend/publish/*"
-          target: "/opt/rwandamotor-api/"
-          strip_components: 2
-
-      - name: Restart service
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.SERVER_HOST }}
-          username: ${{ secrets.SERVER_USER }}
-          key: ${{ secrets.SERVER_SSH_KEY }}
-          script: |
-            sudo systemctl restart rwandamotor-api
-            sleep 3
-            sudo systemctl is-active rwandamotor-api
+      - name: Deploy to /opt/rwandamotor-api
+        run: |
+          sudo systemctl stop rwandamotor-api || true
+          sudo cp -r /tmp/rwandamotor-publish/. /opt/rwandamotor-api/
+          sudo chown -R rwandamotor:rwandamotor /opt/rwandamotor-api
+          sudo systemctl start rwandamotor-api
+          sleep 3
+          sudo systemctl is-active rwandamotor-api
 
   # ── Frontend: trigger Vercel redeploy ──────────────────────────────────────
   deploy-frontend:
