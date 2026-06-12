@@ -1,3 +1,6 @@
+// Fix Npgsql 6+ DateTime UTC requirement
+AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
+
 using System.Text;
 using FluentValidation;
 using MediatR;
