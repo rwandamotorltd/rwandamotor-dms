@@ -135,7 +135,7 @@ export default function LoginPage() {
         </Card>
 
         <p className="text-center text-xs text-muted-foreground mt-6">
-          © 2024 Rwandamotor — Enterprise DMS Platform
+          © {new Date().getFullYear()} Rwandamotor — Enterprise DMS Platform
         </p>
       </motion.div>
     </div>
