@@ -24,12 +24,12 @@ jobs:
 
       - name: Deploy to /opt/rwandamotor-api
         run: |
-          sudo systemctl stop rwandamotor-api || true
+          sudo /usr/bin/systemctl stop rwandamotor-api || true
           sudo cp -r /tmp/rwandamotor-publish/. /opt/rwandamotor-api/
           sudo chown -R rwandamotor:rwandamotor /opt/rwandamotor-api
-          sudo systemctl start rwandamotor-api
+          sudo /usr/bin/systemctl start rwandamotor-api
           sleep 3
-          sudo systemctl is-active rwandamotor-api
+          sudo /usr/bin/systemctl is-active rwandamotor-api
 
   # ── Frontend: trigger Vercel redeploy ──────────────────────────────────────
   deploy-frontend:
