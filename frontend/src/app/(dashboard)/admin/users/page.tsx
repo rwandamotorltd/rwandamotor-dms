@@ -1,13 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
-import { Users, Plus, Pencil, X, ShieldCheck } from "lucide-react";
+import { Users, Plus, Pencil, X, ShieldCheck, KeyRound, Eye, EyeOff } from "lucide-react";
 import { adminApi, type CreateUserPayload, type UpdateUserPayload, type UserItem } from "@/lib/api";
 import { useAuth } from "@/contexts/auth-context";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -25,7 +24,7 @@ const ROLE_COLORS: Record<string, string> = {
   CRE:               "bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400",
 };
 
-// ─── Modal ────────────────────────────────────────────────────
+// ─── User Form Modal ───────────────────────────────────────────
 
 interface UserFormState {
   fullName: string;
@@ -35,13 +34,7 @@ interface UserFormState {
   isActive: boolean;
 }
 
-const EMPTY_FORM: UserFormState = {
-  fullName: "",
-  email: "",
-  password: "",
-  role: "CRE",
-  isActive: true,
-};
+const EMPTY_FORM: UserFormState = { fullName: "", email: "", password: "", role: "CRE", isActive: true };
 
 interface UserModalProps {
   title: string;
@@ -55,13 +48,15 @@ interface UserModalProps {
 }
 
 function UserModal({ title, form, isCreate, onChange, onSave, onClose, saving, error }: UserModalProps) {
+  const [showPwd, setShowPwd] = useState(false);
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="relative bg-card border border-border rounded-xl shadow-2xl w-full max-w-md mx-4"
+        className="relative bg-card border border-border rounded-xl shadow-2xl w-full max-w-md"
       >
         <div className="flex items-center justify-between p-5 border-b border-border">
           <h2 className="text-lg font-semibold flex items-center gap-2">
@@ -103,12 +98,22 @@ function UserModal({ title, form, isCreate, onChange, onSave, onClose, saving, e
           {isCreate && (
             <div className="space-y-1.5">
               <Label>Password <span className="text-destructive">*</span></Label>
-              <Input
-                type="password"
-                value={form.password}
-                onChange={e => onChange({ password: e.target.value })}
-                placeholder="Min. 8 characters"
-              />
+              <div className="relative">
+                <Input
+                  type={showPwd ? "text" : "password"}
+                  value={form.password}
+                  onChange={e => onChange({ password: e.target.value })}
+                  placeholder="Min. 8 characters"
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPwd(v => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {showPwd ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
             </div>
           )}
 
@@ -151,6 +156,101 @@ function UserModal({ title, form, isCreate, onChange, onSave, onClose, saving, e
   );
 }
 
+// ─── Reset Password Modal ──────────────────────────────────────
+
+interface ResetPwdModalProps {
+  user: UserItem;
+  onClose: () => void;
+  onSave: (newPassword: string) => void;
+  saving: boolean;
+  error?: string | null;
+}
+
+function ResetPasswordModal({ user, onClose, onSave, saving, error }: ResetPwdModalProps) {
+  const [pwd, setPwd] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [showPwd, setShowPwd] = useState(false);
+
+  const mismatch = confirm.length > 0 && pwd !== confirm;
+  const valid = pwd.length >= 8 && pwd === confirm;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="relative bg-card border border-border rounded-xl shadow-2xl w-full max-w-sm"
+      >
+        <div className="flex items-center justify-between p-5 border-b border-border">
+          <h2 className="text-lg font-semibold flex items-center gap-2">
+            <KeyRound className="w-4 h-4 text-muted-foreground" />
+            Reset Password
+          </h2>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground transition-colors">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="p-5 space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Set a new password for <span className="font-medium text-foreground">{user.fullName}</span>
+          </p>
+
+          {error && (
+            <div className="rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm px-3 py-2">
+              {error}
+            </div>
+          )}
+
+          <div className="space-y-1.5">
+            <Label>New Password <span className="text-destructive">*</span></Label>
+            <div className="relative">
+              <Input
+                type={showPwd ? "text" : "password"}
+                value={pwd}
+                onChange={e => setPwd(e.target.value)}
+                placeholder="Min. 8 characters"
+                className="pr-10"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPwd(v => !v)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+              >
+                {showPwd ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Confirm Password <span className="text-destructive">*</span></Label>
+            <Input
+              type={showPwd ? "text" : "password"}
+              value={confirm}
+              onChange={e => setConfirm(e.target.value)}
+              placeholder="Re-enter password"
+              className={mismatch ? "border-destructive" : ""}
+            />
+            {mismatch && <p className="text-xs text-destructive">Passwords do not match</p>}
+          </div>
+        </div>
+
+        <div className="flex items-center justify-end gap-3 p-5 border-t border-border">
+          <Button variant="outline" onClick={onClose} disabled={saving}>Cancel</Button>
+          <Button
+            onClick={() => onSave(pwd)}
+            disabled={saving || !valid}
+            className="gradient-primary text-white"
+          >
+            {saving ? "Resetting..." : "Reset Password"}
+          </Button>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
 // ─── Page ─────────────────────────────────────────────────────
 
 export default function AdminUsersPage() {
@@ -158,12 +258,7 @@ export default function AdminUsersPage() {
   const router = useRouter();
   const qc = useQueryClient();
 
-  useEffect(() => {
-    if (user && user.role !== "Admin") router.replace("/dashboard");
-  }, [user, router]);
-
-  if (user?.role !== "Admin") return null;
-
+  // All hooks declared before any early return (React rules)
   const [showCreate, setShowCreate] = useState(false);
   const [createForm, setCreateForm] = useState<UserFormState>(EMPTY_FORM);
   const [createError, setCreateError] = useState<string | null>(null);
@@ -172,9 +267,17 @@ export default function AdminUsersPage() {
   const [editForm, setEditForm] = useState<UserFormState>(EMPTY_FORM);
   const [editError, setEditError] = useState<string | null>(null);
 
+  const [resetUser, setResetUser] = useState<UserItem | null>(null);
+  const [resetError, setResetError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (user && user.role !== "Admin") router.replace("/dashboard");
+  }, [user, router]);
+
   const { data: users = [], isLoading } = useQuery({
     queryKey: ["admin-users"],
     queryFn: () => adminApi.getUsers(),
+    enabled: user?.role === "Admin",
   });
 
   const createMutation = useMutation({
@@ -205,6 +308,22 @@ export default function AdminUsersPage() {
       setEditError(msg ?? "Failed to update user");
     },
   });
+
+  const resetMutation = useMutation({
+    mutationFn: ({ userId, newPassword }: { userId: string; newPassword: string }) =>
+      adminApi.resetPassword(userId, newPassword),
+    onSuccess: (res) => {
+      if (!res.success) { setResetError(res.message ?? "Failed to reset password"); return; }
+      setResetUser(null);
+      setResetError(null);
+    },
+    onError: (err: unknown) => {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      setResetError(msg ?? "Failed to reset password");
+    },
+  });
+
+  if (user?.role !== "Admin") return null;
 
   const openEdit = (u: UserItem) => {
     setEditingUser(u);
@@ -239,14 +358,14 @@ export default function AdminUsersPage() {
             <ShieldCheck className="w-5 h-5 text-primary" />
             User Management
           </h2>
-          <p className="text-muted-foreground text-sm mt-0.5">Manage system users and their roles</p>
+          <p className="text-muted-foreground text-sm mt-0.5">Manage system users, roles and access</p>
         </div>
         <Button
           className="gradient-primary text-white gap-2"
           onClick={() => { setCreateForm(EMPTY_FORM); setCreateError(null); setShowCreate(true); }}
         >
           <Plus className="w-4 h-4" />
-          New User
+          <span className="hidden sm:inline">New User</span>
         </Button>
       </motion.div>
 
@@ -254,57 +373,69 @@ export default function AdminUsersPage() {
         {isLoading ? (
           <div className="p-4 space-y-3">{[...Array(5)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow className="border-border hover:bg-transparent">
-                <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">User</TableHead>
-                <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Email</TableHead>
-                <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Role</TableHead>
-                <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Status</TableHead>
-                <TableHead />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {users.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={5} className="h-32 text-center">
-                    <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                      <Users className="w-10 h-10 opacity-30" />
-                      <p className="text-sm">No users found</p>
-                    </div>
-                  </TableCell>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="border-border hover:bg-transparent">
+                  <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">User</TableHead>
+                  <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden sm:table-cell">Email</TableHead>
+                  <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Role</TableHead>
+                  <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden sm:table-cell">Status</TableHead>
+                  <TableHead />
                 </TableRow>
-              ) : users.map((u) => (
-                <TableRow key={u.id} className="border-border hover:bg-muted/30 transition-colors">
-                  <TableCell className="py-3">
-                    <p className="font-medium text-sm text-foreground">{u.fullName}</p>
-                  </TableCell>
-                  <TableCell className="py-3">
-                    <p className="text-sm text-muted-foreground">{u.email}</p>
-                  </TableCell>
-                  <TableCell className="py-3">
-                    <span className={"inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium " + (ROLE_COLORS[u.role] ?? "bg-muted text-muted-foreground")}>
-                      {u.role}
-                    </span>
-                  </TableCell>
-                  <TableCell className="py-3">
-                    <Badge variant={u.isActive ? "secondary" : "outline"} className="text-xs">
-                      {u.isActive ? "Active" : "Inactive"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="py-3 text-right">
-                    <button
-                      onClick={() => openEdit(u)}
-                      className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                      title="Edit user"
-                    >
-                      <Pencil className="w-4 h-4" />
-                    </button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {users.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="h-32 text-center">
+                      <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                        <Users className="w-10 h-10 opacity-30" />
+                        <p className="text-sm">No users found</p>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : users.map((u) => (
+                  <TableRow key={u.id} className="border-border hover:bg-muted/30 transition-colors">
+                    <TableCell className="py-3">
+                      <p className="font-medium text-sm text-foreground">{u.fullName}</p>
+                      <p className="text-xs text-muted-foreground sm:hidden">{u.email}</p>
+                    </TableCell>
+                    <TableCell className="py-3 hidden sm:table-cell">
+                      <p className="text-sm text-muted-foreground">{u.email}</p>
+                    </TableCell>
+                    <TableCell className="py-3">
+                      <span className={"inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium " + (ROLE_COLORS[u.role] ?? "bg-muted text-muted-foreground")}>
+                        {u.role}
+                      </span>
+                    </TableCell>
+                    <TableCell className="py-3 hidden sm:table-cell">
+                      <Badge variant={u.isActive ? "secondary" : "outline"} className="text-xs">
+                        {u.isActive ? "Active" : "Inactive"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="py-3 text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        <button
+                          onClick={() => { setResetUser(u); setResetError(null); }}
+                          className="p-1.5 rounded-md text-muted-foreground hover:text-amber-500 hover:bg-amber-500/10 transition-colors"
+                          title="Reset password"
+                        >
+                          <KeyRound className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => openEdit(u)}
+                          className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                          title="Edit user"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         )}
       </motion.div>
 
@@ -331,6 +462,16 @@ export default function AdminUsersPage() {
           onClose={() => setEditingUser(null)}
           saving={updateMutation.isPending}
           error={editError}
+        />
+      )}
+
+      {resetUser && (
+        <ResetPasswordModal
+          user={resetUser}
+          onClose={() => setResetUser(null)}
+          onSave={(newPassword) => resetMutation.mutate({ userId: resetUser.id, newPassword })}
+          saving={resetMutation.isPending}
+          error={resetError}
         />
       )}
     </div>

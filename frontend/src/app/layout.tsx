@@ -9,8 +9,8 @@ const geistSans = Geist({ variable: "--font-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: { default: "Rwandamotor DMS", template: "%s | Rwandamotor DMS" },
-  description: "Retention & Service Intelligence Platform — Rwanda Multi-Brand Automotive DMS",
+  title: { default: "Rwandamotor - CSSR", template: "%s | Rwandamotor CSSR" },
+  description: "Customer Service & Sales Retention Platform — Rwanda Multi-Brand Automotive DMS",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

@@ -1,6 +1,7 @@
 using MediatR;
 using Microsoft.AspNetCore.Identity;
 using RwandaMotor.Domain.Entities;
+using FluentValidation;
 
 namespace RwandaMotor.Application.Features.Admin.Commands;
 
@@ -86,6 +87,43 @@ public class UpdateUserCommandHandler : IRequestHandler<UpdateUserCommand, (bool
             return (false, $"Role '{cmd.Role}' does not exist.");
 
         await _users.AddToRoleAsync(user, cmd.Role);
+        return (true, null);
+    }
+}
+
+// ── Reset Password ───────────────────────────────────────────────────────────
+
+public record ResetPasswordCommand(
+    string UserId,
+    string NewPassword
+) : IRequest<(bool Success, string? Error)>;
+
+public class ResetPasswordCommandValidator : AbstractValidator<ResetPasswordCommand>
+{
+    public ResetPasswordCommandValidator()
+    {
+        RuleFor(x => x.UserId).NotEmpty();
+        RuleFor(x => x.NewPassword).NotEmpty().MinimumLength(8);
+    }
+}
+
+public class ResetPasswordCommandHandler : IRequestHandler<ResetPasswordCommand, (bool Success, string? Error)>
+{
+    private readonly UserManager<ApplicationUser> _users;
+
+    public ResetPasswordCommandHandler(UserManager<ApplicationUser> users) => _users = users;
+
+    public async Task<(bool Success, string? Error)> Handle(ResetPasswordCommand cmd, CancellationToken ct)
+    {
+        var user = await _users.FindByIdAsync(cmd.UserId);
+        if (user == null) return (false, "User not found.");
+
+        var token = await _users.GeneratePasswordResetTokenAsync(user);
+        var result = await _users.ResetPasswordAsync(user, token, cmd.NewPassword);
+
+        if (!result.Succeeded)
+            return (false, string.Join("; ", result.Errors.Select(e => e.Description)));
+
         return (true, null);
     }
 }

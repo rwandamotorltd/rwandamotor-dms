@@ -323,6 +323,9 @@ export const adminApi = {
 
   updateUser: (payload: UpdateUserPayload) =>
     api.put<ApiResponse<boolean>>('/admin/users/' + payload.userId, payload).then(r => r.data),
+
+  resetPassword: (userId: string, newPassword: string) =>
+    api.post<ApiResponse<boolean>>('/admin/users/' + userId + '/reset-password', { newPassword }).then(r => r.data),
 };
 
 // ============================================================

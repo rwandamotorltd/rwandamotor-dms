@@ -6,7 +6,7 @@ import { motion } from "framer-motion";
 import {
   LayoutDashboard, Car, Users, Wrench, TrendingUp,
   Upload, Settings, LogOut, Shield, ChevronLeft, ChevronRight,
-  UserCog, Activity
+  UserCog, Activity, X
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/auth-context";
@@ -36,9 +36,11 @@ const BOTTOM_ITEMS = [
 interface SidebarProps {
   collapsed: boolean;
   onToggle: () => void;
+  mobileOpen?: boolean;
+  onMobileClose?: () => void;
 }
 
-export function Sidebar({ collapsed, onToggle }: SidebarProps) {
+export function Sidebar({ collapsed, onToggle, mobileOpen = false, onMobileClose }: SidebarProps) {
   const pathname = usePathname();
   const { user, logout } = useAuth();
 
@@ -55,7 +57,12 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
       <motion.aside
         animate={{ width: collapsed ? 72 : 256 }}
         transition={{ duration: 0.2, ease: "easeInOut" }}
-        className="relative flex flex-col h-screen bg-sidebar border-r border-sidebar-border shrink-0 overflow-hidden"
+        className={cn(
+          "relative flex flex-col h-screen bg-sidebar border-r border-sidebar-border shrink-0 overflow-hidden",
+          // On mobile: hidden by default, shown as overlay when mobileOpen
+          "hidden md:flex",
+          mobileOpen && "!flex fixed inset-y-0 left-0 z-30"
+        )}
       >
         {/* Logo */}
         <div className={cn(
@@ -66,10 +73,19 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
             <Shield className="w-5 h-5 text-white" />
           </div>
           {!collapsed && (
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.1 }}>
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.1 }} className="flex-1">
               <p className="text-sm font-semibold text-sidebar-foreground leading-none">Rwandamotor</p>
-              <p className="text-xs text-sidebar-foreground/50 leading-none mt-0.5">DMS Platform</p>
+              <p className="text-xs text-sidebar-foreground/50 leading-none mt-0.5">CSSR Platform</p>
             </motion.div>
+          )}
+          {/* Close button on mobile */}
+          {mobileOpen && !collapsed && (
+            <button
+              onClick={onMobileClose}
+              className="md:hidden ml-auto p-1 rounded-md text-sidebar-foreground/50 hover:text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
           )}
         </div>
 

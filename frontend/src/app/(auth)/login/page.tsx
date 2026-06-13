@@ -51,7 +51,7 @@ export default function LoginPage() {
             <Shield className="w-8 h-8 text-white" />
           </div>
           <div className="text-center">
-            <h1 className="text-2xl font-bold text-foreground">Rwandamotor DMS</h1>
+            <h1 className="text-2xl font-bold text-foreground">Rwandamotor - CSSR</h1>
             <p className="text-sm text-muted-foreground mt-1">Retention & Service Intelligence Platform</p>
           </div>
         </div>
@@ -112,30 +112,11 @@ export default function LoginPage() {
               </Button>
             </form>
 
-            <div className="mt-6 pt-4 border-t border-border">
-              <p className="text-xs text-muted-foreground text-center mb-2">Demo credentials</p>
-              <div className="grid grid-cols-3 gap-2">
-                {[
-                  { role: "Admin", email: "admin@rwandamotor.com", pwd: "Admin@123!" },
-                  { role: "Director", email: "director@rwandamotor.com", pwd: "Director@123!" },
-                  { role: "CRM", email: "crm@rwandamotor.com", pwd: "Crm@123!" },
-                ].map(d => (
-                  <button
-                    key={d.role}
-                    type="button"
-                    onClick={() => { setEmail(d.email); setPassword(d.pwd); }}
-                    className="text-[11px] bg-muted hover:bg-muted/80 rounded-md px-2 py-1.5 text-center transition-colors"
-                  >
-                    <span className="block font-medium text-foreground">{d.role}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
           </CardContent>
         </Card>
 
         <p className="text-center text-xs text-muted-foreground mt-6">
-          © {new Date().getFullYear()} Rwandamotor — Enterprise DMS Platform
+          © {new Date().getFullYear()} Rwandamotor - CSSR
         </p>
       </motion.div>
     </div>

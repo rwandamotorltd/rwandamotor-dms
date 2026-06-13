@@ -40,4 +40,14 @@ public class AdminController : ControllerBase
         if (!success) return BadRequest(ApiResponse<bool>.Fail(error ?? "Failed to update user"));
         return Ok(ApiResponse<bool>.Ok(true, "User updated successfully"));
     }
+
+    [HttpPost("users/{id}/reset-password")]
+    public async Task<IActionResult> ResetPassword(string id, [FromBody] ResetPasswordRequest body)
+    {
+        var (success, error) = await _mediator.Send(new ResetPasswordCommand(id, body.NewPassword));
+        if (!success) return BadRequest(ApiResponse<bool>.Fail(error ?? "Failed to reset password"));
+        return Ok(ApiResponse<bool>.Ok(true, "Password reset successfully"));
+    }
 }
+
+public record ResetPasswordRequest(string NewPassword);
