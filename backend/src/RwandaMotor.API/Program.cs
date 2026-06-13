@@ -77,7 +77,14 @@ var allowedOrigins = builder.Configuration.GetSection("AllowedOrigins").Get<stri
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("DmsPolicy", policy =>
-        policy.WithOrigins(allowedOrigins)
+        policy.SetIsOriginAllowed(origin =>
+        {
+            if (allowedOrigins.Contains(origin)) return true;
+            // Allow all Vercel preview deployments automatically
+            if (Uri.TryCreate(origin, UriKind.Absolute, out var uri) &&
+                uri.Host.EndsWith(".vercel.app", StringComparison.OrdinalIgnoreCase)) return true;
+            return false;
+        })
               .AllowAnyHeader()
               .AllowAnyMethod()
               .AllowCredentials());
@@ -140,17 +147,4 @@ if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI(c =>
-    {
-        c.SwaggerEndpoint("/swagger/v1/swagger.json", "RwandaMotor DMS API v1");
-        c.RoutePrefix = "swagger";
-    });
-}
-
-app.UseSerilogRequestLogging();
-app.UseMiddleware<RwandaMotor.API.Middleware.ExceptionHandlingMiddleware>();
-app.UseCors("DmsPolicy");
-app.UseAuthentication();
-app.UseAuthorization();
-app.MapControllers();
-
-app.Run();
+    
