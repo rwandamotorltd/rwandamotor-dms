@@ -13,8 +13,6 @@ import { useAuth } from "@/contexts/auth-context";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { useState } from "react";
-
 // roles: null = all roles can see it; string[] = only those roles
 const NAV_ITEMS = [
   { href: "/dashboard",          label: "Dashboard",         icon: LayoutDashboard, badge: null,  roles: null },

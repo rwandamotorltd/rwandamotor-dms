@@ -16,11 +16,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     if (!isLoading && !user) router.replace("/login");
   }, [user, isLoading, router]);
 
-  // Close mobile sidebar on route change
-  useEffect(() => {
-    setMobileOpen(false);
-  }, []);
-
   if (isLoading) {
     return (
       <div className="flex h-screen items-center justify-center bg-background">

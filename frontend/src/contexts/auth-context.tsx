@@ -25,9 +25,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const token = localStorage.getItem("access_token");
       if (stored && token) {
         const parsed: AuthUser = JSON.parse(stored);
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setUser(parsed);
       }
     } catch { /* ignore */ }
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsLoading(false);
   }, []);
 
