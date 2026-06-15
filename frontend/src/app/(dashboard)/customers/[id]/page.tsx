@@ -6,7 +6,7 @@ import { motion } from "framer-motion";
 import Link from "next/link";
 import {
   ArrowLeft, User, Car, Wrench, Calendar, Phone, Mail, MapPin,
-  Building2, DollarSign, Hash, CheckCircle2
+  Building2, DollarSign, Hash, CheckCircle2, FileText, Gauge
 } from "lucide-react";
 import { customersApi } from "@/lib/api";
 import { useAuth } from "@/contexts/auth-context";
@@ -19,6 +19,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const CATEGORY_COLORS: Record<string, string> = {
   Retail:     "bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-400",
@@ -83,7 +84,7 @@ export default function Customer360Page({ params }: { params: Promise<{ id: stri
       {/* KPI Strip */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <KpiCard title="Vehicles" value={customer.vehicles.length} icon={Car} variant="info" index={0} />
-        <KpiCard title="Service Records" value={customer.serviceHistory.length} icon={Wrench} variant="default" index={1} />
+        <KpiCard title="Job Cards" value={customer.jobCards.length} icon={FileText} variant="default" index={1} />
         <KpiCard title="Total Spent" value={formatCurrency(totalRevenue)} icon={DollarSign} variant="success" index={2} />
         <KpiCard
           title="Member Since"
@@ -166,90 +167,158 @@ export default function Customer360Page({ params }: { params: Promise<{ id: stri
           </Card>
         </div>
 
-        {/* Right column: Service History */}
+        {/* Right column: Tabs */}
         <div className="lg:col-span-2">
-          <Card className="h-full">
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <Wrench className="w-4 h-4 text-muted-foreground" /> Service History
-                </CardTitle>
-                <span className="text-xs text-muted-foreground">{customer.serviceHistory.length} records</span>
-              </div>
-            </CardHeader>
-            <CardContent className="p-0">
-              {customer.serviceHistory.length === 0 ? (
+          <Tabs defaultValue="jobcards">
+            <TabsList className="mb-4">
+              <TabsTrigger value="jobcards">Job Cards ({customer.jobCards.length})</TabsTrigger>
+              <TabsTrigger value="history">Service Records ({customer.serviceHistory.length})</TabsTrigger>
+            </TabsList>
+
+            {/* Job Cards Tab */}
+            <TabsContent value="jobcards" className="space-y-3">
+              {customer.jobCards.length === 0 ? (
                 <div className="flex flex-col items-center gap-3 py-16 text-muted-foreground">
-                  <Wrench className="w-12 h-12 opacity-25" />
-                  <p className="text-sm">No service history</p>
+                  <FileText className="w-12 h-12 opacity-25" />
+                  <p className="text-sm">No job cards yet</p>
                 </div>
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-border bg-muted/30">
-                        <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Date</th>
-                        <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Vehicle</th>
-                        <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Service</th>
-                        <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Technician</th>
-                        <th className="text-right px-4 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Cost</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {customer.serviceHistory.map((s, idx) => (
-                        <motion.tr
-                          key={s.id}
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          transition={{ delay: idx * 0.02 }}
-                          className="border-b border-border/50 hover:bg-muted/20 transition-colors"
-                        >
-                          <td className="px-4 py-3 whitespace-nowrap">
-                            <p className="font-medium text-sm">{formatDate(s.serviceDate)}</p>
-                            <p className="text-xs text-muted-foreground">{formatMileage(s.mileageAtService)}</p>
-                          </td>
-                          <td className="px-4 py-3">
-                            <p className="font-medium text-sm">{s.vehicleLabel}</p>
-                            {s.plateNumber && <p className="text-xs font-semibold text-primary">{s.plateNumber}</p>}
-                          </td>
-                          <td className="px-4 py-3">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <Badge variant={s.isWarrantyJob ? "outline" : "secondary"} className="text-xs">
-                                {SERVICE_TYPE_LABELS[s.serviceType] ?? s.serviceType}
-                              </Badge>
-                              {s.isWarrantyJob && (
-                                <span className="text-[10px] text-violet-600 dark:text-violet-400 font-medium">Warranty</span>
-                              )}
-                            </div>
-                            {s.invoiceNumber && (
-                              <p className="font-mono text-xs text-muted-foreground mt-1">{s.invoiceNumber}</p>
-                            )}
-                          </td>
-                          <td className="px-4 py-3">
-                            {s.technicianName ? (
-                              <div className="flex items-center gap-2">
-                                <Avatar className="w-6 h-6">
-                                  <AvatarFallback className="text-[10px] gradient-primary text-white">
-                                    {s.technicianName.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2)}
-                                  </AvatarFallback>
-                                </Avatar>
-                                <span className="text-sm">{s.technicianName}</span>
+                customer.jobCards.map((jc, idx) => (
+                  <motion.div key={jc.id} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: idx * 0.04 }}>
+                    <Link href={"/job-cards/" + jc.id}>
+                      <Card className="hover:shadow-md transition-shadow cursor-pointer hover:border-primary/50">
+                        <CardContent className="pt-4 pb-3">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex items-start gap-3">
+                              <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${jc.status === "Open" ? "bg-amber-100 dark:bg-amber-900/30" : "bg-emerald-100 dark:bg-emerald-900/30"}`}>
+                                <FileText className={`w-4 h-4 ${jc.status === "Open" ? "text-amber-600 dark:text-amber-400" : "text-emerald-600 dark:text-emerald-400"}`} />
                               </div>
-                            ) : (
-                              <span className="text-muted-foreground text-sm">—</span>
+                              <div>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="font-mono font-semibold text-sm text-primary">{jc.jobCardNumber}</span>
+                                  <Badge variant={jc.status === "Open" ? "outline" : "secondary"} className={`text-[10px] py-0 px-1.5 h-4 ${jc.status === "Open" ? "border-amber-400 text-amber-600 dark:text-amber-400" : "text-emerald-700 dark:text-emerald-400"}`}>
+                                    {jc.status}
+                                  </Badge>
+                                  <Badge variant="outline" className="text-[10px] py-0 px-1.5 h-4">
+                                    {SERVICE_TYPE_LABELS[jc.serviceType] ?? jc.serviceType}
+                                  </Badge>
+                                </div>
+                                <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground flex-wrap">
+                                  <span className="flex items-center gap-1">
+                                    <Calendar className="w-3 h-3" /> {formatDate(jc.createdAt)}
+                                  </span>
+                                  <span className="flex items-center gap-1">
+                                    <Gauge className="w-3 h-3" /> {formatMileage(jc.mileage)}
+                                  </span>
+                                  {jc.vin && <span className="font-mono">{jc.vin}</span>}
+                                  {jc.plateNumber && <span className="font-semibold text-primary">{jc.plateNumber}</span>}
+                                  {jc.technicianName && (
+                                    <span className="flex items-center gap-1">
+                                      <User className="w-3 h-3" /> {jc.technicianName}
+                                    </span>
+                                  )}
+                                </div>
+                                {jc.deliveryNoteNumber && (
+                                  <p className="text-xs font-mono text-muted-foreground mt-0.5">DN: {jc.deliveryNoteNumber}</p>
+                                )}
+                                {jc.notes && (
+                                  <p className="text-xs text-foreground/70 mt-1">{jc.notes}</p>
+                                )}
+                              </div>
+                            </div>
+                            {jc.closedAt && (
+                              <div className="text-right text-xs text-muted-foreground shrink-0">
+                                <p>Closed</p>
+                                <p className="font-medium">{formatDate(jc.closedAt)}</p>
+                              </div>
                             )}
-                          </td>
-                          <td className="px-4 py-3 text-right">
-                            <span className="font-medium text-sm">{formatCurrency(s.totalCost)}</span>
-                          </td>
-                        </motion.tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </Link>
+                  </motion.div>
+                ))
               )}
-            </CardContent>
-          </Card>
+            </TabsContent>
+
+            {/* Service Records Tab */}
+            <TabsContent value="history">
+              <Card>
+                <CardContent className="p-0">
+                  {customer.serviceHistory.length === 0 ? (
+                    <div className="flex flex-col items-center gap-3 py-16 text-muted-foreground">
+                      <Wrench className="w-12 h-12 opacity-25" />
+                      <p className="text-sm">No service records yet</p>
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b border-border bg-muted/30">
+                            <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Date</th>
+                            <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Vehicle</th>
+                            <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Service</th>
+                            <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Technician</th>
+                            <th className="text-right px-4 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Cost</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {customer.serviceHistory.map((s, idx) => (
+                            <motion.tr
+                              key={s.id}
+                              initial={{ opacity: 0 }}
+                              animate={{ opacity: 1 }}
+                              transition={{ delay: idx * 0.02 }}
+                              className="border-b border-border/50 hover:bg-muted/20 transition-colors"
+                            >
+                              <td className="px-4 py-3 whitespace-nowrap">
+                                <p className="font-medium text-sm">{formatDate(s.serviceDate)}</p>
+                                <p className="text-xs text-muted-foreground">{formatMileage(s.mileageAtService)}</p>
+                              </td>
+                              <td className="px-4 py-3">
+                                <p className="font-medium text-sm">{s.vehicleLabel}</p>
+                                {s.plateNumber && <p className="text-xs font-semibold text-primary">{s.plateNumber}</p>}
+                              </td>
+                              <td className="px-4 py-3">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <Badge variant={s.isWarrantyJob ? "outline" : "secondary"} className="text-xs">
+                                    {SERVICE_TYPE_LABELS[s.serviceType] ?? s.serviceType}
+                                  </Badge>
+                                  {s.isWarrantyJob && (
+                                    <span className="text-[10px] text-violet-600 dark:text-violet-400 font-medium">Warranty</span>
+                                  )}
+                                </div>
+                                {s.invoiceNumber && (
+                                  <p className="font-mono text-xs text-muted-foreground mt-1">{s.invoiceNumber}</p>
+                                )}
+                              </td>
+                              <td className="px-4 py-3">
+                                {s.technicianName ? (
+                                  <div className="flex items-center gap-2">
+                                    <Avatar className="w-6 h-6">
+                                      <AvatarFallback className="text-[10px] gradient-primary text-white">
+                                        {s.technicianName.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2)}
+                                      </AvatarFallback>
+                                    </Avatar>
+                                    <span className="text-sm">{s.technicianName}</span>
+                                  </div>
+                                ) : (
+                                  <span className="text-muted-foreground text-sm">—</span>
+                                )}
+                              </td>
+                              <td className="px-4 py-3 text-right">
+                                <span className="font-medium text-sm">{formatCurrency(s.totalCost)}</span>
+                              </td>
+                            </motion.tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
         </div>
       </div>
     </div>

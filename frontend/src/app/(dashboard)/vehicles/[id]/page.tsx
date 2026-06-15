@@ -7,7 +7,7 @@ import Link from "next/link";
 import {
   ArrowLeft, Car, User, Wrench, Shield, TrendingUp, Clock,
   CheckCircle2, AlertTriangle, Calendar, Gauge, DollarSign,
-  MapPin, Phone, Mail, Star, Pencil, X
+  MapPin, Phone, Mail, Star, Pencil, X, FileText
 } from "lucide-react";
 import { vehiclesApi, servicePoliciesApi, type UpdateVehiclePayload } from "@/lib/api";
 import { useAuth } from "@/contexts/auth-context";
@@ -33,7 +33,7 @@ const FUEL_TYPES = ["Petrol", "Diesel", "Electric", "Hybrid", "Other"];
 const TRANSMISSIONS = ["Manual", "Automatic", "CVT", "AMT"];
 const RETENTION_STATUSES: RetentionStatus[] = ["Active", "DueSoon", "Overdue", "Lost", "Recovered", "External"];
 
-// ─── Edit Modal ───────────────────────────────────────────────
+// ─── Edit Modal ───────────────────────────────────────────────────
 
 interface EditFormState {
   plateNumber: string;
@@ -251,7 +251,7 @@ function EditVehicleModal({ form, policies, onChange, onSave, onClose, saving, e
   );
 }
 
-// ─── Main Page ────────────────────────────────────────────────
+// ─── Main Page ──────────────────────────────────────────────────
 
 export default function Vehicle360Page({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -512,14 +512,76 @@ export default function Vehicle360Page({ params }: { params: Promise<{ id: strin
           )}
         </div>
 
-        {/* Right column: Tabs with timeline, follow-ups, technicians */}
+        {/* Right column: Tabs with job cards, timeline, follow-ups, technicians */}
         <div className="lg:col-span-2">
-          <Tabs defaultValue="timeline">
+          <Tabs defaultValue="jobcards">
             <TabsList className="mb-4">
-              <TabsTrigger value="timeline">Service Timeline</TabsTrigger>
+              <TabsTrigger value="jobcards">Job Cards ({vehicle.jobCards.length})</TabsTrigger>
+              <TabsTrigger value="timeline">Service Records</TabsTrigger>
               <TabsTrigger value="followups">Follow-ups</TabsTrigger>
               <TabsTrigger value="technicians">Technicians</TabsTrigger>
             </TabsList>
+
+            {/* Job Cards */}
+            <TabsContent value="jobcards" className="space-y-3">
+              {vehicle.jobCards.length === 0 ? (
+                <EmptyState icon={FileText} message="No job cards yet" />
+              ) : (
+                vehicle.jobCards.map((jc, idx) => (
+                  <motion.div key={jc.id} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: idx * 0.04 }}>
+                    <Link href={"/job-cards/" + jc.id}>
+                      <Card className="hover:shadow-md transition-shadow cursor-pointer hover:border-primary/50">
+                        <CardContent className="pt-4 pb-3">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex items-start gap-3">
+                              <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${jc.status === "Open" ? "bg-amber-100 dark:bg-amber-900/30" : "bg-emerald-100 dark:bg-emerald-900/30"}`}>
+                                <FileText className={`w-4 h-4 ${jc.status === "Open" ? "text-amber-600 dark:text-amber-400" : "text-emerald-600 dark:text-emerald-400"}`} />
+                              </div>
+                              <div>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="font-mono font-semibold text-sm text-primary">{jc.jobCardNumber}</span>
+                                  <Badge variant={jc.status === "Open" ? "outline" : "secondary"} className={`text-[10px] py-0 px-1.5 h-4 ${jc.status === "Open" ? "border-amber-400 text-amber-600 dark:text-amber-400" : "text-emerald-700 dark:text-emerald-400"}`}>
+                                    {jc.status}
+                                  </Badge>
+                                  <Badge variant="outline" className="text-[10px] py-0 px-1.5 h-4">
+                                    {SERVICE_TYPE_LABELS[jc.serviceType] ?? jc.serviceType}
+                                  </Badge>
+                                </div>
+                                <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground flex-wrap">
+                                  <span className="flex items-center gap-1">
+                                    <Calendar className="w-3 h-3" /> {formatDate(jc.createdAt)}
+                                  </span>
+                                  <span className="flex items-center gap-1">
+                                    <Gauge className="w-3 h-3" /> {formatMileage(jc.mileage)}
+                                  </span>
+                                  {jc.technicianName && (
+                                    <span className="flex items-center gap-1">
+                                      <User className="w-3 h-3" /> {jc.technicianName}
+                                    </span>
+                                  )}
+                                </div>
+                                {jc.deliveryNoteNumber && (
+                                  <p className="text-xs font-mono text-muted-foreground mt-0.5">DN: {jc.deliveryNoteNumber}</p>
+                                )}
+                                {jc.notes && (
+                                  <p className="text-xs text-foreground/70 mt-1">{jc.notes}</p>
+                                )}
+                              </div>
+                            </div>
+                            {jc.closedAt && (
+                              <div className="text-right text-xs text-muted-foreground shrink-0">
+                                <p>Closed</p>
+                                <p className="font-medium">{formatDate(jc.closedAt)}</p>
+                              </div>
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </Link>
+                  </motion.div>
+                ))
+              )}
+            </TabsContent>
 
             {/* Service Timeline */}
             <TabsContent value="timeline" className="space-y-3">

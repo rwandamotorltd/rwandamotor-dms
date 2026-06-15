@@ -220,6 +220,22 @@ export interface Vehicle360Kpis {
   lastServiceDaysAgo: number | null;
 }
 
+export interface JobCard360Item {
+  id: string;
+  jobCardNumber: string;
+  vin: string | null;
+  plateNumber: string | null;
+  serviceType: ServiceType;
+  status: JobCardStatus;
+  mileage: number;
+  technicianId: string | null;
+  technicianName: string | null;
+  createdAt: string;
+  closedAt: string | null;
+  deliveryNoteNumber: string | null;
+  notes: string | null;
+}
+
 export interface Vehicle360 {
   id: string;
   vin: string;
@@ -254,6 +270,7 @@ export interface Vehicle360 {
   followUpHistory: FollowUpHistory[];
   technicianHistory: TechnicianHistory[];
   kpis: Vehicle360Kpis;
+  jobCards: JobCard360Item[];
 }
 
 // ============================================================
@@ -300,6 +317,7 @@ export interface Customer360 {
   createdAt: string;
   vehicles: CustomerVehicleSummary[];
   serviceHistory: CustomerServiceHistoryItem[];
+  jobCards: JobCard360Item[];
 }
 
 export interface CustomerListItem {
