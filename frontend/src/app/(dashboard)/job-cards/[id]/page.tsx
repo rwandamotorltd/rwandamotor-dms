@@ -206,6 +206,30 @@ function useJobCard(id: string) {
   });
 }
 
+// ─── Print helper ─────────────────────────────────────────────────────────────
+
+function printJobCard(jobCardNumber: string) {
+  const el = document.getElementById("job-card-print");
+  if (!el) return;
+  const w = window.open("", "_blank");
+  if (!w) return;
+  w.document.write(`<!DOCTYPE html>
+<html>
+<head>
+  <title>${jobCardNumber}</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 16px; font-family: Arial, sans-serif; font-size: 12px; }
+    @page { margin: 1cm; size: A4 portrait; }
+  </style>
+</head>
+<body>${el.innerHTML}</body>
+</html>`);
+  w.document.close();
+  w.focus();
+  setTimeout(() => { w.print(); w.close(); }, 300);
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function JobCardDetailPage() {
@@ -220,7 +244,7 @@ export default function JobCardDetailPage() {
   // Auto-print if ?print=1
   useEffect(() => {
     if (searchParams.get("print") === "1" && data) {
-      setTimeout(() => window.print(), 300);
+      setTimeout(() => printJobCard(data.jobCardNumber), 400);
     }
   }, [searchParams, data]);
 
@@ -245,17 +269,14 @@ export default function JobCardDetailPage() {
 
   return (
     <>
-      {/* Print stylesheet */}
-      <style>{`
-        @media print {
-          body > * { display: none !important; }
-          #job-card-print { display: block !important; }
-        }
-        #job-card-print { display: none; }
-      `}</style>
-
-      {/* Hidden print output */}
-      <div ref={printRef}><PrintView data={data} /></div>
+      {/* Off-screen print template — rendered to DOM so we can extract innerHTML */}
+      <div
+        ref={printRef}
+        aria-hidden="true"
+        style={{ position: "absolute", left: -9999, top: 0, width: 750, pointerEvents: "none" }}
+      >
+        <PrintView data={data} />
+      </div>
 
       {/* Screen view */}
       <div className="flex flex-col gap-6 p-6 max-w-4xl mx-auto">
@@ -275,7 +296,7 @@ export default function JobCardDetailPage() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={() => window.print()}>
+            <Button variant="outline" size="sm" onClick={() => printJobCard(data.jobCardNumber)}>
               <Printer className="w-4 h-4 mr-2" /> Print
             </Button>
             {data.status === "Open" && (
