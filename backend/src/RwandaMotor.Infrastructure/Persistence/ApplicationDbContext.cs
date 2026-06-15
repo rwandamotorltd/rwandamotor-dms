@@ -22,6 +22,9 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>, IApplica
     public DbSet<FollowUp> FollowUps => Set<FollowUp>();
     public DbSet<ImportLog> ImportLogs => Set<ImportLog>();
     public DbSet<ImportLogRow> ImportLogRows => Set<ImportLogRow>();
+    public DbSet<JobCard> JobCards => Set<JobCard>();
+    public DbSet<JobCardSequence> JobCardSequences => Set<JobCardSequence>();
+    public DbSet<SalesHistory> SalesHistories => Set<SalesHistory>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -41,6 +44,18 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>, IApplica
         builder.Entity<FollowUp>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<ImportLog>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<ImportLogRow>().HasQueryFilter(e => !e.IsDeleted);
+        builder.Entity<JobCard>().HasQueryFilter(e => !e.IsDeleted);
+        builder.Entity<SalesHistory>().HasQueryFilter(e => !e.IsDeleted);
+
+        // Store accessories list as a JSON column
+        builder.Entity<JobCard>()
+            .Property(j => j.AccessoriesPresent)
+            .HasColumnType("jsonb");
+
+        // Unique index: one sequence row per year
+        builder.Entity<JobCardSequence>()
+            .HasIndex(s => s.Year)
+            .IsUnique();
     }
 
     public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)

@@ -1,5 +1,5 @@
 import axios, { AxiosInstance } from 'axios';
-import type { ApiResponse, AuthResponse, DashboardKpis, PaginatedResult, RetentionAnalytics, VisitFrequencyCohort, CohortVehicle, RetentionStatus, Vehicle360, Customer360, VehicleListItem, CustomerListItem, ServiceRecordListItem, ServicePolicy } from '@/types';
+import type { ApiResponse, AuthResponse, DashboardKpis, PaginatedResult, RetentionAnalytics, VisitFrequencyCohort, CohortVehicle, RetentionStatus, Vehicle360, Customer360, VehicleListItem, CustomerListItem, ServiceRecordListItem, ServicePolicy, JobCardListItem, JobCardDetail, JobCardStatus, ServiceType, FuelLevel } from '@/types';
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5000/api';
 
@@ -326,6 +326,53 @@ export const adminApi = {
 
   resetPassword: (userId: string, newPassword: string) =>
     api.post<ApiResponse<boolean>>('/admin/users/' + userId + '/reset-password', { newPassword }).then(r => r.data),
+};
+
+// ============================================================
+// Job Cards
+// ============================================================
+export interface CreateJobCardPayload {
+  vehicleId: string;
+  customerId?: string | null;
+  technicianId?: string | null;
+  serviceType: ServiceType;
+  fuelLevel: FuelLevel;
+  mileage: number;
+  notes?: string | null;
+  additionalInfo?: string | null;
+  accessoriesPresent?: string[];
+}
+
+export interface ShareJobCardPayload {
+  recipientEmail: string;
+  customMessage?: string | null;
+}
+
+export const jobCardsApi = {
+  list: (params: {
+    search?: string;
+    status?: JobCardStatus;
+    serviceType?: ServiceType;
+    dateFrom?: string;
+    dateTo?: string;
+    pageNumber?: number;
+    pageSize?: number;
+  }) => api.get<ApiResponse<PaginatedResult<JobCardListItem>>>('/jobcards', { params }).then(r => r.data.data!),
+
+  get: (id: string) =>
+    api.get<ApiResponse<JobCardDetail>>(`/jobcards/${id}`).then(r => r.data.data!),
+
+  create: (payload: CreateJobCardPayload) =>
+    api.post<ApiResponse<{ id: string; jobCardNumber: string }>>('/jobcards', payload).then(r => r.data),
+
+  convertToDeliveryNote: (id: string) =>
+    api.post<ApiResponse<string>>(`/jobcards/${id}/convert`).then(r => r.data),
+
+  updateSequence: (year: number, startingSequence: number) =>
+    api.put<ApiResponse<boolean>>('/jobcards/sequence', { year, startingSequence }).then(r => r.data),
+
+  share: (id: string, payload: ShareJobCardPayload) =>
+    api.post<ApiResponse<object>>(`/jobcards/${id}/share`, payload).then(r => r.data),
 };
 
 // ============================================================

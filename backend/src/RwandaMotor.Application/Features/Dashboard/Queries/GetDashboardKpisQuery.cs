@@ -2,6 +2,7 @@ using MediatR;
 using Microsoft.EntityFrameworkCore;
 using RwandaMotor.Application.Common.Interfaces;
 using RwandaMotor.Domain.Enums;
+using RwandaMotor.Domain.Entities;
 
 namespace RwandaMotor.Application.Features.Dashboard.Queries;
 
@@ -38,6 +39,15 @@ public class GetDashboardKpisQueryHandler : IRequestHandler<GetDashboardKpisQuer
         var monthlyServices = await _db.ServiceRecords
             .CountAsync(s => !s.IsDeleted && s.ServiceDate >= monthStart, ct);
 
+        var openJobCards = await _db.JobCards
+            .CountAsync(j => !j.IsDeleted && j.Status == JobCardStatus.Open, ct);
+        var todayJobCards = await _db.JobCards
+            .CountAsync(j => !j.IsDeleted && j.CreatedAt.Date == now.Date, ct);
+        var monthlyJobCards = await _db.JobCards
+            .CountAsync(j => !j.IsDeleted && j.CreatedAt >= monthStart, ct);
+        var monthlySalesHistory = await _db.SalesHistories
+            .CountAsync(s => !s.IsDeleted && s.SaleDate >= monthStart, ct);
+
         var monthlySummary = await _retention.GetRetentionSummaryAsync(RetentionPeriod.Monthly, now, ct);
         var quarterlySummary = await _retention.GetRetentionSummaryAsync(RetentionPeriod.Quarterly, now, ct);
         var sixMonthSummary = await _retention.GetRetentionSummaryAsync(RetentionPeriod.SixMonth, now, ct);
@@ -62,7 +72,11 @@ public class GetDashboardKpisQueryHandler : IRequestHandler<GetDashboardKpisQuer
             SixMonthRetentionRate: sixMonthSummary.RetentionRate,
             YearlyRetentionRate: yearlySummary.RetentionRate,
             RetentionTrend: trendData,
-            BrandRetention: brandData
+            BrandRetention: brandData,
+            OpenJobCards: openJobCards,
+            TodayJobCards: todayJobCards,
+            MonthlyJobCards: monthlyJobCards,
+            MonthlySalesHistory: monthlySalesHistory
         );
     }
 }
@@ -83,4 +97,8 @@ public record DashboardKpisDto(
     decimal SixMonthRetentionRate,
     decimal YearlyRetentionRate,
     List<RetentionTrendPointDto> RetentionTrend,
-    List<BrandRetentionDto> BrandRetention);
+    List<BrandRetentionDto> BrandRetention,
+    int OpenJobCards,
+    int TodayJobCards,
+    int MonthlyJobCards,
+    int MonthlySalesHistory);

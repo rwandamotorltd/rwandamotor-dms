@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import {
   Car, Users, TrendingUp, AlertTriangle, CheckCircle2,
-  Clock, RefreshCw, Activity, Wrench, BarChart3
+  Clock, RefreshCw, Activity, Wrench, BarChart3, ClipboardList, FileCheck
 } from "lucide-react";
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid,
@@ -109,8 +109,11 @@ export default function DashboardPage() {
         <KpiCard title="Overdue"          value={kpis.overdueVehicles}       subtitle="Missed interval"     icon={AlertTriangle} variant="warning" index={5} href="/vehicles?status=Overdue" />
         <KpiCard title="Recovered"        value={kpis.recoveredVehicles}     subtitle="Returned after lost" icon={RefreshCw}     variant="success" index={6} href="/vehicles?status=Recovered" />
         <KpiCard title="Follow-ups"       value={kpis.activeFollowUps}       subtitle="Pending contact"     icon={Activity}      variant="info"    index={7} href="/retention" />
-        <KpiCard title="Monthly Services"  value={kpis.monthlyServiceCount}                      subtitle="This month"      icon={Wrench}      variant="default" index={8} href="/service-records" />
-        <KpiCard title="6-Month Retention" value={formatPercentage(kpis.sixMonthRetentionRate)} subtitle="Rolling 6 months" icon={TrendingUp} variant="success" index={9} href="/retention" />
+        <KpiCard title="Monthly Services"  value={kpis.monthlyServiceCount}                      subtitle="This month"      icon={Wrench}         variant="default" index={8} href="/service-records" />
+        <KpiCard title="6-Month Retention" value={formatPercentage(kpis.sixMonthRetentionRate)} subtitle="Rolling 6 months" icon={TrendingUp}      variant="success" index={9} href="/retention" />
+        <KpiCard title="Open Job Cards"    value={kpis.openJobCards ?? 0}                        subtitle="Awaiting delivery" icon={ClipboardList}  variant="warning" index={10} href="/job-cards?status=Open" />
+        <KpiCard title="Today's Receptions" value={kpis.todayJobCards ?? 0}                     subtitle="Vehicles received today" icon={FileCheck} variant="info"    index={11} href="/job-cards" />
+        <KpiCard title="Monthly Job Cards" value={kpis.monthlyJobCards ?? 0}                    subtitle="This month"       icon={ClipboardList}  variant="default" index={12} href="/job-cards" />
       </div>
 
       {/* Charts Row */}

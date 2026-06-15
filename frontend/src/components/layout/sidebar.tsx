@@ -6,7 +6,7 @@ import { motion } from "framer-motion";
 import {
   LayoutDashboard, Car, Users, Wrench, TrendingUp,
   Upload, Settings, LogOut, Shield, ChevronLeft, ChevronRight,
-  UserCog, Activity, X
+  UserCog, Activity, X, ClipboardList
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/auth-context";
@@ -19,7 +19,8 @@ const NAV_ITEMS = [
   { href: "/vehicles",           label: "Vehicles",           icon: Car,             badge: null,  roles: null },
   { href: "/customers",          label: "Customers",          icon: Users,           badge: null,  roles: null },
   { href: "/service-records",    label: "Service Records",    icon: Wrench,          badge: null,  roles: null },
-  { href: "/retention",          label: "Retention",          icon: TrendingUp,      badge: "NEW", roles: null },
+  { href: "/job-cards",          label: "Job Cards",          icon: ClipboardList,   badge: null,  roles: null },
+  { href: "/retention",          label: "Retention",          icon: TrendingUp,      badge: null,  roles: null },
   // TechnicalDirector cannot access Import Center
   { href: "/import",             label: "Import Center",      icon: Upload,          badge: null,  roles: ["Admin", "CRMOfficer"] as string[] },
   // Admin-only management pages

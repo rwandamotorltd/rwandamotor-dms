@@ -3,6 +3,8 @@
 // ============================================================
 
 export type RetentionStatus = 'Active' | 'DueSoon' | 'Overdue' | 'Lost' | 'Recovered' | 'External';
+export type JobCardStatus = 'Open' | 'Closed';
+export type FuelLevel = 'Empty' | 'Quarter' | 'Half' | 'ThreeQuarter' | 'Full';
 export type ServiceType = 'RoutineMaintenance' | 'OilChange' | 'MajorService' | 'TyreRotation' |
   'BrakeService' | 'TransmissionService' | 'AirConditioningService' | 'ElectricalDiagnostics' |
   'BodyRepair' | 'WarrantyRepair' | 'RecallRepair' | 'PDI' | 'EmergencyRepair' | 'Inspection' | 'Other';
@@ -53,6 +55,10 @@ export interface DashboardKpis {
   yearlyRetentionRate: number;
   retentionTrend: RetentionTrendPoint[];
   brandRetention: BrandRetention[];
+  openJobCards: number;
+  todayJobCards: number;
+  monthlyJobCards: number;
+  monthlySalesHistory: number;
 }
 
 export interface RetentionTrendPoint {
@@ -321,6 +327,66 @@ export interface ServicePolicy {
   dueSoonLeadKm: number;
   lostThresholdMonths: number;
   isDefault: boolean;
+}
+
+// ============================================================
+// Job Cards
+// ============================================================
+export interface JobCardListItem {
+  id: string;
+  jobCardNumber: string;
+  vin: string;
+  plateNumber: string | null;
+  year: number;
+  customerName: string | null;
+  customerPhone: string | null;
+  serviceType: ServiceType;
+  status: JobCardStatus;
+  fuelLevel: FuelLevel;
+  mileage: number;
+  receivedByName: string;
+  technicianName: string | null;
+  createdAt: string;
+  closedAt: string | null;
+  deliveryNoteNumber: string | null;
+}
+
+export interface JobCardDetail {
+  id: string;
+  jobCardNumber: string;
+  vehicleId: string;
+  vin: string;
+  plateNumber: string | null;
+  year: number;
+  color: string | null;
+  transmission: string | null;
+  fuelType: string | null;
+  fuelLevel: FuelLevel;
+  mileage: number;
+  brandName: string;
+  modelName: string;
+  customerId: string | null;
+  customerName: string | null;
+  customerPhone: string | null;
+  technicianId: string | null;
+  technicianName: string | null;
+  serviceType: ServiceType;
+  status: JobCardStatus;
+  notes: string | null;
+  additionalInfo: string | null;
+  accessoriesPresent: string[];
+  receivedByName: string;
+  createdAt: string;
+  closedAt: string | null;
+  closedByName: string | null;
+  deliveryNoteNumber: string | null;
+  deliveryNoteGeneratedAt: string | null;
+}
+
+export interface JobCardSequenceInfo {
+  year: number;
+  startingSequence: number;
+  currentSequence: number;
 }
 
 // ============================================================
