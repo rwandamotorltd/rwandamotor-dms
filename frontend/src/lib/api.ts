@@ -75,6 +75,19 @@ export interface BulkUpdatePayload {
   notesAppend?: string | null;
 }
 
+// ============================================================
+// Brands
+// ============================================================
+export interface BrandDto {
+  id: string;
+  name: string;
+  models: { id: string; name: string }[];
+}
+
+export const brandsApi = {
+  list: () => api.get<ApiResponse<BrandDto[]>>('/vehicles/brands').then(r => r.data.data!),
+};
+
 export const vehiclesApi = {
   list: (params: {
     search?: string; brandId?: string; modelId?: string;
@@ -324,76 +337,4 @@ export const adminApi = {
   updateUser: (payload: UpdateUserPayload) =>
     api.put<ApiResponse<boolean>>('/admin/users/' + payload.userId, payload).then(r => r.data),
 
-  resetPassword: (userId: string, newPassword: string) =>
-    api.post<ApiResponse<boolean>>('/admin/users/' + userId + '/reset-password', { newPassword }).then(r => r.data),
-};
-
-// ============================================================
-// Job Cards
-// ============================================================
-export interface CreateJobCardPayload {
-  vehicleId: string;
-  customerId?: string | null;
-  technicianId?: string | null;
-  serviceType: ServiceType;
-  fuelLevel: FuelLevel;
-  mileage: number;
-  notes?: string | null;
-  additionalInfo?: string | null;
-  accessoriesPresent?: string[];
-}
-
-export interface ShareJobCardPayload {
-  recipientEmail: string;
-  customMessage?: string | null;
-}
-
-export const jobCardsApi = {
-  list: (params: {
-    search?: string;
-    status?: JobCardStatus;
-    serviceType?: ServiceType;
-    dateFrom?: string;
-    dateTo?: string;
-    pageNumber?: number;
-    pageSize?: number;
-  }) => api.get<ApiResponse<PaginatedResult<JobCardListItem>>>('/jobcards', { params }).then(r => r.data.data!),
-
-  get: (id: string) =>
-    api.get<ApiResponse<JobCardDetail>>(`/jobcards/${id}`).then(r => r.data.data!),
-
-  create: (payload: CreateJobCardPayload) =>
-    api.post<ApiResponse<{ id: string; jobCardNumber: string }>>('/jobcards', payload).then(r => r.data),
-
-  convertToDeliveryNote: (id: string) =>
-    api.post<ApiResponse<string>>(`/jobcards/${id}/convert`).then(r => r.data),
-
-  updateSequence: (year: number, startingSequence: number) =>
-    api.put<ApiResponse<boolean>>('/jobcards/sequence', { year, startingSequence }).then(r => r.data),
-
-  share: (id: string, payload: ShareJobCardPayload) =>
-    api.post<ApiResponse<object>>(`/jobcards/${id}/share`, payload).then(r => r.data),
-};
-
-// ============================================================
-// Admin — Technicians (full CRUD via techniciansApi)
-// ============================================================
-export interface CreateTechnicianPayload {
-  fullName: string;
-  employeeCode: string;
-  phone?: string | null;
-  email?: string | null;
-  specialization?: string | null;
-  certificationLevel?: string | null;
-}
-
-export interface UpdateTechnicianPayload {
-  id: string;
-  fullName: string;
-  employeeCode: string;
-  phone?: string | null;
-  email?: string | null;
-  specialization?: string | null;
-  certificationLevel?: string | null;
-  isActive: boolean;
-}
+  resetPassword: (userId: string, newPassword: 

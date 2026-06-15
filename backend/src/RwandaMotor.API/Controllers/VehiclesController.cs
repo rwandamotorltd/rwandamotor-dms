@@ -42,8 +42,14 @@ public class VehiclesController : ControllerBase
         return Ok(ApiResponse<Vehicle360Dto>.Ok(result));
     }
 
+    [HttpGet("brands")]
+    public async Task<IActionResult> GetBrands()
+    {
+        var result = await _mediator.Send(new GetBrandsQuery());
+        return Ok(ApiResponse<List<BrandDto>>.Ok(result));
+    }
+
     [HttpPost]
-    [Authorize(Policy = "TechnicalDirector")]
     public async Task<IActionResult> CreateVehicle([FromBody] CreateVehicleCommand command)
     {
         var id = await _mediator.Send(command);
@@ -87,7 +93,4 @@ public class VehiclesController : ControllerBase
         [FromQuery] RetentionStatus? retentionStatus,
         [FromQuery] bool? isSoldByDealership)
     {
-        var deleted = await _mediator.Send(new DeleteAllVehiclesCommand(search, retentionStatus, isSoldByDealership));
-        return Ok(ApiResponse<int>.Ok(deleted, $"{deleted} vehicle(s) deleted"));
-    }
-}
+        var deleted = await _mediator.Send(ne
