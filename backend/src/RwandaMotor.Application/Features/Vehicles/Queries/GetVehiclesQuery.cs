@@ -33,14 +33,13 @@ public class GetVehiclesQueryHandler : IRequestHandler<GetVehiclesQuery, Paginat
 
         if (!string.IsNullOrWhiteSpace(q.Search))
         {
-            // PostgreSQL: use ILike for case-insensitive pattern matching
-            var s = $"%{q.Search.Trim()}%";
+            var s = q.Search.Trim().ToLower();
             query = query.Where(v =>
-                EF.Functions.ILike(v.VIN, s) ||
-                (v.PlateNumber != null && EF.Functions.ILike(v.PlateNumber, s)) ||
-                (v.Customer != null && EF.Functions.ILike(v.Customer.FullName, s)) ||
-                EF.Functions.ILike(v.Brand.Name, s) ||
-                EF.Functions.ILike(v.Model.Name, s));
+                v.VIN.ToLower().Contains(s) ||
+                (v.PlateNumber != null && v.PlateNumber.ToLower().Contains(s)) ||
+                (v.Customer != null && v.Customer.FullName.ToLower().Contains(s)) ||
+                v.Brand.Name.ToLower().Contains(s) ||
+                v.Model.Name.ToLower().Contains(s));
         }
 
         if (q.BrandId.HasValue) query = query.Where(v => v.BrandId == q.BrandId);
