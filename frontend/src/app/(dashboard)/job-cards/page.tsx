@@ -19,6 +19,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { Plus, Search, FileText, ArrowRight, Printer, Mail, ClipboardList, X } from "lucide-react";
+import { useAuth } from "@/contexts/auth-context";
 import { format } from "date-fns";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -657,6 +658,8 @@ function ShareDialog({ jobCard, open, onClose }: {
 export default function JobCardsPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { hasPermission } = useAuth();
+  const canCreate = hasPermission("jobCards.create");
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<JobCardStatus | "">("");
@@ -701,9 +704,11 @@ export default function JobCardsPage() {
             Vehicle reception records with auto-numbered delivery notes
           </p>
         </div>
-        <Button onClick={() => setCreateOpen(true)}>
-          <Plus className="w-4 h-4 mr-2" /> New Job Card
-        </Button>
+        {canCreate && (
+          <Button onClick={() => setCreateOpen(true)}>
+            <Plus className="w-4 h-4 mr-2" /> New Job Card
+          </Button>
+        )}
       </div>
 
       {/* Filters */}
@@ -875,11 +880,13 @@ export default function JobCardsPage() {
       </Card>
 
       {/* Dialogs */}
-      <CreateJobCardDialog
-        open={createOpen}
-        onClose={() => setCreateOpen(false)}
-        onCreated={handleCreated}
-      />
+      {canCreate && (
+        <CreateJobCardDialog
+          open={createOpen}
+          onClose={() => setCreateOpen(false)}
+          onCreated={handleCreated}
+        />
+      )}
       {shareTarget && (
         <ShareDialog
           jobCard={shareTarget}

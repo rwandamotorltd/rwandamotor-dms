@@ -1,7 +1,9 @@
 using FluentValidation;
 using MediatR;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 using RwandaMotor.Application.Common.Interfaces;
+using RwandaMotor.Application.Common.Permissions;
 using RwandaMotor.Domain.Entities;
 
 namespace RwandaMotor.Application.Features.Auth.Commands;
@@ -21,11 +23,13 @@ public class LoginCommandHandler : IRequestHandler<LoginCommand, AuthResponseDto
 {
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly IJwtService _jwtService;
+    private readonly IApplicationDbContext _db;
 
-    public LoginCommandHandler(UserManager<ApplicationUser> userManager, IJwtService jwtService)
+    public LoginCommandHandler(UserManager<ApplicationUser> userManager, IJwtService jwtService, IApplicationDbContext db)
     {
         _userManager = userManager;
         _jwtService = jwtService;
+        _db = db;
     }
 
     public async Task<AuthResponseDto> Handle(LoginCommand cmd, CancellationToken ct)
@@ -41,6 +45,8 @@ public class LoginCommandHandler : IRequestHandler<LoginCommand, AuthResponseDto
             throw new UnauthorizedAccessException("Invalid credentials.");
 
         var roles = await _userManager.GetRolesAsync(user);
+        var role = roles.FirstOrDefault() ?? string.Empty;
+
         var accessToken = _jwtService.GenerateAccessToken(user, roles);
         var refreshToken = _jwtService.GenerateRefreshToken();
 
@@ -49,14 +55,28 @@ public class LoginCommandHandler : IRequestHandler<LoginCommand, AuthResponseDto
         user.LastLoginAt = DateTime.UtcNow;
         await _userManager.UpdateAsync(user);
 
+        // Resolve effective permissions: group overrides role defaults
+        List<string> permissions;
+        if (user.PermissionGroupId.HasValue)
+        {
+            var group = await _db.PermissionGroups
+                .FirstOrDefaultAsync(g => g.Id == user.PermissionGroupId.Value, ct);
+            permissions = group?.Permissions ?? DefaultPermissions.ForRole(role);
+        }
+        else
+        {
+            permissions = DefaultPermissions.ForRole(role);
+        }
+
         return new AuthResponseDto(
             AccessToken: accessToken,
             RefreshToken: refreshToken,
             UserId: user.Id,
             FullName: user.FullName,
             Email: user.Email!,
-            Role: roles.FirstOrDefault() ?? string.Empty,
-            ExpiresAt: DateTime.UtcNow.AddHours(8)
+            Role: role,
+            ExpiresAt: DateTime.UtcNow.AddHours(8),
+            Permissions: permissions
         );
     }
 }
@@ -68,4 +88,5 @@ public record AuthResponseDto(
     string FullName,
     string Email,
     string Role,
-    DateTime ExpiresAt);
+    DateTime ExpiresAt,
+    List<string> Permissions);

@@ -20,6 +20,7 @@ public interface IApplicationDbContext
     DbSet<JobCard> JobCards { get; }
     DbSet<JobCardSequence> JobCardSequences { get; }
     DbSet<SalesHistory> SalesHistories { get; }
+    DbSet<PermissionGroup> PermissionGroups { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

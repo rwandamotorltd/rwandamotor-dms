@@ -1,112 +1,767 @@
 "use client";
 
-import { useState } from "react";
-import { useMutation } from "@tanstack/react-query";
-import { jobCardsApi } from "@/lib/api";
+import { useState, useEffect } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { motion } from "framer-motion";
+import {
+  Settings, Hash, AlertTriangle, Users, ShieldCheck,
+  Plus, Pencil, Trash2, X, Eye, EyeOff, KeyRound, Check
+} from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
+import { useRouter } from "next/navigation";
+import {
+  adminApi, permissionGroupsApi,
+  type UserItem, type CreateUserPayload, type UpdateUserPayload,
+  type PermissionGroupItem, type CreatePermissionGroupPayload,
+} from "@/lib/api";
+import { jobCardsApi } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { Settings, Hash, AlertTriangle } from "lucide-react";
 
-export default function SettingsPage() {
-  const { user } = useAuth();
+// ─── Constants ────────────────────────────────────────────────
+
+const ROLES = ["Admin", "TechnicalDirector", "CRMOfficer", "CRE"];
+
+const ROLE_COLORS: Record<string, string> = {
+  Admin:             "bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-400",
+  TechnicalDirector: "bg-violet-50 dark:bg-violet-950/50 text-violet-700 dark:text-violet-400",
+  CRMOfficer:        "bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-400",
+  CRE:               "bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400",
+};
+
+// All available permission keys with friendly labels grouped by section
+const PERMISSION_SECTIONS = [
+  {
+    label: "Navigation",
+    keys: [
+      { key: "nav.dashboard",       label: "Dashboard" },
+      { key: "nav.vehicles",        label: "Vehicles" },
+      { key: "nav.customers",       label: "Customers" },
+      { key: "nav.serviceRecords",  label: "Service Records" },
+      { key: "nav.jobCards",        label: "Job Cards" },
+      { key: "nav.retention",       label: "Retention" },
+      { key: "nav.import",          label: "Import Center" },
+      { key: "nav.settings",        label: "Settings" },
+    ],
+  },
+  {
+    label: "Job Cards",
+    keys: [
+      { key: "jobCards.create",  label: "Create Job Card" },
+      { key: "jobCards.convert", label: "Convert to Delivery Note" },
+    ],
+  },
+  {
+    label: "Vehicles",
+    keys: [
+      { key: "vehicles.create", label: "Create Vehicle" },
+      { key: "vehicles.edit",   label: "Edit Vehicle" },
+      { key: "vehicles.delete", label: "Delete Vehicle" },
+    ],
+  },
+  {
+    label: "Customers",
+    keys: [
+      { key: "customers.create", label: "Create Customer" },
+      { key: "customers.edit",   label: "Edit Customer" },
+      { key: "customers.delete", label: "Delete Customer" },
+    ],
+  },
+  {
+    label: "Service Records",
+    keys: [
+      { key: "serviceRecords.create", label: "Create Service Record" },
+    ],
+  },
+  {
+    label: "Dashboard Widgets",
+    keys: [
+      { key: "dashboard.kpi",             label: "KPI Cards" },
+      { key: "dashboard.retention",       label: "Retention Charts" },
+      { key: "dashboard.jobCardsWidget",  label: "Job Cards Widget" },
+    ],
+  },
+];
+
+// ─── User Form Modal ──────────────────────────────────────────
+
+interface UserFormState {
+  fullName: string;
+  email: string;
+  password: string;
+  role: string;
+  isActive: boolean;
+  permissionGroupId: string;
+}
+
+const EMPTY_USER_FORM: UserFormState = {
+  fullName: "", email: "", password: "", role: "CRE", isActive: true, permissionGroupId: "",
+};
+
+function UserModal({
+  title, form, isCreate, groups, onChange, onSave, onClose, saving, error,
+}: {
+  title: string;
+  form: UserFormState;
+  isCreate: boolean;
+  groups: PermissionGroupItem[];
+  onChange: (patch: Partial<UserFormState>) => void;
+  onSave: () => void;
+  onClose: () => void;
+  saving: boolean;
+  error?: string | null;
+}) {
+  const [showPwd, setShowPwd] = useState(false);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="relative bg-card border border-border rounded-xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto"
+      >
+        <div className="flex items-center justify-between p-5 border-b border-border sticky top-0 bg-card z-10">
+          <h2 className="text-lg font-semibold flex items-center gap-2">
+            <ShieldCheck className="w-4 h-4 text-muted-foreground" /> {title}
+          </h2>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground transition-colors">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="p-5 space-y-4">
+          {error && (
+            <div className="rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm px-3 py-2">
+              {error}
+            </div>
+          )}
+
+          <div className="space-y-1.5">
+            <Label>Full Name <span className="text-destructive">*</span></Label>
+            <Input value={form.fullName} onChange={e => onChange({ fullName: e.target.value })} placeholder="Jean Pierre Habimana" />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Email <span className="text-destructive">*</span></Label>
+            <Input type="email" value={form.email} onChange={e => onChange({ email: e.target.value })}
+              placeholder="user@rwandamotor.com" disabled={!isCreate} />
+          </div>
+
+          {isCreate && (
+            <div className="space-y-1.5">
+              <Label>Password <span className="text-destructive">*</span></Label>
+              <div className="relative">
+                <Input type={showPwd ? "text" : "password"} value={form.password}
+                  onChange={e => onChange({ password: e.target.value })} placeholder="Min. 8 characters" className="pr-10" />
+                <button type="button" onClick={() => setShowPwd(v => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                  {showPwd ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div className="space-y-1.5">
+            <Label>Role</Label>
+            <Select value={form.role} onValueChange={v => onChange({ role: v ?? "CRE" })}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {ROLES.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Permission Group <span className="text-xs text-muted-foreground">(overrides role defaults)</span></Label>
+            <Select value={form.permissionGroupId} onValueChange={v => onChange({ permissionGroupId: v ?? "" })}>
+              <SelectTrigger>
+                <span className={!form.permissionGroupId ? "text-muted-foreground" : ""}>
+                  {form.permissionGroupId
+                    ? (groups.find(g => g.id === form.permissionGroupId)?.name ?? "…")
+                    : "Use role defaults"}
+                </span>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">Use role defaults</SelectItem>
+                {groups.map(g => <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {!isCreate && (
+            <div className="flex items-center gap-3 pt-1">
+              <input id="isActive" type="checkbox" checked={form.isActive}
+                onChange={e => onChange({ isActive: e.target.checked })}
+                className="w-4 h-4 rounded border-border accent-primary" />
+              <Label htmlFor="isActive" className="cursor-pointer">Active user</Label>
+            </div>
+          )}
+        </div>
+
+        <div className="flex justify-end gap-3 p-5 border-t border-border sticky bottom-0 bg-card">
+          <Button variant="outline" onClick={onClose} disabled={saving}>Cancel</Button>
+          <Button onClick={onSave}
+            disabled={saving || !form.fullName.trim() || !form.email.trim() || (isCreate && !form.password.trim())}
+            className="gradient-primary text-white">
+            {saving ? "Saving…" : isCreate ? "Create User" : "Save Changes"}
+          </Button>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
+// ─── Reset Password Modal ─────────────────────────────────────
+
+function ResetPasswordModal({
+  user: target, onClose, onSave, saving, error,
+}: {
+  user: UserItem; onClose: () => void; onSave: (pwd: string) => void; saving: boolean; error?: string | null;
+}) {
+  const [pwd, setPwd] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [show, setShow] = useState(false);
+  const mismatch = confirm.length > 0 && pwd !== confirm;
+  const valid = pwd.length >= 8 && pwd === confirm;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+      <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
+        className="relative bg-card border border-border rounded-xl shadow-2xl w-full max-w-sm">
+        <div className="flex items-center justify-between p-5 border-b">
+          <h2 className="text-lg font-semibold flex items-center gap-2"><KeyRound className="w-4 h-4" /> Reset Password</h2>
+          <button onClick={onClose}><X className="w-5 h-5 text-muted-foreground" /></button>
+        </div>
+        <div className="p-5 space-y-4">
+          <p className="text-sm text-muted-foreground">New password for <span className="font-medium text-foreground">{target.fullName}</span></p>
+          {error && <div className="rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm px-3 py-2">{error}</div>}
+          <div className="space-y-1.5">
+            <Label>New Password</Label>
+            <div className="relative">
+              <Input type={show ? "text" : "password"} value={pwd} onChange={e => setPwd(e.target.value)}
+                placeholder="Min. 8 characters" className="pr-10" />
+              <button type="button" onClick={() => setShow(v => !v)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                {show ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label>Confirm</Label>
+            <Input type={show ? "text" : "password"} value={confirm} onChange={e => setConfirm(e.target.value)}
+              className={mismatch ? "border-destructive" : ""} />
+            {mismatch && <p className="text-xs text-destructive">Passwords do not match</p>}
+          </div>
+        </div>
+        <div className="flex justify-end gap-3 p-5 border-t">
+          <Button variant="outline" onClick={onClose} disabled={saving}>Cancel</Button>
+          <Button onClick={() => onSave(pwd)} disabled={saving || !valid} className="gradient-primary text-white">
+            {saving ? "Resetting…" : "Reset Password"}
+          </Button>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
+// ─── Permission Group Modal ───────────────────────────────────
+
+function PermissionGroupModal({
+  title, initial, onSave, onClose, saving, error,
+}: {
+  title: string;
+  initial: { name: string; description: string; permissions: string[] };
+  onSave: (data: CreatePermissionGroupPayload) => void;
+  onClose: () => void;
+  saving: boolean;
+  error?: string | null;
+}) {
+  const [name, setName] = useState(initial.name);
+  const [description, setDescription] = useState(initial.description);
+  const [selected, setSelected] = useState<Set<string>>(new Set(initial.permissions));
+
+  const toggle = (key: string) =>
+    setSelected(prev => { const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n; });
+
+  const toggleSection = (keys: string[]) => {
+    const allOn = keys.every(k => selected.has(k));
+    setSelected(prev => {
+      const n = new Set(prev);
+      if (allOn) keys.forEach(k => n.delete(k));
+      else keys.forEach(k => n.add(k));
+      return n;
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+      <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
+        className="relative bg-card border border-border rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between p-5 border-b">
+          <h2 className="text-lg font-semibold">{title}</h2>
+          <button onClick={onClose}><X className="w-5 h-5 text-muted-foreground" /></button>
+        </div>
+
+        <div className="overflow-y-auto p-5 space-y-5 flex-1">
+          {error && <div className="rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm px-3 py-2">{error}</div>}
+
+          <div className="space-y-1.5">
+            <Label>Group Name <span className="text-destructive">*</span></Label>
+            <Input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Reception Staff" />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Description</Label>
+            <Input value={description} onChange={e => setDescription(e.target.value)} placeholder="Optional description" />
+          </div>
+
+          <Separator />
+
+          <div className="space-y-4">
+            <Label className="text-sm font-semibold">Permissions</Label>
+            {PERMISSION_SECTIONS.map(section => {
+              const sectionKeys = section.keys.map(k => k.key);
+              const allOn = sectionKeys.every(k => selected.has(k));
+              const someOn = sectionKeys.some(k => selected.has(k));
+              return (
+                <div key={section.label} className="space-y-2">
+                  <button
+                    onClick={() => toggleSection(sectionKeys)}
+                    className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground transition-colors group"
+                  >
+                    <div className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${allOn ? "bg-primary border-primary" : someOn ? "bg-primary/30 border-primary/50" : "border-border"}`}>
+                      {allOn && <Check className="w-2.5 h-2.5 text-white" />}
+                      {someOn && !allOn && <div className="w-2 h-2 rounded-sm bg-primary" />}
+                    </div>
+                    {section.label}
+                  </button>
+                  <div className="grid grid-cols-2 gap-1.5 pl-1">
+                    {section.keys.map(({ key, label }) => (
+                      <button key={key} onClick={() => toggle(key)}
+                        className="flex items-center gap-2 text-sm text-left rounded-md px-2 py-1.5 hover:bg-muted transition-colors">
+                        <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors ${selected.has(key) ? "bg-primary border-primary" : "border-border"}`}>
+                          {selected.has(key) && <Check className="w-2.5 h-2.5 text-white" />}
+                        </div>
+                        <span className="text-xs">{label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="flex justify-between items-center p-5 border-t">
+          <span className="text-xs text-muted-foreground">{selected.size} permissions selected</span>
+          <div className="flex gap-3">
+            <Button variant="outline" onClick={onClose} disabled={saving}>Cancel</Button>
+            <Button onClick={() => onSave({ name: name.trim(), description: description.trim() || null, permissions: [...selected] })}
+              disabled={saving || !name.trim()} className="gradient-primary text-white">
+              {saving ? "Saving…" : "Save Group"}
+            </Button>
+          </div>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
+// ─── Users Tab ────────────────────────────────────────────────
+
+function UsersTab({ groups }: { groups: PermissionGroupItem[] }) {
+  const qc = useQueryClient();
+  const [showCreate, setShowCreate] = useState(false);
+  const [createForm, setCreateForm] = useState<UserFormState>(EMPTY_USER_FORM);
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [editingUser, setEditingUser] = useState<UserItem | null>(null);
+  const [editForm, setEditForm] = useState<UserFormState>(EMPTY_USER_FORM);
+  const [editError, setEditError] = useState<string | null>(null);
+  const [resetUser, setResetUser] = useState<UserItem | null>(null);
+  const [resetError, setResetError] = useState<string | null>(null);
+
+  const { data: users = [], isLoading } = useQuery({
+    queryKey: ["admin-users"],
+    queryFn: () => adminApi.getUsers(),
+  });
+
+  const createMutation = useMutation({
+    mutationFn: (p: CreateUserPayload) => adminApi.createUser(p),
+    onSuccess: res => {
+      if (!res.success) { setCreateError(res.message ?? "Failed"); return; }
+      qc.invalidateQueries({ queryKey: ["admin-users"] });
+      setShowCreate(false); setCreateForm(EMPTY_USER_FORM); setCreateError(null);
+      toast.success("User created");
+    },
+    onError: (e: { response?: { data?: { message?: string } } }) =>
+      setCreateError(e?.response?.data?.message ?? "Failed to create user"),
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: (p: UpdateUserPayload) => adminApi.updateUser(p),
+    onSuccess: res => {
+      if (!res.success) { setEditError(res.message ?? "Failed"); return; }
+      qc.invalidateQueries({ queryKey: ["admin-users"] });
+      setEditingUser(null); setEditError(null);
+      toast.success("User updated");
+    },
+    onError: (e: { response?: { data?: { message?: string } } }) =>
+      setEditError(e?.response?.data?.message ?? "Failed to update user"),
+  });
+
+  const resetMutation = useMutation({
+    mutationFn: ({ id, pwd }: { id: string; pwd: string }) => adminApi.resetPassword(id, pwd),
+    onSuccess: res => {
+      if (!res.success) { setResetError(res.message ?? "Failed"); return; }
+      setResetUser(null); setResetError(null);
+      toast.success("Password reset");
+    },
+    onError: (e: { response?: { data?: { message?: string } } }) =>
+      setResetError(e?.response?.data?.message ?? "Failed to reset password"),
+  });
+
+  const openEdit = (u: UserItem) => {
+    setEditingUser(u);
+    setEditForm({ fullName: u.fullName, email: u.email, password: "", role: u.role, isActive: u.isActive, permissionGroupId: u.permissionGroupId ?? "" });
+    setEditError(null);
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-muted-foreground">Manage system users and their access levels</p>
+        <Button onClick={() => { setCreateForm(EMPTY_USER_FORM); setCreateError(null); setShowCreate(true); }}
+          className="gradient-primary text-white gap-2">
+          <Plus className="w-4 h-4" /><span className="hidden sm:inline">New User</span>
+        </Button>
+      </div>
+
+      <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
+        {isLoading ? (
+          <div className="p-4 space-y-3">{[...Array(5)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="border-border hover:bg-transparent">
+                  <TableHead className="text-xs font-semibold text-muted-foreground uppercase">User</TableHead>
+                  <TableHead className="text-xs font-semibold text-muted-foreground uppercase hidden sm:table-cell">Email</TableHead>
+                  <TableHead className="text-xs font-semibold text-muted-foreground uppercase">Role</TableHead>
+                  <TableHead className="text-xs font-semibold text-muted-foreground uppercase hidden md:table-cell">Permission Group</TableHead>
+                  <TableHead className="text-xs font-semibold text-muted-foreground uppercase hidden sm:table-cell">Status</TableHead>
+                  <TableHead />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {users.length === 0 ? (
+                  <TableRow><TableCell colSpan={6} className="h-24 text-center text-muted-foreground">No users found</TableCell></TableRow>
+                ) : users.map(u => (
+                  <TableRow key={u.id} className="border-border hover:bg-muted/30">
+                    <TableCell className="py-3">
+                      <p className="font-medium text-sm">{u.fullName}</p>
+                      <p className="text-xs text-muted-foreground sm:hidden">{u.email}</p>
+                    </TableCell>
+                    <TableCell className="py-3 hidden sm:table-cell text-sm text-muted-foreground">{u.email}</TableCell>
+                    <TableCell className="py-3">
+                      <span className={"inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium " + (ROLE_COLORS[u.role] ?? "bg-muted text-muted-foreground")}>
+                        {u.role}
+                      </span>
+                    </TableCell>
+                    <TableCell className="py-3 hidden md:table-cell">
+                      {u.permissionGroupName
+                        ? <Badge variant="outline" className="text-xs">{u.permissionGroupName}</Badge>
+                        : <span className="text-xs text-muted-foreground">Role defaults</span>}
+                    </TableCell>
+                    <TableCell className="py-3 hidden sm:table-cell">
+                      <Badge variant={u.isActive ? "secondary" : "outline"} className="text-xs">
+                        {u.isActive ? "Active" : "Inactive"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="py-3 text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        <button onClick={() => { setResetUser(u); setResetError(null); }}
+                          className="p-1.5 rounded-md text-muted-foreground hover:text-amber-500 hover:bg-amber-500/10 transition-colors" title="Reset password">
+                          <KeyRound className="w-4 h-4" />
+                        </button>
+                        <button onClick={() => openEdit(u)}
+                          className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors" title="Edit">
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </div>
+
+      {showCreate && (
+        <UserModal title="New User" form={createForm} isCreate groups={groups}
+          onChange={p => setCreateForm(f => ({ ...f, ...p }))}
+          onSave={() => createMutation.mutate({ fullName: createForm.fullName.trim(), email: createForm.email.trim(), password: createForm.password, role: createForm.role, permissionGroupId: createForm.permissionGroupId || null })}
+          onClose={() => setShowCreate(false)} saving={createMutation.isPending} error={createError} />
+      )}
+
+      {editingUser && (
+        <UserModal title={`Edit — ${editingUser.fullName}`} form={editForm} isCreate={false} groups={groups}
+          onChange={p => setEditForm(f => ({ ...f, ...p }))}
+          onSave={() => updateMutation.mutate({ userId: editingUser.id, fullName: editForm.fullName.trim(), role: editForm.role, isActive: editForm.isActive, permissionGroupId: editForm.permissionGroupId || null })}
+          onClose={() => setEditingUser(null)} saving={updateMutation.isPending} error={editError} />
+      )}
+
+      {resetUser && (
+        <ResetPasswordModal user={resetUser}
+          onSave={pwd => resetMutation.mutate({ id: resetUser.id, pwd })}
+          onClose={() => setResetUser(null)} saving={resetMutation.isPending} error={resetError} />
+      )}
+    </div>
+  );
+}
+
+// ─── Permission Groups Tab ────────────────────────────────────
+
+function PermGroupsTab() {
+  const qc = useQueryClient();
+  const [showCreate, setShowCreate] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [editing, setEditing] = useState<PermissionGroupItem | null>(null);
+  const [editError, setEditError] = useState<string | null>(null);
+
+  const { data: groups = [], isLoading } = useQuery({
+    queryKey: ["permission-groups"],
+    queryFn: () => permissionGroupsApi.list(),
+  });
+
+  const createMutation = useMutation({
+    mutationFn: (p: CreatePermissionGroupPayload) => permissionGroupsApi.create(p),
+    onSuccess: res => {
+      if (!res.success) { setCreateError(res.message ?? "Failed"); return; }
+      qc.invalidateQueries({ queryKey: ["permission-groups"] });
+      setShowCreate(false); setCreateError(null);
+      toast.success("Permission group created");
+    },
+    onError: (e: { response?: { data?: { message?: string } } }) =>
+      setCreateError(e?.response?.data?.message ?? "Failed"),
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, ...p }: { id: string } & CreatePermissionGroupPayload) =>
+      permissionGroupsApi.update(id, p),
+    onSuccess: res => {
+      if (!res.success) { setEditError(res.message ?? "Failed"); return; }
+      qc.invalidateQueries({ queryKey: ["permission-groups"] });
+      setEditing(null); setEditError(null);
+      toast.success("Permission group updated");
+    },
+    onError: (e: { response?: { data?: { message?: string } } }) =>
+      setEditError(e?.response?.data?.message ?? "Failed"),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => permissionGroupsApi.delete(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["permission-groups"] });
+      toast.success("Group deleted");
+    },
+    onError: () => toast.error("Failed to delete group"),
+  });
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-muted-foreground">Create reusable permission sets and assign them to users</p>
+        <Button onClick={() => { setCreateError(null); setShowCreate(true); }} className="gradient-primary text-white gap-2">
+          <Plus className="w-4 h-4" /><span className="hidden sm:inline">New Group</span>
+        </Button>
+      </div>
+
+      {isLoading ? (
+        <div className="space-y-3">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-20 w-full rounded-xl" />)}</div>
+      ) : groups.length === 0 ? (
+        <Card>
+          <CardContent className="py-12 text-center text-muted-foreground text-sm">
+            No permission groups yet. Create one to override role defaults.
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-3">
+          {groups.map(g => (
+            <Card key={g.id} className="hover:border-primary/30 transition-colors">
+              <CardContent className="p-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-semibold text-sm">{g.name}</h3>
+                      <Badge variant="secondary" className="text-xs">{g.permissions.length} permissions</Badge>
+                    </div>
+                    {g.description && <p className="text-xs text-muted-foreground mt-0.5">{g.description}</p>}
+                    <div className="flex flex-wrap gap-1 mt-2">
+                      {g.permissions.slice(0, 8).map(p => (
+                        <span key={p} className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">{p}</span>
+                      ))}
+                      {g.permissions.length > 8 && (
+                        <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">+{g.permissions.length - 8} more</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button onClick={() => { setEditing(g); setEditError(null); }}
+                      className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+                      <Pencil className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (confirm(`Delete "${g.name}"? Users assigned to this group will revert to role defaults.`))
+                          deleteMutation.mutate(g.id);
+                      }}
+                      className="p-1.5 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {showCreate && (
+        <PermissionGroupModal title="New Permission Group"
+          initial={{ name: "", description: "", permissions: [] }}
+          onSave={data => createMutation.mutate(data)}
+          onClose={() => setShowCreate(false)} saving={createMutation.isPending} error={createError} />
+      )}
+
+      {editing && (
+        <PermissionGroupModal title={`Edit — ${editing.name}`}
+          initial={{ name: editing.name, description: editing.description ?? "", permissions: editing.permissions }}
+          onSave={data => updateMutation.mutate({ id: editing.id, ...data })}
+          onClose={() => setEditing(null)} saving={updateMutation.isPending} error={editError} />
+      )}
+    </div>
+  );
+}
+
+// ─── Sequence Override Tab ────────────────────────────────────
+
+function SequenceTab() {
   const currentYear = new Date().getFullYear();
   const [year, setYear] = useState(currentYear);
   const [startingSequence, setStartingSequence] = useState(1);
 
-  const sequenceMutation = useMutation({
+  const mutation = useMutation({
     mutationFn: () => jobCardsApi.updateSequence(year, startingSequence),
-    onSuccess: () =>
-      toast.success(`Sequence for ${year} set — first card will be OR${String(year).slice(-2)}${String(startingSequence).padStart(5, "0")}`),
-    onError: (err: { response?: { data?: { message?: string } } }) =>
-      toast.error(err?.response?.data?.message ?? "Failed to update sequence"),
+    onSuccess: () => toast.success(`Sequence for ${year} reset — first card: OR${String(year).slice(-2)}${String(startingSequence).padStart(5, "0")}`),
+    onError: (e: { response?: { data?: { message?: string } } }) =>
+      toast.error(e?.response?.data?.message ?? "Failed to update sequence"),
   });
 
-  const isAdmin = user?.role === "Admin";
-
-  const previewNumber = `OR${String(year).slice(-2)}${String(startingSequence).padStart(5, "0")}`;
+  const preview = `OR${String(year).slice(-2)}${String(startingSequence).padStart(5, "0")}`;
 
   return (
-    <div className="max-w-2xl mx-auto p-6 space-y-6">
+    <Card className="max-w-lg">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base"><Hash className="w-4 h-4" /> Job Card Sequence Override</CardTitle>
+        <CardDescription>Set the starting number for job card IDs in a given year. Resets the counter.</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-5">
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-1.5">
+            <Label>Year</Label>
+            <Input type="number" min={2020} max={2099} value={year} onChange={e => setYear(Number(e.target.value))} />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Starting Number</Label>
+            <Input type="number" min={1} value={startingSequence} onChange={e => setStartingSequence(Number(e.target.value))} />
+          </div>
+        </div>
+
+        <div className="rounded-md bg-muted px-4 py-3 text-sm">
+          First job card for <span className="font-medium">{year}</span> will be:{" "}
+          <span className="font-mono font-bold text-primary">{preview}</span>
+        </div>
+
+        <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
+          <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+          <span>
+            This <strong>resets the counter</strong>. Next cards: {preview},{" "}
+            {`OR${String(year).slice(-2)}${String(startingSequence + 1).padStart(5, "0")}`},{" "}
+            {`OR${String(year).slice(-2)}${String(startingSequence + 2).padStart(5, "0")}`}…
+          </span>
+        </div>
+
+        <Button onClick={() => mutation.mutate()} disabled={mutation.isPending || startingSequence < 1 || year < 2020} size="sm">
+          {mutation.isPending ? "Saving…" : "Save Sequence"}
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ─── Main Page ─────────────────────────────────────────────────
+
+export default function SettingsPage() {
+  const { user } = useAuth();
+  const router = useRouter();
+  const isAdmin = user?.role === "Admin";
+
+  useEffect(() => {
+    if (user && !isAdmin) router.replace("/dashboard");
+  }, [user, isAdmin, router]);
+
+  // Pre-load groups for the Users tab's dropdown
+  const { data: groups = [] } = useQuery({
+    queryKey: ["permission-groups"],
+    queryFn: () => permissionGroupsApi.list(),
+    enabled: isAdmin,
+  });
+
+  if (!isAdmin) return null;
+
+  return (
+    <div className="p-6 space-y-6 max-w-5xl">
       <div>
         <h1 className="text-2xl font-bold flex items-center gap-2">
           <Settings className="w-6 h-6" /> Settings
         </h1>
-        <p className="text-muted-foreground text-sm mt-1">System configuration and preferences</p>
+        <p className="text-muted-foreground text-sm mt-1">System configuration, users and permissions</p>
       </div>
 
       <Separator />
 
-      {!isAdmin ? (
-        <Card>
-          <CardContent className="py-10 text-center text-muted-foreground text-sm">
-            No configurable settings available for your role.
-          </CardContent>
-        </Card>
-      ) : (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Hash className="w-4 h-4" /> Job Card Sequence Override
-            </CardTitle>
-            <CardDescription>
-              Set the starting number for job card IDs in a given year. Only applies if no
-              cards have been issued yet for that year (i.e. the sequence hasn&apos;t started).
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-5">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <Label htmlFor="seq-year">Year</Label>
-                <Input
-                  id="seq-year"
-                  type="number"
-                  min={2020}
-                  max={2099}
-                  value={year}
-                  onChange={e => setYear(Number(e.target.value))}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="seq-start">Starting Number</Label>
-                <Input
-                  id="seq-start"
-                  type="number"
-                  min={1}
-                  value={startingSequence}
-                  onChange={e => setStartingSequence(Number(e.target.value))}
-                />
-              </div>
-            </div>
+      <Tabs defaultValue="users">
+        <TabsList className="mb-6">
+          <TabsTrigger value="users" className="gap-2"><Users className="w-4 h-4" />Users</TabsTrigger>
+          <TabsTrigger value="groups" className="gap-2"><ShieldCheck className="w-4 h-4" />Permission Groups</TabsTrigger>
+          <TabsTrigger value="sequence" className="gap-2"><Hash className="w-4 h-4" />Sequence</TabsTrigger>
+        </TabsList>
 
-            <div className="rounded-md bg-muted px-4 py-3 text-sm">
-              First job card for <span className="font-medium">{year}</span> will be:{" "}
-              <span className="font-mono font-bold text-primary">{previewNumber}</span>
-            </div>
+        <TabsContent value="users">
+          <UsersTab groups={groups} />
+        </TabsContent>
 
-            <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
-              <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-              <span>
-                This <strong>resets the counter</strong>. The very next job card issued will use
-                your number, then continue: {previewNumber}, {`OR${String(year).slice(-2)}${String(startingSequence + 1).padStart(5, "0")}`},{" "}
-                {`OR${String(year).slice(-2)}${String(startingSequence + 2).padStart(5, "0")}`}…
-              </span>
-            </div>
+        <TabsContent value="groups">
+          <PermGroupsTab />
+        </TabsContent>
 
-            <Button
-              onClick={() => sequenceMutation.mutate()}
-              disabled={sequenceMutation.isPending || startingSequence < 1 || year < 2020}
-              size="sm"
-            >
-              {sequenceMutation.isPending ? "Saving…" : "Save Sequence"}
-            </Button>
-          </CardContent>
-        </Card>
-      )}
+        <TabsContent value="sequence">
+          <SequenceTab />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

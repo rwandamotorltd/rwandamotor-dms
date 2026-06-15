@@ -1,5 +1,7 @@
 using MediatR;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
+using RwandaMotor.Application.Common.Interfaces;
 using RwandaMotor.Domain.Entities;
 using FluentValidation;
 
@@ -11,7 +13,8 @@ public record CreateUserCommand(
     string FullName,
     string Email,
     string Password,
-    string Role
+    string Role,
+    Guid? PermissionGroupId = null
 ) : IRequest<(bool Success, string? Error)>;
 
 public class CreateUserCommandHandler : IRequestHandler<CreateUserCommand, (bool Success, string? Error)>
@@ -36,6 +39,7 @@ public class CreateUserCommandHandler : IRequestHandler<CreateUserCommand, (bool
             Email    = cmd.Email,
             FullName = cmd.FullName.Trim(),
             IsActive = true,
+            PermissionGroupId = cmd.PermissionGroupId,
         };
 
         var result = await _users.CreateAsync(user, cmd.Password);
@@ -50,13 +54,14 @@ public class CreateUserCommandHandler : IRequestHandler<CreateUserCommand, (bool
     }
 }
 
-// ── Update User (role + active status) ──────────────────────────────────────
+// ── Update User ───────────────────────────────────────────────────────────────
 
 public record UpdateUserCommand(
     string UserId,
     string FullName,
     string Role,
-    bool IsActive
+    bool IsActive,
+    Guid? PermissionGroupId = null
 ) : IRequest<(bool Success, string? Error)>;
 
 public class UpdateUserCommandHandler : IRequestHandler<UpdateUserCommand, (bool Success, string? Error)>
@@ -77,6 +82,7 @@ public class UpdateUserCommandHandler : IRequestHandler<UpdateUserCommand, (bool
 
         user.FullName = cmd.FullName.Trim();
         user.IsActive = cmd.IsActive;
+        user.PermissionGroupId = cmd.PermissionGroupId;
         await _users.UpdateAsync(user);
 
         // Replace role
@@ -121,6 +127,30 @@ public class ResetPasswordCommandHandler : IRequestHandler<ResetPasswordCommand,
         var token = await _users.GeneratePasswordResetTokenAsync(user);
         var result = await _users.ResetPasswordAsync(user, token, cmd.NewPassword);
 
+        if (!result.Succeeded)
+            return (false, string.Join("; ", result.Errors.Select(e => e.Description)));
+
+        return (true, null);
+    }
+}
+
+// ── Delete User ───────────────────────────────────────────────────────────────
+
+public record DeleteUserCommand(string UserId) : IRequest<(bool Success, string? Error)>;
+
+public class DeleteUserCommandHandler : IRequestHandler<DeleteUserCommand, (bool Success, string? Error)>
+{
+    private readonly UserManager<ApplicationUser> _users;
+
+    public DeleteUserCommandHandler(UserManager<ApplicationUser> users) => _users = users;
+
+    public async Task<(bool Success, string? Error)> Handle(DeleteUserCommand cmd, CancellationToken ct)
+    {
+        var user = await _users.FindByIdAsync(cmd.UserId);
+        if (user == null) return (false, "User not found.");
+
+        user.IsActive = false;
+        var result = await _users.UpdateAsync(user);
         if (!result.Succeeded)
             return (false, string.Join("; ", result.Errors.Select(e => e.Description)));
 

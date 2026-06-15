@@ -1,5 +1,7 @@
 using MediatR;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
+using RwandaMotor.Application.Common.Interfaces;
 using RwandaMotor.Domain.Entities;
 
 namespace RwandaMotor.Application.Features.Admin.Queries;
@@ -10,7 +12,9 @@ public record UserDto(
     string Email,
     string Role,
     bool IsActive,
-    DateTime CreatedAt
+    DateTime CreatedAt,
+    Guid? PermissionGroupId,
+    string? PermissionGroupName
 );
 
 public record GetUsersQuery : IRequest<List<UserDto>>;
@@ -18,24 +22,38 @@ public record GetUsersQuery : IRequest<List<UserDto>>;
 public class GetUsersQueryHandler : IRequestHandler<GetUsersQuery, List<UserDto>>
 {
     private readonly UserManager<ApplicationUser> _users;
+    private readonly IApplicationDbContext _db;
 
-    public GetUsersQueryHandler(UserManager<ApplicationUser> users) => _users = users;
+    public GetUsersQueryHandler(UserManager<ApplicationUser> users, IApplicationDbContext db)
+    {
+        _users = users;
+        _db = db;
+    }
 
     public async Task<List<UserDto>> Handle(GetUsersQuery request, CancellationToken ct)
     {
         var users = _users.Users.OrderBy(u => u.FullName).ToList();
 
+        // Load all permission groups for lookup
+        var groups = await _db.PermissionGroups
+            .ToDictionaryAsync(g => g.Id, g => g.Name, ct);
+
         var result = new List<UserDto>();
         foreach (var u in users)
         {
             var roles = await _users.GetRolesAsync(u);
+            string? groupName = u.PermissionGroupId.HasValue && groups.TryGetValue(u.PermissionGroupId.Value, out var gn)
+                ? gn : null;
+
             result.Add(new UserDto(
                 u.Id ?? "",
                 u.FullName,
                 u.Email ?? "",
                 roles.FirstOrDefault() ?? "—",
                 u.IsActive,
-                u.Id != null ? DateTime.UtcNow : DateTime.UtcNow // placeholder — Identity doesn't store CreatedAt by default
+                DateTime.UtcNow, // Identity doesn't expose CreatedAt by default
+                u.PermissionGroupId,
+                groupName
             ));
         }
         return result;

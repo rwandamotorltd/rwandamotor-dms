@@ -311,6 +311,8 @@ export interface UserItem {
   email: string;
   role: string;
   isActive: boolean;
+  permissionGroupId: string | null;
+  permissionGroupName: string | null;
 }
 
 export interface CreateUserPayload {
@@ -318,6 +320,7 @@ export interface CreateUserPayload {
   email: string;
   password: string;
   role: string;
+  permissionGroupId?: string | null;
 }
 
 export interface UpdateUserPayload {
@@ -325,6 +328,7 @@ export interface UpdateUserPayload {
   fullName: string;
   role: string;
   isActive: boolean;
+  permissionGroupId?: string | null;
 }
 
 export const adminApi = {
@@ -339,6 +343,43 @@ export const adminApi = {
 
   resetPassword: (userId: string, newPassword: string) =>
     api.post<ApiResponse<boolean>>('/admin/users/' + userId + '/reset-password', { newPassword }).then(r => r.data),
+};
+
+// ============================================================
+// Admin — Permission Groups
+// ============================================================
+export interface PermissionGroupItem {
+  id: string;
+  name: string;
+  description: string | null;
+  permissions: string[];
+  createdAt: string;
+}
+
+export interface CreatePermissionGroupPayload {
+  name: string;
+  description?: string | null;
+  permissions: string[];
+}
+
+export interface UpdatePermissionGroupPayload {
+  name: string;
+  description?: string | null;
+  permissions: string[];
+}
+
+export const permissionGroupsApi = {
+  list: () =>
+    api.get<ApiResponse<PermissionGroupItem[]>>('/admin/permission-groups').then(r => r.data.data!),
+
+  create: (payload: CreatePermissionGroupPayload) =>
+    api.post<ApiResponse<string>>('/admin/permission-groups', payload).then(r => r.data),
+
+  update: (id: string, payload: UpdatePermissionGroupPayload) =>
+    api.put<ApiResponse<boolean>>('/admin/permission-groups/' + id, payload).then(r => r.data),
+
+  delete: (id: string) =>
+    api.delete<ApiResponse<boolean>>('/admin/permission-groups/' + id).then(r => r.data),
 };
 
 // ============================================================

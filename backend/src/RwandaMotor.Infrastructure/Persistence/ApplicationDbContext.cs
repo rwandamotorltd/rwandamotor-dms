@@ -25,6 +25,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>, IApplica
     public DbSet<JobCard> JobCards => Set<JobCard>();
     public DbSet<JobCardSequence> JobCardSequences => Set<JobCardSequence>();
     public DbSet<SalesHistory> SalesHistories => Set<SalesHistory>();
+    public DbSet<PermissionGroup> PermissionGroups => Set<PermissionGroup>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -51,6 +52,13 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>, IApplica
         builder.Entity<JobCard>()
             .Property(j => j.AccessoriesPresent)
             .HasColumnType("jsonb");
+
+        // PermissionGroup: store permissions list as jsonb
+        builder.Entity<PermissionGroup>()
+            .Property(p => p.Permissions)
+            .HasColumnType("jsonb");
+        builder.Entity<PermissionGroup>()
+            .HasQueryFilter(p => !p.IsDeleted);
 
         // Unique index: one sequence row per year
         builder.Entity<JobCardSequence>()

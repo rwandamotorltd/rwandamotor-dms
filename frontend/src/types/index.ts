@@ -26,6 +26,7 @@ export interface AuthResponse {
   email: string;
   role: string;
   expiresAt: string;
+  permissions: string[];
 }
 
 export interface AuthUser {
@@ -33,6 +34,7 @@ export interface AuthUser {
   fullName: string;
   email: string;
   role: string;
+  permissions: string[];
 }
 
 // ============================================================
