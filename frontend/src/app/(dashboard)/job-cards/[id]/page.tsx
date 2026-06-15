@@ -438,4 +438,29 @@ export default function JobCardDetailPage() {
         {/* Footer signature */}
         <Card>
           <CardContent className="pt-4">
-            <div className="grid grid-
+        {/* Footer signature */}
+        <Card>
+          <CardContent className="pt-4">
+            <div className="grid grid-cols-2 gap-8">
+              <div>
+                <div className="border-t-2 border-foreground/30 pt-3 mt-10">
+                  <p className="font-semibold text-sm">Customer Signature</p>
+                  <p className="text-xs text-muted-foreground mt-1">I confirm the vehicle condition above is accurate</p>
+                </div>
+              </div>
+              <div>
+                <div className="border-t-2 border-foreground/30 pt-3 mt-10">
+                  <p className="font-semibold text-sm">Received By: {data.receivedByName}</p>
+                  <p className="text-xs text-muted-foreground mt-1">RwandaMotor Service Advisor</p>
+                  {data.status === "Closed" && data.closedByName && (
+                    <p className="text-xs text-muted-foreground">Closed by: {data.closedByName}</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </>
+  );
+}
