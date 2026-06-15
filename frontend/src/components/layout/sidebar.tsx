@@ -62,7 +62,7 @@ export function Sidebar({ collapsed, onToggle, mobileOpen = false, onMobileClose
   });
 
   const visibleBottomItems = BOTTOM_NAV.filter(item =>
-    hasPermission(item.permission)
+    !item.permission || hasPermission(item.permission)
   );
 
   function NavLink({ href, label, icon: Icon }: { href: string; label: string; icon: React.ElementType }) {
