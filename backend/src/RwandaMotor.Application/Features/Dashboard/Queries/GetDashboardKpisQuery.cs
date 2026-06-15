@@ -72,4 +72,33 @@ public class GetDashboardKpisQueryHandler : IRequestHandler<GetDashboardKpisQuer
             SixMonthRetentionRate: sixMonthSummary.RetentionRate,
             YearlyRetentionRate: yearlySummary.RetentionRate,
             RetentionTrend: trendData,
-            BrandReten
+            BrandRetention: brandData,
+            OpenJobCards: openJobCards,
+            TodayJobCards: todayJobCards,
+            MonthlyJobCards: monthlyJobCards,
+            MonthlySalesHistory: monthlySalesHistory
+        );
+    }
+}
+
+public record DashboardKpisDto(
+    int TotalVehicles,
+    int DealershipVehicles,
+    int ActiveVehicles,
+    int DueSoonVehicles,
+    int OverdueVehicles,
+    int LostVehicles,
+    int RecoveredVehicles,
+    int TotalCustomers,
+    int ActiveFollowUps,
+    int MonthlyServiceCount,
+    decimal MonthlyRetentionRate,
+    decimal QuarterlyRetentionRate,
+    decimal SixMonthRetentionRate,
+    decimal YearlyRetentionRate,
+    List<RetentionTrendPointDto> RetentionTrend,
+    List<BrandRetentionDto> BrandRetention,
+    int OpenJobCards,
+    int TodayJobCards,
+    int MonthlyJobCards,
+    int MonthlySalesHistory);

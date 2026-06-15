@@ -40,7 +40,7 @@ public class ConvertToDeliveryNoteCommandHandler : IRequestHandler<ConvertToDeli
         var now = DateTime.UtcNow;
 
         // Generate Delivery Note number: DN + YY + same sequence as job card
-        var dnNumber = "DN" + jobCard.JobCardNumber[2..]; // OR2600001 → DN2600001
+        var dnNumber = "DN" + jobCard.JobCardNumber[2..]; // OR2600001 -> DN2600001
 
         jobCard.Status = JobCardStatus.Closed;
         jobCard.ClosedAt = now;
@@ -51,7 +51,7 @@ public class ConvertToDeliveryNoteCommandHandler : IRequestHandler<ConvertToDeli
         jobCard.UpdatedAt = now;
         jobCard.UpdatedBy = _currentUser.UserId;
 
-        // ── Auto-create Service Record ────────────────────────────────────────
+        // -- Auto-create Service Record ----------------------------------------
         var nextService = await _intervalEngine.CalculateNextServiceAsync(
             jobCard.VehicleId, jobCard.Mileage, now, ct);
 
@@ -62,4 +62,52 @@ public class ConvertToDeliveryNoteCommandHandler : IRequestHandler<ConvertToDeli
             ServiceDate = now,
             MileageAtService = jobCard.Mileage,
             ServiceType = jobCard.ServiceType,
-            ServiceDe
+            ServiceDescription = $"Auto-created from Job Card {jobCard.JobCardNumber}",
+            InvoiceNumber = dnNumber,
+            Notes = jobCard.Notes,
+            NextServiceMileage = nextService.NextServiceMileage,
+            NextServiceDate = nextService.NextServiceDate,
+            CreatedBy = _currentUser.UserId
+        };
+        _db.ServiceRecords.Add(serviceRecord);
+
+        // Update vehicle service tracking fields
+        var vehicle = jobCard.Vehicle;
+        if (vehicle != null)
+        {
+            vehicle.LastServiceDate = now;
+            vehicle.LastServiceMileage = jobCard.Mileage;
+            vehicle.CurrentMileage = Math.Max(vehicle.CurrentMileage ?? 0, jobCard.Mileage);
+            vehicle.NextServiceDate = nextService.NextServiceDate;
+            vehicle.NextServiceMileage = nextService.NextServiceMileage;
+            vehicle.UpdatedAt = now;
+        }
+
+        // If PDI -> create a SalesHistory entry
+        if (jobCard.ServiceType == ServiceType.PDI)
+        {
+            _db.SalesHistories.Add(new SalesHistory
+            {
+                VehicleId = jobCard.VehicleId,
+                CustomerId = jobCard.CustomerId,
+                JobCardId = jobCard.Id,
+                SaleDate = now,
+                SaleType = "PDI",
+                VIN = jobCard.VIN,
+                PlateNumber = jobCard.PlateNumber,
+                CustomerName = jobCard.CustomerName,
+                JobCardNumber = jobCard.JobCardNumber,
+                DeliveryNoteNumber = dnNumber,
+                Notes = "Auto-created from PDI Job Card conversion",
+                CreatedBy = _currentUser.UserId
+            });
+        }
+
+        await _db.SaveChangesAsync(ct);
+
+        // Re-evaluate retention status after new service
+        await _retentionEngine.EvaluateVehicleStatusAsync(jobCard.VehicleId, ct);
+
+        return dnNumber;
+    }
+}

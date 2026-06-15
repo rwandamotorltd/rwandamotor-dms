@@ -10,7 +10,7 @@ using RwandaMotor.Infrastructure;
 using RwandaMotor.Infrastructure.Persistence.Seed;
 using Serilog;
 
-// Fix Npgsql 6+ DateTime UTC requirement — must be before any EF/Npgsql code
+// Fix Npgsql 6+ DateTime UTC requirement -- must be before any EF/Npgsql code
 AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
 
 var builder = WebApplication.CreateBuilder(args);
@@ -94,7 +94,7 @@ builder.Services.AddCors(options =>
 builder.Services.AddControllers()
     .AddJsonOptions(opts =>
     {
-        // Allow string ↔ enum round-trip (frontend sends "Phone", "Retail", etc.)
+        // Allow string <-> enum round-trip (frontend sends "Phone", "Retail", etc.)
         opts.JsonSerializerOptions.Converters.Add(
             new System.Text.Json.Serialization.JsonStringEnumConverter());
     });
@@ -105,7 +105,7 @@ builder.Services.AddSwaggerGen(c =>
     {
         Title = "RwandaMotor DMS API",
         Version = "v1",
-        Description = "Retention & Service Intelligence Platform — Rwanda Multi-Brand Automotive DMS"
+        Description = "Retention & Service Intelligence Platform -- Rwanda Multi-Brand Automotive DMS"
     });
     c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
@@ -147,4 +147,17 @@ if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI(c =>
-    
+    {
+        c.SwaggerEndpoint("/swagger/v1/swagger.json", "RwandaMotor DMS API v1");
+        c.RoutePrefix = "swagger";
+    });
+}
+
+app.UseSerilogRequestLogging();
+app.UseMiddleware<RwandaMotor.API.Middleware.ExceptionHandlingMiddleware>();
+app.UseCors("DmsPolicy");
+app.UseAuthentication();
+app.UseAuthorization();
+app.MapControllers();
+
+app.Run();

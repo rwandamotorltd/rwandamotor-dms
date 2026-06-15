@@ -7,7 +7,7 @@ using FluentValidation;
 
 namespace RwandaMotor.Application.Features.Admin.Commands;
 
-// ── Create User ──────────────────────────────────────────────────────────────
+// -- Create User ---------------------------------------------------------------
 
 public record CreateUserCommand(
     string FullName,
@@ -54,7 +54,7 @@ public class CreateUserCommandHandler : IRequestHandler<CreateUserCommand, (bool
     }
 }
 
-// ── Update User ───────────────────────────────────────────────────────────────
+// -- Update User ---------------------------------------------------------------
 
 public record UpdateUserCommand(
     string UserId,
@@ -97,7 +97,7 @@ public class UpdateUserCommandHandler : IRequestHandler<UpdateUserCommand, (bool
     }
 }
 
-// ── Reset Password ───────────────────────────────────────────────────────────
+// -- Reset Password ------------------------------------------------------------
 
 public record ResetPasswordCommand(
     string UserId,
@@ -122,4 +122,38 @@ public class ResetPasswordCommandHandler : IRequestHandler<ResetPasswordCommand,
     public async Task<(bool Success, string? Error)> Handle(ResetPasswordCommand cmd, CancellationToken ct)
     {
         var user = await _users.FindByIdAsync(cmd.UserId);
-        if (user == null) return (false, "User not found
+        if (user == null) return (false, "User not found.");
+
+        var token = await _users.GeneratePasswordResetTokenAsync(user);
+        var result = await _users.ResetPasswordAsync(user, token, cmd.NewPassword);
+
+        if (!result.Succeeded)
+            return (false, string.Join("; ", result.Errors.Select(e => e.Description)));
+
+        return (true, null);
+    }
+}
+
+// -- Delete User ---------------------------------------------------------------
+
+public record DeleteUserCommand(string UserId) : IRequest<(bool Success, string? Error)>;
+
+public class DeleteUserCommandHandler : IRequestHandler<DeleteUserCommand, (bool Success, string? Error)>
+{
+    private readonly UserManager<ApplicationUser> _users;
+
+    public DeleteUserCommandHandler(UserManager<ApplicationUser> users) => _users = users;
+
+    public async Task<(bool Success, string? Error)> Handle(DeleteUserCommand cmd, CancellationToken ct)
+    {
+        var user = await _users.FindByIdAsync(cmd.UserId);
+        if (user == null) return (false, "User not found.");
+
+        user.IsActive = false;
+        var result = await _users.UpdateAsync(user);
+        if (!result.Succeeded)
+            return (false, string.Join("; ", result.Errors.Select(e => e.Description)));
+
+        return (true, null);
+    }
+}

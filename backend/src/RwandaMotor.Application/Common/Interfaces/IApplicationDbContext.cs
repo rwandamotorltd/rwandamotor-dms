@@ -18,4 +18,9 @@ public interface IApplicationDbContext
     DbSet<ImportLog> ImportLogs { get; }
     DbSet<ImportLogRow> ImportLogRows { get; }
     DbSet<JobCard> JobCards { get; }
-    DbSet<JobCardSequence> JobCardSequences {
+    DbSet<JobCardSequence> JobCardSequences { get; }
+    DbSet<SalesHistory> SalesHistories { get; }
+    DbSet<PermissionGroup> PermissionGroups { get; }
+
+    Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
+}

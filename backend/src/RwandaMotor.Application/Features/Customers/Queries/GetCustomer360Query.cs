@@ -1,6 +1,7 @@
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using RwandaMotor.Application.Common.Interfaces;
+using RwandaMotor.Application.Features.Vehicles.Queries;
 using RwandaMotor.Domain.Enums;
 
 namespace RwandaMotor.Application.Features.Customers.Queries;
@@ -24,6 +25,27 @@ public class GetCustomer360QueryHandler : IRequestHandler<GetCustomer360Query, C
             .FirstOrDefaultAsync(ct);
 
         if (customer == null) return null;
+
+        var jobCards = await _db.JobCards
+            .Include(j => j.Technician)
+            .Where(j => j.CustomerId == request.CustomerId && !j.IsDeleted)
+            .OrderByDescending(j => j.CreatedAt)
+            .Select(j => new JobCard360Dto(
+                j.Id,
+                j.JobCardNumber,
+                j.VIN,
+                j.PlateNumber,
+                j.ServiceType,
+                j.Status,
+                j.Mileage,
+                j.TechnicianId,
+                j.Technician != null ? j.Technician.FullName : null,
+                j.CreatedAt,
+                j.ClosedAt,
+                j.DeliveryNoteNumber,
+                j.Notes
+            ))
+            .ToListAsync(ct);
 
         var vehicles = customer.Vehicles
             .Where(v => !v.IsDeleted)
@@ -82,7 +104,8 @@ public class GetCustomer360QueryHandler : IRequestHandler<GetCustomer360Query, C
             customer.IsActive,
             customer.CreatedAt,
             vehicles,
-            serviceHistory
+            serviceHistory,
+            jobCards
         );
     }
 }
@@ -103,7 +126,8 @@ public record Customer360Dto(
     bool IsActive,
     DateTime CreatedAt,
     List<CustomerVehicleSummaryDto> Vehicles,
-    List<CustomerServiceHistoryDto> ServiceHistory
+    List<CustomerServiceHistoryDto> ServiceHistory,
+    List<JobCard360Dto> JobCards
 );
 
 public record CustomerVehicleSummaryDto(

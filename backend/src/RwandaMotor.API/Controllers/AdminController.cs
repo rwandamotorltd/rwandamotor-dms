@@ -50,4 +50,4 @@ public class AdminController : ControllerBase
     }
 }
 
-publ
+public record ResetPasswordRequest(string NewPassword);
