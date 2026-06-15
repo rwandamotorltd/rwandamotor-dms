@@ -173,7 +173,7 @@ function CreateJobCardDialog({ open, onClose, onCreated }: {
 
             <div className="space-y-1">
               <Label>Technician</Label>
-              <Select value={technicianId} onValueChange={setTechnicianId}>
+              <Select value={technicianId} onValueChange={(val) => setTechnicianId(val ?? "")}>
                 <SelectTrigger><SelectValue placeholder="Unassigned" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="">Unassigned</SelectItem>
@@ -497,7 +497,4 @@ export default function JobCardsPage() {
       />
       {shareTarget && (
         <ShareDialog jobCard={shareTarget} open={true} onClose={() => setShareTarget(null)} />
-      )}
-    </div>
-  );
-}
+      )
