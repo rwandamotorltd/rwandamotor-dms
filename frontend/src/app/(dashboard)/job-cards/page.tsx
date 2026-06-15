@@ -497,4 +497,7 @@ export default function JobCardsPage() {
       />
       {shareTarget && (
         <ShareDialog jobCard={shareTarget} open={true} onClose={() => setShareTarget(null)} />
-      )
+      )}
+    </div>
+  );
+}
