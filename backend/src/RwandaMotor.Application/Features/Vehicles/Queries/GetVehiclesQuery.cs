@@ -33,15 +33,14 @@ public class GetVehiclesQueryHandler : IRequestHandler<GetVehiclesQuery, Paginat
 
         if (!string.IsNullOrWhiteSpace(q.Search))
         {
-            // SQL Server default collation is case-insensitive — Contains() translates to
-            // LIKE '%term%' which works without LOWER() and preserves index hints.
-            var s = q.Search.Trim();
+            // PostgreSQL: use ILike for case-insensitive pattern matching
+            var s = $"%{q.Search.Trim()}%";
             query = query.Where(v =>
-                v.VIN.Contains(s) ||
-                (v.PlateNumber != null && v.PlateNumber.Contains(s)) ||
-                (v.Customer != null && v.Customer.FullName.Contains(s)) ||
-                v.Brand.Name.Contains(s) ||
-                v.Model.Name.Contains(s));
+                EF.Functions.ILike(v.VIN, s) ||
+                (v.PlateNumber != null && EF.Functions.ILike(v.PlateNumber, s)) ||
+                (v.Customer != null && EF.Functions.ILike(v.Customer.FullName, s)) ||
+                EF.Functions.ILike(v.Brand.Name, s) ||
+                EF.Functions.ILike(v.Model.Name, s));
         }
 
         if (q.BrandId.HasValue) query = query.Where(v => v.BrandId == q.BrandId);

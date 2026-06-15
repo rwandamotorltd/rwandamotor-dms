@@ -181,7 +181,7 @@ function AddVehicleDialog({ open, onClose, onCreated }: {
               <Label>Brand <span className="text-red-500">*</span></Label>
               <Select value={brandId} onValueChange={v => { setBrandId(v ?? ""); setModelId(""); }}>
                 <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select brand" />
+                  <span className={`flex flex-1 text-left${!brandId ? " text-muted-foreground" : ""}`}>{brandId ? (brands?.find(b => b.id === brandId)?.name ?? "…") : "Select brand"}</span>
                 </SelectTrigger>
                 <SelectContent>
                   {brands?.map(b => (
@@ -194,7 +194,7 @@ function AddVehicleDialog({ open, onClose, onCreated }: {
               <Label>Model <span className="text-red-500">*</span></Label>
               <Select value={modelId} onValueChange={v => setModelId(v ?? "")} disabled={!brandId || models.length === 0}>
                 <SelectTrigger className="w-full">
-                  <SelectValue placeholder={!brandId ? "Select brand first" : "Select model"} />
+                  <span className={`flex flex-1 text-left${!modelId ? " text-muted-foreground" : ""}`}>{modelId ? (models.find(m => m.id === modelId)?.name ?? "…") : (!brandId ? "Select brand first" : "Select model")}</span>
                 </SelectTrigger>
                 <SelectContent>
                   {models.map(m => (
@@ -238,7 +238,7 @@ function AddVehicleDialog({ open, onClose, onCreated }: {
             <div className="space-y-1">
               <Label>Fuel Type</Label>
               <Select value={fuelType} onValueChange={v => setFuelType(v ?? "")}>
-                <SelectTrigger className="w-full"><SelectValue placeholder="Select…" /></SelectTrigger>
+                <SelectTrigger className="w-full"><span className={`flex flex-1 text-left${!fuelType ? " text-muted-foreground" : ""}`}>{fuelType || "Select…"}</span></SelectTrigger>
                 <SelectContent>
                   {FUEL_TYPES.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}
                 </SelectContent>
@@ -247,7 +247,7 @@ function AddVehicleDialog({ open, onClose, onCreated }: {
             <div className="space-y-1">
               <Label>Transmission</Label>
               <Select value={transmission} onValueChange={v => setTransmission(v ?? "")}>
-                <SelectTrigger className="w-full"><SelectValue placeholder="Select…" /></SelectTrigger>
+                <SelectTrigger className="w-full"><span className={`flex flex-1 text-left${!transmission ? " text-muted-foreground" : ""}`}>{transmission || "Select…"}</span></SelectTrigger>
                 <SelectContent>
                   {TRANSMISSIONS.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
                 </SelectContent>
@@ -341,7 +341,10 @@ function CreateJobCardDialog({ open, onClose, onCreated }: {
         toast.error(res.message ?? "Failed to create job card");
       }
     },
-    onError: () => toast.error("Failed to create job card"),
+    onError: (err: unknown) => {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      toast.error(msg ?? "Failed to create job card");
+    },
   });
 
   const selectVehicle = (v: VehicleListItem) => {
@@ -489,7 +492,7 @@ function CreateJobCardDialog({ open, onClose, onCreated }: {
               <div className="space-y-1">
                 <Label>Service Type <span className="text-red-500">*</span></Label>
                 <Select value={serviceType} onValueChange={v => setServiceType(v as ServiceType)}>
-                  <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="w-full"><span className="flex flex-1 text-left">{serviceTypeLabel(serviceType)}</span></SelectTrigger>
                   <SelectContent>
                     {SERVICE_TYPES.map(t => (
                       <SelectItem key={t} value={t}>{serviceTypeLabel(t)}</SelectItem>
@@ -500,7 +503,11 @@ function CreateJobCardDialog({ open, onClose, onCreated }: {
               <div className="space-y-1">
                 <Label>Technician</Label>
                 <Select value={technicianId} onValueChange={v => setTechnicianId(v ?? "")}>
-                  <SelectTrigger className="w-full"><SelectValue placeholder="Unassigned" /></SelectTrigger>
+                  <SelectTrigger className="w-full">
+                    <span className={`flex flex-1 text-left${!technicianId ? " text-muted-foreground" : ""}`}>
+                      {technicianId ? (technicians?.find(t => t.id === technicianId)?.fullName ?? "…") : "Unassigned"}
+                    </span>
+                  </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="">Unassigned</SelectItem>
                     {technicians?.map(t => (
@@ -526,7 +533,7 @@ function CreateJobCardDialog({ open, onClose, onCreated }: {
               <div className="space-y-1">
                 <Label>Fuel Level</Label>
                 <Select value={fuelLevel} onValueChange={v => setFuelLevel(v as FuelLevel)}>
-                  <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="w-full"><span className="flex flex-1 text-left">{FUEL_LEVELS.find(f => f.value === fuelLevel)?.label ?? fuelLevel}</span></SelectTrigger>
                   <SelectContent>
                     {FUEL_LEVELS.map(f => (
                       <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>
@@ -712,7 +719,7 @@ export default function JobCardsPage() {
         </div>
         <Select value={statusFilter} onValueChange={v => { setStatusFilter(v as JobCardStatus | ""); setPage(1); }}>
           <SelectTrigger className="w-36">
-            <SelectValue placeholder="All statuses" />
+            <span className={`flex flex-1 text-left${!statusFilter ? " text-muted-foreground" : ""}`}>{statusFilter || "All statuses"}</span>
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="">All statuses</SelectItem>
@@ -722,7 +729,7 @@ export default function JobCardsPage() {
         </Select>
         <Select value={serviceTypeFilter} onValueChange={v => { setServiceTypeFilter(v as ServiceType | ""); setPage(1); }}>
           <SelectTrigger className="w-48">
-            <SelectValue placeholder="All service types" />
+            <span className={`flex flex-1 text-left${!serviceTypeFilter ? " text-muted-foreground" : ""}`}>{serviceTypeFilter ? serviceTypeLabel(serviceTypeFilter) : "All service types"}</span>
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="">All service types</SelectItem>
