@@ -1,5 +1,6 @@
 "use client";
 
+import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
@@ -14,8 +15,15 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
-// permission key required to show the nav item (null = always visible)
-const NAV_ITEMS = [
+interface NavItem {
+  href: string;
+  label: string;
+  icon: React.ElementType;
+  permission: string | null;
+  adminOnly?: boolean;
+}
+
+const NAV_ITEMS: NavItem[] = [
   { href: "/dashboard",         label: "Dashboard",      icon: LayoutDashboard, permission: "nav.dashboard" },
   { href: "/vehicles",          label: "Vehicles",        icon: Car,             permission: "nav.vehicles" },
   { href: "/customers",         label: "Customers",       icon: Users,           permission: "nav.customers" },
@@ -23,12 +31,12 @@ const NAV_ITEMS = [
   { href: "/job-cards",         label: "Job Cards",       icon: ClipboardList,   permission: "nav.jobCards" },
   { href: "/retention",         label: "Retention",       icon: TrendingUp,      permission: "nav.retention" },
   { href: "/import",            label: "Import Center",   icon: Upload,          permission: "nav.import" },
-  { href: "/admin/technicians", label: "Technicians",     icon: Activity,        permission: null as string | null, adminOnly: true },
-] as const;
+  { href: "/admin/technicians", label: "Technicians",     icon: Activity,        permission: null, adminOnly: true },
+];
 
-const BOTTOM_NAV = [
+const BOTTOM_NAV: NavItem[] = [
   { href: "/settings", label: "Settings", icon: Settings, permission: "nav.settings" },
-] as const;
+];
 
 interface SidebarProps {
   collapsed: boolean;
