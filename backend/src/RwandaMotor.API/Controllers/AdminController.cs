@@ -48,6 +48,22 @@ public class AdminController : ControllerBase
         if (!success) return BadRequest(ApiResponse<bool>.Fail(error ?? "Failed to reset password"));
         return Ok(ApiResponse<bool>.Ok(true, "Password reset successfully"));
     }
+
+    // ── Company Settings ──────────────────────────────────────
+
+    [HttpGet("company-settings")]
+    public async Task<IActionResult> GetCompanySettings()
+    {
+        var result = await _mediator.Send(new GetCompanySettingsQuery());
+        return Ok(ApiResponse<CompanySettingsDto>.Ok(result));
+    }
+
+    [HttpPut("company-settings")]
+    public async Task<IActionResult> UpdateCompanySettings([FromBody] UpdateCompanySettingsCommand command)
+    {
+        await _mediator.Send(command);
+        return Ok(ApiResponse<bool>.Ok(true, "Company settings updated successfully"));
+    }
 }
 
 public record ResetPasswordRequest(string NewPassword);

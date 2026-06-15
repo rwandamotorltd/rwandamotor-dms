@@ -394,6 +394,23 @@ export interface ServicePolicy {
 }
 
 // ============================================================
+// Company Settings
+// ============================================================
+export interface CompanySettings {
+  companyName: string;
+  address: string | null;
+  phone: string | null;
+  email: string | null;
+  tinNumber: string | null;
+  website: string | null;
+  jobCardShowHeader: boolean;
+  jobCardShowFooter: boolean;
+  deliveryNoteShowHeader: boolean;
+  deliveryNoteShowFooter: boolean;
+  footerDisclaimer: string | null;
+}
+
+// ============================================================
 // Job Cards
 // ============================================================
 export interface JobCardListItem {

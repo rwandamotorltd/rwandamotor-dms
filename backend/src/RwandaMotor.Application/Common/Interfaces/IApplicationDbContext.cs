@@ -21,6 +21,7 @@ public interface IApplicationDbContext
     DbSet<JobCardSequence> JobCardSequences { get; }
     DbSet<SalesHistory> SalesHistories { get; }
     DbSet<PermissionGroup> PermissionGroups { get; }
+    DbSet<CompanySettings> CompanySettings { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

@@ -5,16 +5,17 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import {
   Settings, Hash, AlertTriangle, Users, ShieldCheck,
-  Plus, Pencil, Trash2, X, Eye, EyeOff, KeyRound, Check
+  Plus, Pencil, Trash2, X, Eye, EyeOff, KeyRound, Check, Building2, Save
 } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
 import { useRouter } from "next/navigation";
 import {
-  adminApi, permissionGroupsApi,
+  adminApi, permissionGroupsApi, companySettingsApi,
   type UserItem, type CreateUserPayload, type UpdateUserPayload,
   type PermissionGroupItem, type CreatePermissionGroupPayload,
 } from "@/lib/api";
 import { jobCardsApi } from "@/lib/api";
+import type { CompanySettings } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -712,6 +713,179 @@ function SequenceTab() {
   );
 }
 
+// ─── Company Tab ───────────────────────────────────────────────
+
+const EMPTY_COMPANY: CompanySettings = {
+  companyName: "RwandaMotor",
+  address: null,
+  phone: null,
+  email: null,
+  tinNumber: null,
+  website: null,
+  jobCardShowHeader: true,
+  jobCardShowFooter: true,
+  deliveryNoteShowHeader: true,
+  deliveryNoteShowFooter: true,
+  footerDisclaimer: "RwandaMotor declines all responsibility for materials not listed above.",
+};
+
+function CompanyTab() {
+  const qc = useQueryClient();
+  const { data, isLoading } = useQuery({
+    queryKey: ["company-settings"],
+    queryFn: () => companySettingsApi.get(),
+  });
+
+  const [form, setForm] = useState<CompanySettings>(EMPTY_COMPANY);
+
+  useEffect(() => {
+    if (data) setForm(data);
+  }, [data]);
+
+  const mutation = useMutation({
+    mutationFn: () => companySettingsApi.update(form),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["company-settings"] });
+      toast.success("Company settings saved");
+    },
+    onError: () => toast.error("Failed to save company settings"),
+  });
+
+  const patch = (p: Partial<CompanySettings>) => setForm(f => ({ ...f, ...p }));
+
+  if (isLoading) {
+    return (
+      <div className="space-y-3">
+        {[...Array(6)].map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6 max-w-2xl">
+      {/* Company Info */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Building2 className="w-4 h-4 text-muted-foreground" /> Company Information
+          </CardTitle>
+          <CardDescription>
+            These details appear on printed documents (job cards, delivery notes).
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label>Company Name <span className="text-destructive">*</span></Label>
+              <Input value={form.companyName} onChange={e => patch({ companyName: e.target.value })} placeholder="RwandaMotor" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>TIN Number</Label>
+              <Input value={form.tinNumber ?? ""} onChange={e => patch({ tinNumber: e.target.value || null })} placeholder="000000000" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Phone</Label>
+              <Input value={form.phone ?? ""} onChange={e => patch({ phone: e.target.value || null })} placeholder="+250 788 000 000" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Email</Label>
+              <Input type="email" value={form.email ?? ""} onChange={e => patch({ email: e.target.value || null })} placeholder="admin@rwandamotor.com" />
+            </div>
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label>Address</Label>
+              <Input value={form.address ?? ""} onChange={e => patch({ address: e.target.value || null })} placeholder="KG 123 St, Kigali, Rwanda" />
+            </div>
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label>Website</Label>
+              <Input value={form.website ?? ""} onChange={e => patch({ website: e.target.value || null })} placeholder="www.rwandamotor.com" />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Print Toggles */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Print Configuration</CardTitle>
+          <CardDescription>
+            Control which sections appear on each document type when printed.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Job Card toggles */}
+            <div className="rounded-lg border border-border p-4 space-y-3">
+              <p className="text-sm font-medium">Job Card</p>
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={form.jobCardShowHeader}
+                  onChange={e => patch({ jobCardShowHeader: e.target.checked })}
+                  className="h-4 w-4 rounded border-border accent-primary"
+                />
+                <span className="text-sm">Show company header</span>
+              </label>
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={form.jobCardShowFooter}
+                  onChange={e => patch({ jobCardShowFooter: e.target.checked })}
+                  className="h-4 w-4 rounded border-border accent-primary"
+                />
+                <span className="text-sm">Show footer disclaimer</span>
+              </label>
+            </div>
+
+            {/* Delivery Note toggles */}
+            <div className="rounded-lg border border-border p-4 space-y-3">
+              <p className="text-sm font-medium">Delivery Note</p>
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={form.deliveryNoteShowHeader}
+                  onChange={e => patch({ deliveryNoteShowHeader: e.target.checked })}
+                  className="h-4 w-4 rounded border-border accent-primary"
+                />
+                <span className="text-sm">Show company header</span>
+              </label>
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={form.deliveryNoteShowFooter}
+                  onChange={e => patch({ deliveryNoteShowFooter: e.target.checked })}
+                  className="h-4 w-4 rounded border-border accent-primary"
+                />
+                <span className="text-sm">Show footer disclaimer</span>
+              </label>
+            </div>
+          </div>
+
+          {/* Footer disclaimer text */}
+          <div className="space-y-1.5">
+            <Label>Footer Disclaimer / Terms</Label>
+            <textarea
+              className="w-full min-h-[80px] rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-y"
+              value={form.footerDisclaimer ?? ""}
+              onChange={e => patch({ footerDisclaimer: e.target.value || null })}
+              placeholder="RwandaMotor declines all responsibility for materials not listed above."
+            />
+            <p className="text-xs text-muted-foreground">
+              Appears at the bottom of printed documents when footer is enabled.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="flex justify-end">
+        <Button onClick={() => mutation.mutate()} disabled={mutation.isPending} className="gap-2">
+          <Save className="w-4 h-4" />
+          {mutation.isPending ? "Saving…" : "Save Company Settings"}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Page ─────────────────────────────────────────────────
 
 export default function SettingsPage() {
@@ -748,6 +922,7 @@ export default function SettingsPage() {
           <TabsTrigger value="users" className="gap-2"><Users className="w-4 h-4" />Users</TabsTrigger>
           <TabsTrigger value="groups" className="gap-2"><ShieldCheck className="w-4 h-4" />Permission Groups</TabsTrigger>
           <TabsTrigger value="sequence" className="gap-2"><Hash className="w-4 h-4" />Sequence</TabsTrigger>
+          <TabsTrigger value="company" className="gap-2"><Building2 className="w-4 h-4" />Company</TabsTrigger>
         </TabsList>
 
         <TabsContent value="users">
@@ -760,6 +935,10 @@ export default function SettingsPage() {
 
         <TabsContent value="sequence">
           <SequenceTab />
+        </TabsContent>
+
+        <TabsContent value="company">
+          <CompanyTab />
         </TabsContent>
       </Tabs>
     </div>

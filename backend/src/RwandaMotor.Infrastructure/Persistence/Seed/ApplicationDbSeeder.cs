@@ -36,6 +36,7 @@ public class ApplicationDbSeeder
         await SeedTechniciansAndBays();
         await SeedDemoData();
         await CleanupDemoServiceRecords(); // remove seeded demo service records
+        await SeedCompanySettings();
         _logger.LogInformation("Database seeding completed.");
     }
 
@@ -357,5 +358,31 @@ public class ApplicationDbSeeder
 
         await _db.SaveChangesAsync();
         _logger.LogInformation("Cleaned up {Count} demo service records.", demoRecords.Count);
+    }
+
+    private async Task SeedCompanySettings()
+    {
+        var existing = await _db.CompanySettings.FindAsync(CompanySettings.SingletonId);
+        if (existing != null) return; // already seeded — never overwrite admin edits
+
+        _db.CompanySettings.Add(new CompanySettings
+        {
+            Id               = CompanySettings.SingletonId,
+            CompanyName      = "RwandaMotor",
+            Address          = "KG 123 St, Kigali, Rwanda",
+            Phone            = "+250 788 000 000",
+            Email            = "admin@rwandamotor.com",
+            TinNumber        = "000000000",
+            Website          = "www.rwandamotor.com",
+            JobCardShowHeader          = true,
+            JobCardShowFooter          = true,
+            DeliveryNoteShowHeader     = true,
+            DeliveryNoteShowFooter     = true,
+            FooterDisclaimer = "RwandaMotor declines all responsibility for materials not listed above.",
+            UpdatedAt        = DateTime.UtcNow,
+        });
+
+        await _db.SaveChangesAsync();
+        _logger.LogInformation("CompanySettings seeded.");
     }
 }

@@ -2,7 +2,8 @@
 
 import { useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { jobCardsApi } from "@/lib/api";
+import { jobCardsApi, companySettingsApi } from "@/lib/api";
+import type { CompanySettings } from "@/types";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -41,146 +42,214 @@ function FuelGauge({ level }: { level: string }) {
 
 // ─── Print template (rendered offscreen, injected on demand) ─────────────────
 
-function PrintView({ data }: { data: NonNullable<ReturnType<typeof useJobCard>["data"]> }) {
-  const accessories_all = [
-    "Jack","Spare Tyre","Spanner / Wheel Brace","Fire Extinguisher",
-    "Warning Triangle","First Aid Kit","Reflective Vest","Tool Kit",
-    "Owner's Manual","Locking Wheel Nut Key",
-  ];
+// Accessories as shown on the PDF (short names, exact order)
+const PRINT_ACCESSORIES = [
+  { label: "Wheel Spanner",     key: "Spanner / Wheel Brace" },
+  { label: "Jack",              key: "Jack" },
+  { label: "Warning Triangle",  key: "Warning Triangle" },
+  { label: "Fire Extinguisher", key: "Fire Extinguisher" },
+  { label: "Spare Tyre",        key: "Spare Tyre" },
+];
+
+type JobCardData = NonNullable<ReturnType<typeof useJobCard>["data"]>;
+
+interface PrintViewProps {
+  data: JobCardData;
+  settings: CompanySettings;
+}
+
+function PrintView({ data, settings }: PrintViewProps) {
+  const isDelivery = data.status === "Closed" && !!data.deliveryNoteNumber;
+  const docNumber  = isDelivery ? data.deliveryNoteNumber! : data.jobCardNumber;
+  const docDate    = format(new Date(data.createdAt), "dd/MM/yyyy");
+  const serviceLabel = data.serviceType.replace(/([A-Z])/g, " $1").trim().toUpperCase();
+
+  // Split notes into numbered work items
+  const workItems = (data.notes ?? "")
+    .split(/\n/)
+    .map(l => l.trim())
+    .filter(Boolean);
+
+  const cell = (style?: React.CSSProperties): React.CSSProperties => ({
+    border: "1px solid #000", padding: "3px 6px", ...style,
+  });
+
+  const showHeader  = isDelivery ? settings.deliveryNoteShowHeader : settings.jobCardShowHeader;
+  const showFooter  = isDelivery ? settings.deliveryNoteShowFooter : settings.jobCardShowFooter;
 
   return (
     <div
       id="job-card-print"
-      style={{ fontFamily: "Arial, sans-serif", fontSize: 12, padding: 32, maxWidth: 750, margin: "0 auto" }}
+      style={{ fontFamily: "Arial, sans-serif", fontSize: 11, padding: 28, maxWidth: 770, margin: "0 auto", color: "#000" }}
     >
-      {/* Header */}
-      <table style={{ width: "100%", marginBottom: 16 }}>
-        <tbody>
-          <tr>
-            <td>
-              <h1 style={{ margin: 0, fontSize: 20, fontWeight: "bold" }}>RWANDAMOTOR</h1>
-              <p style={{ margin: 0, color: "#555" }}>Customer Service Reception Record</p>
-            </td>
-            <td style={{ textAlign: "right" }}>
-              <div style={{ fontSize: 18, fontWeight: "bold", fontFamily: "monospace" }}>
-                {data.status === "Closed" && data.deliveryNoteNumber
-                  ? data.deliveryNoteNumber
-                  : data.jobCardNumber}
-              </div>
-              <div style={{ fontSize: 11, color: "#555" }}>
-                {data.status === "Closed" ? "DELIVERY NOTE" : "JOB CARD"}
-              </div>
-              <div style={{ fontSize: 11 }}>{format(new Date(data.createdAt), "dd MMM yyyy")}</div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-
-      <hr />
-
-      {/* Vehicle Info */}
-      <h3 style={{ marginBottom: 6 }}>Vehicle Information</h3>
-      <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: 12 }}>
-        <tbody>
-          {[
-            ["VIN", data.vin], ["Plate Number", data.plateNumber ?? "—"],
-            ["Year", data.year], ["Colour", data.color ?? "—"],
-            ["Make / Model", `${data.brandName} ${data.modelName}`],
-            ["Transmission", data.transmission ?? "—"], ["Fuel Type", data.fuelType ?? "—"],
-            ["Fuel Level", FUEL_LABELS[data.fuelLevel] ?? data.fuelLevel],
-            ["Mileage In (km)", data.mileage.toLocaleString()],
-          ].reduce<[string, string | number][][]>((rows, item, i) =>
-            i % 2 === 0 ? [...rows, [item as [string, string | number]]] : [...rows.slice(0, -1), [...rows[rows.length - 1], item as [string, string | number]]],
-          []).map((row, ri) => (
-            <tr key={ri} style={{ background: ri % 2 === 0 ? "#f9f9f9" : "#fff" }}>
-              {row.map(([label, val], ci) => (
-                <>
-                  <td key={`${ri}-${ci}-l`} style={{ padding: "4px 8px", fontWeight: "bold", width: "20%", border: "1px solid #ddd" }}>{label}</td>
-                  <td key={`${ri}-${ci}-v`} style={{ padding: "4px 8px", width: "30%", border: "1px solid #ddd" }}>{val}</td>
-                </>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-
-      {/* Customer Info */}
-      <h3 style={{ marginBottom: 6 }}>Customer Information</h3>
-      <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: 12 }}>
-        <tbody>
-          <tr style={{ background: "#f9f9f9" }}>
-            <td style={{ padding: "4px 8px", fontWeight: "bold", width: "20%", border: "1px solid #ddd" }}>Name</td>
-            <td style={{ padding: "4px 8px", border: "1px solid #ddd" }}>{data.customerName ?? "—"}</td>
-            <td style={{ padding: "4px 8px", fontWeight: "bold", width: "20%", border: "1px solid #ddd" }}>Phone</td>
-            <td style={{ padding: "4px 8px", border: "1px solid #ddd" }}>{data.customerPhone ?? "—"}</td>
-          </tr>
-        </tbody>
-      </table>
-
-      {/* Accessories */}
-      <h3 style={{ marginBottom: 6 }}>Accessories Checklist</h3>
-      <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: 12 }}>
-        <tbody>
-          {accessories_all.reduce<string[][]>((rows, acc, i) =>
-            i % 2 === 0 ? [...rows, [acc]] : [...rows.slice(0, -1), [...rows[rows.length - 1], acc]],
-          []).map((row, ri) => (
-            <tr key={ri} style={{ background: ri % 2 === 0 ? "#f9f9f9" : "#fff" }}>
-              {row.map((acc, ci) => {
-                const present = data.accessoriesPresent.includes(acc);
-                return (
-                  <>
-                    <td key={`${ri}-${ci}-c`} style={{ padding: "4px 8px", border: "1px solid #ddd", width: "6%", textAlign: "center" }}>
-                      {present ? "☑" : "☐"}
-                    </td>
-                    <td key={`${ri}-${ci}-n`} style={{ padding: "4px 8px", border: "1px solid #ddd", width: "44%" }}>{acc}</td>
-                  </>
-                );
-              })}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-
-      {/* Service + Notes */}
-      <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: 12 }}>
-        <tbody>
-          <tr style={{ background: "#f9f9f9" }}>
-            <td style={{ padding: "4px 8px", fontWeight: "bold", width: "20%", border: "1px solid #ddd" }}>Service Type</td>
-            <td style={{ padding: "4px 8px", border: "1px solid #ddd" }}>{data.serviceType.replace(/([A-Z])/g, " $1").trim()}</td>
-            <td style={{ padding: "4px 8px", fontWeight: "bold", width: "20%", border: "1px solid #ddd" }}>Technician</td>
-            <td style={{ padding: "4px 8px", border: "1px solid #ddd" }}>{data.technicianName ?? "Unassigned"}</td>
-          </tr>
-          {data.notes && (
+      {/* ── HEADER ─────────────────────────────────────────────── */}
+      {showHeader && (
+        <table style={{ width: "100%", marginBottom: 14, borderCollapse: "collapse" }}>
+          <tbody>
             <tr>
-              <td style={{ padding: "4px 8px", fontWeight: "bold", border: "1px solid #ddd" }}>Notes</td>
-              <td colSpan={3} style={{ padding: "4px 8px", border: "1px solid #ddd" }}>{data.notes}</td>
+              {/* Company info box */}
+              <td style={{ verticalAlign: "top", width: "60%" }}>
+                <div style={{ border: "1.5px solid #000", padding: "8px 12px", display: "inline-block", minWidth: 220 }}>
+                  <div style={{ fontWeight: "bold", fontSize: 14, marginBottom: 3 }}>{settings.companyName.toUpperCase()}</div>
+                  {settings.address   && <div style={{ fontSize: 10 }}>{settings.address}</div>}
+                  {settings.phone     && <div style={{ fontSize: 10 }}>Tel: {settings.phone}</div>}
+                  {settings.email     && <div style={{ fontSize: 10 }}>Email: {settings.email}</div>}
+                  {settings.tinNumber && <div style={{ fontSize: 10 }}>TIN: {settings.tinNumber}</div>}
+                </div>
+              </td>
+              {/* Date + stamp box */}
+              <td style={{ verticalAlign: "top", textAlign: "right" }}>
+                <div style={{ fontSize: 11, marginBottom: 6 }}>Date: <strong>{docDate}</strong></div>
+                <div style={{ border: "1.5px solid #000", width: 80, height: 60, display: "inline-block" }} />
+              </td>
             </tr>
-          )}
-          {data.additionalInfo && (
-            <tr style={{ background: "#f9f9f9" }}>
-              <td style={{ padding: "4px 8px", fontWeight: "bold", border: "1px solid #ddd" }}>Additional Info</td>
-              <td colSpan={3} style={{ padding: "4px 8px", border: "1px solid #ddd" }}>{data.additionalInfo}</td>
-            </tr>
-          )}
+          </tbody>
+        </table>
+      )}
+
+      {/* ── TITLE ──────────────────────────────────────────────── */}
+      <div style={{ textAlign: "center", marginBottom: 4 }}>
+        <div style={{ fontSize: 15, fontWeight: "bold", letterSpacing: 1 }}>
+          {isDelivery ? "DELIVERY NOTE N°:" : "REPAIR ORDER N°:"} {docNumber}
+        </div>
+        <div style={{ fontSize: 12, fontWeight: "bold", marginTop: 2 }}>{serviceLabel}</div>
+      </div>
+
+      <hr style={{ border: "none", borderTop: "1.5px solid #000", margin: "8px 0" }} />
+
+      {/* ── WORK ITEMS ─────────────────────────────────────────── */}
+      <div style={{ marginBottom: 10 }}>
+        {workItems.length > 0
+          ? workItems.map((item, i) => (
+              <div key={i} style={{ marginBottom: 3 }}>{i + 1}. {item}</div>
+            ))
+          : [1, 2, 3].map(i => (
+              <div key={i} style={{ marginBottom: 8, borderBottom: "1px dotted #aaa", minHeight: 18 }}>&nbsp;</div>
+            ))
+        }
+      </div>
+
+      {/* Other work section */}
+      <div style={{ marginBottom: 10 }}>
+        <div style={{ fontWeight: "bold", fontSize: 10, marginBottom: 4 }}>
+          OTHER WORK DEEMED NECESSARY BY THE CLIENT AT THE WORKSHOP:
+        </div>
+        {[1, 2, 3, 4, 5].map(i => (
+          <div key={i} style={{ borderBottom: "1px dotted #aaa", minHeight: 16, marginBottom: 5 }}>&nbsp;</div>
+        ))}
+      </div>
+
+      {/* ── CLIENT + VEHICLE INFO ──────────────────────────────── */}
+      <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: 10 }}>
+        <thead>
+          <tr>
+            <th colSpan={4} style={{ ...cell({ background: "#f0f0f0", fontWeight: "bold", textAlign: "left", fontSize: 10 }) }}>
+              CLIENT INFORMATION
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style={cell({ fontWeight: "bold", width: "16%", fontSize: 10 })}>Name / Contact</td>
+            <td style={cell({ width: "34%" })}>{data.customerName ?? "—"} {data.customerPhone ? `/ ${data.customerPhone}` : ""}</td>
+            <td style={cell({ fontWeight: "bold", width: "16%", fontSize: 10 })}>Address / Email</td>
+            <td style={cell({ width: "34%" })}>—</td>
+          </tr>
         </tbody>
       </table>
 
-      {/* Signature */}
-      <table style={{ width: "100%", marginTop: 32 }}>
+      {/* Vehicle info + accessories side by side */}
+      <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: 10 }}>
         <tbody>
           <tr>
-            <td style={{ width: "50%", paddingRight: 16 }}>
-              <div style={{ borderTop: "2px solid #000", paddingTop: 4, marginTop: 32 }}>
-                <div style={{ fontWeight: "bold" }}>Customer Signature</div>
-                <div style={{ color: "#555", fontSize: 11 }}>I confirm the vehicle condition above is accurate</div>
+            {/* Left: Vehicle info */}
+            <td style={{ width: "60%", verticalAlign: "top", paddingRight: 6 }}>
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead>
+                  <tr>
+                    <th colSpan={4} style={cell({ background: "#f0f0f0", fontWeight: "bold", textAlign: "left", fontSize: 10 })}>
+                      VEHICLE INFORMATION
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[
+                    ["Brand",    data.brandName],
+                    ["Model",    data.modelName],
+                    ["VIN",      data.vin],
+                    ["Plate N°", data.plateNumber ?? "—"],
+                    ["Year",     String(data.year)],
+                    ["Fuel",     `${(data.fuelType ?? "—")} — ${FUEL_LABELS[data.fuelLevel] ?? data.fuelLevel}`],
+                    ["Mileage",  `${data.mileage.toLocaleString()} km`],
+                  ].map(([k, v]) => (
+                    <tr key={k}>
+                      <td style={cell({ fontWeight: "bold", width: "38%", fontSize: 10 })}>{k}</td>
+                      <td style={cell({ fontSize: 10 })}>{v}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </td>
+
+            {/* Right: Accessories */}
+            <td style={{ width: "40%", verticalAlign: "top", paddingLeft: 6 }}>
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead>
+                  <tr>
+                    <th colSpan={2} style={cell({ background: "#f0f0f0", fontWeight: "bold", textAlign: "left", fontSize: 10 })}>
+                      ACCESSORIES
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {PRINT_ACCESSORIES.map(({ label, key }) => {
+                    const present = data.accessoriesPresent.includes(key);
+                    return (
+                      <tr key={key}>
+                        <td style={cell({ width: "24px", textAlign: "center", fontSize: 13 })}>
+                          {present ? "☒" : "☐"}
+                        </td>
+                        <td style={cell({ fontSize: 10 })}>{label}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      {/* ── REMARKS ────────────────────────────────────────────── */}
+      {data.additionalInfo && (
+        <div style={{ marginBottom: 8 }}>
+          <div style={{ fontWeight: "bold", fontSize: 10, marginBottom: 3 }}>REMARKS:</div>
+          <div style={{ fontSize: 10 }}>{data.additionalInfo}</div>
+        </div>
+      )}
+      {!data.additionalInfo && (
+        <div style={{ marginBottom: 8 }}>
+          <div style={{ fontWeight: "bold", fontSize: 10, marginBottom: 3 }}>REMARKS:</div>
+          {[1, 2, 3, 4].map(i => (
+            <div key={i} style={{ borderBottom: "1px dotted #aaa", minHeight: 14, marginBottom: 4 }}>&nbsp;</div>
+          ))}
+        </div>
+      )}
+
+      {/* ── SIGNATURES ─────────────────────────────────────────── */}
+      <table style={{ width: "100%", marginTop: 20 }}>
+        <tbody>
+          <tr>
+            <td style={{ width: "50%", paddingRight: 16, verticalAlign: "bottom" }}>
+              <div style={{ borderTop: "1.5px solid #000", paddingTop: 4, marginTop: 30 }}>
+                <div style={{ fontWeight: "bold", fontSize: 10 }}>Authorized By / Name &amp; Signature</div>
               </div>
             </td>
-            <td style={{ width: "50%", paddingLeft: 16 }}>
-              <div style={{ borderTop: "2px solid #000", paddingTop: 4, marginTop: 32 }}>
-                <div style={{ fontWeight: "bold" }}>Received By: {data.receivedByName}</div>
-                <div style={{ color: "#555", fontSize: 11 }}>RwandaMotor Service Advisor</div>
+            <td style={{ width: "50%", paddingLeft: 16, verticalAlign: "bottom" }}>
+              <div style={{ borderTop: "1.5px solid #000", paddingTop: 4, marginTop: 30 }}>
+                <div style={{ fontWeight: "bold", fontSize: 10 }}>Received By: {data.receivedByName}</div>
                 {data.status === "Closed" && data.closedByName && (
-                  <div style={{ color: "#555", fontSize: 11 }}>Closed by: {data.closedByName}</div>
+                  <div style={{ fontSize: 10, color: "#444" }}>Closed by: {data.closedByName}</div>
                 )}
               </div>
             </td>
@@ -188,10 +257,12 @@ function PrintView({ data }: { data: NonNullable<ReturnType<typeof useJobCard>["
         </tbody>
       </table>
 
-      <div style={{ marginTop: 24, borderTop: "1px solid #ddd", paddingTop: 8, color: "#888", fontSize: 10, textAlign: "center" }}>
-        RwandaMotor — Customer Service Reception Record · {data.jobCardNumber}
-        {data.deliveryNoteNumber ? ` · Delivery Note: ${data.deliveryNoteNumber}` : ""}
-      </div>
+      {/* ── FOOTER ─────────────────────────────────────────────── */}
+      {showFooter && settings.footerDisclaimer && (
+        <div style={{ marginTop: 16, borderTop: "1px solid #000", paddingTop: 6, fontSize: 9, textAlign: "center", color: "#333" }}>
+          {settings.footerDisclaimer}
+        </div>
+      )}
     </div>
   );
 }
@@ -241,12 +312,17 @@ export default function JobCardDetailPage() {
 
   const { data, isLoading } = useJobCard(id);
 
+  const { data: companySettings } = useQuery({
+    queryKey: ["company-settings"],
+    queryFn: () => companySettingsApi.get(),
+  });
+
   // Auto-print if ?print=1
   useEffect(() => {
-    if (searchParams.get("print") === "1" && data) {
+    if (searchParams.get("print") === "1" && data && companySettings) {
       setTimeout(() => printJobCard(data.jobCardNumber), 400);
     }
-  }, [searchParams, data]);
+  }, [searchParams, data, companySettings]);
 
   const convertMutation = useMutation({
     mutationFn: () => jobCardsApi.convertToDeliveryNote(id),
@@ -277,9 +353,18 @@ export default function JobCardDetailPage() {
       <div
         ref={printRef}
         aria-hidden="true"
-        style={{ position: "absolute", left: -9999, top: 0, width: 750, pointerEvents: "none" }}
+        style={{ position: "absolute", left: -9999, top: 0, width: 770, pointerEvents: "none" }}
       >
-        <PrintView data={data} />
+        <PrintView
+          data={data}
+          settings={companySettings ?? {
+            companyName: "RwandaMotor",
+            address: null, phone: null, email: null, tinNumber: null, website: null,
+            jobCardShowHeader: true, jobCardShowFooter: true,
+            deliveryNoteShowHeader: true, deliveryNoteShowFooter: true,
+            footerDisclaimer: "RwandaMotor declines all responsibility for materials not listed above.",
+          }}
+        />
       </div>
 
       {/* Screen view */}

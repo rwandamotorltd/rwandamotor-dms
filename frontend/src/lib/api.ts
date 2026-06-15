@@ -1,5 +1,5 @@
 import axios, { AxiosInstance } from 'axios';
-import type { ApiResponse, AuthResponse, DashboardKpis, PaginatedResult, RetentionAnalytics, VisitFrequencyCohort, CohortVehicle, RetentionStatus, Vehicle360, Customer360, VehicleListItem, CustomerListItem, ServiceRecordListItem, ServicePolicy, JobCardListItem, JobCardDetail, JobCardStatus, ServiceType, FuelLevel } from '@/types';
+import type { ApiResponse, AuthResponse, DashboardKpis, PaginatedResult, RetentionAnalytics, VisitFrequencyCohort, CohortVehicle, RetentionStatus, Vehicle360, Customer360, VehicleListItem, CustomerListItem, ServiceRecordListItem, ServicePolicy, JobCardListItem, JobCardDetail, JobCardStatus, ServiceType, FuelLevel, CompanySettings } from '@/types';
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5000/api';
 
@@ -380,6 +380,17 @@ export const permissionGroupsApi = {
 
   delete: (id: string) =>
     api.delete<ApiResponse<boolean>>('/admin/permission-groups/' + id).then(r => r.data),
+};
+
+// ============================================================
+// Admin — Company Settings
+// ============================================================
+export const companySettingsApi = {
+  get: () =>
+    api.get<ApiResponse<CompanySettings>>('/admin/company-settings').then(r => r.data.data!),
+
+  update: (payload: CompanySettings) =>
+    api.put<ApiResponse<boolean>>('/admin/company-settings', payload).then(r => r.data),
 };
 
 // ============================================================
