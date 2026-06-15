@@ -12,11 +12,19 @@ public class ConvertToDeliveryNoteCommandHandler : IRequestHandler<ConvertToDeli
 {
     private readonly IApplicationDbContext _db;
     private readonly ICurrentUserService _currentUser;
+    private readonly IServiceIntervalEngine _intervalEngine;
+    private readonly IRetentionEngine _retentionEngine;
 
-    public ConvertToDeliveryNoteCommandHandler(IApplicationDbContext db, ICurrentUserService currentUser)
+    public ConvertToDeliveryNoteCommandHandler(
+        IApplicationDbContext db,
+        ICurrentUserService currentUser,
+        IServiceIntervalEngine intervalEngine,
+        IRetentionEngine retentionEngine)
     {
         _db = db;
         _currentUser = currentUser;
+        _intervalEngine = intervalEngine;
+        _retentionEngine = retentionEngine;
     }
 
     public async Task<string> Handle(ConvertToDeliveryNoteCommand cmd, CancellationToken ct)
@@ -32,7 +40,6 @@ public class ConvertToDeliveryNoteCommandHandler : IRequestHandler<ConvertToDeli
         var now = DateTime.UtcNow;
 
         // Generate Delivery Note number: DN + YY + same sequence as job card
-        // Extract sequence from job card number (last 5 digits)
         var dnNumber = "DN" + jobCard.JobCardNumber[2..]; // OR2600001 → DN2600001
 
         jobCard.Status = JobCardStatus.Closed;
@@ -43,6 +50,38 @@ public class ConvertToDeliveryNoteCommandHandler : IRequestHandler<ConvertToDeli
         jobCard.DeliveryNoteGeneratedAt = now;
         jobCard.UpdatedAt = now;
         jobCard.UpdatedBy = _currentUser.UserId;
+
+        // ── Auto-create Service Record ────────────────────────────────────────
+        var nextService = await _intervalEngine.CalculateNextServiceAsync(
+            jobCard.VehicleId, jobCard.Mileage, now, ct);
+
+        var serviceRecord = new ServiceRecord
+        {
+            VehicleId = jobCard.VehicleId,
+            TechnicianId = jobCard.TechnicianId,
+            ServiceDate = now,
+            MileageAtService = jobCard.Mileage,
+            ServiceType = jobCard.ServiceType,
+            ServiceDescription = jobCard.Notes,
+            InvoiceNumber = dnNumber,
+            Notes = $"Auto-created from Job Card {jobCard.JobCardNumber}",
+            NextServiceMileage = nextService.NextServiceMileage,
+            NextServiceDate = nextService.NextServiceDate,
+            CreatedBy = _currentUser.UserId
+        };
+        _db.ServiceRecords.Add(serviceRecord);
+
+        // Update vehicle service tracking fields
+        var vehicle = jobCard.Vehicle;
+        if (vehicle != null)
+        {
+            vehicle.LastServiceDate = now;
+            vehicle.LastServiceMileage = jobCard.Mileage;
+            vehicle.CurrentMileage = Math.Max(vehicle.CurrentMileage ?? 0, jobCard.Mileage);
+            vehicle.NextServiceDate = nextService.NextServiceDate;
+            vehicle.NextServiceMileage = nextService.NextServiceMileage;
+            vehicle.UpdatedAt = now;
+        }
 
         // If PDI → create a SalesHistory entry
         if (jobCard.ServiceType == ServiceType.PDI)
@@ -65,6 +104,9 @@ public class ConvertToDeliveryNoteCommandHandler : IRequestHandler<ConvertToDeli
         }
 
         await _db.SaveChangesAsync(ct);
+
+        // Re-evaluate retention status after new service
+        await _retentionEngine.EvaluateVehicleStatusAsync(jobCard.VehicleId, ct);
 
         return dnNumber;
     }

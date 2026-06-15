@@ -90,8 +90,11 @@ export default function SettingsPage() {
 
             <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
               <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-              This only takes effect when the year&apos;s sequence hasn&apos;t started yet.
-              If cards have already been issued, the existing sequence continues.
+              <span>
+                This <strong>resets the counter</strong>. The very next job card issued will use
+                your number, then continue: {previewNumber}, {`OR${String(year).slice(-2)}${String(startingSequence + 1).padStart(5, "0")}`},{" "}
+                {`OR${String(year).slice(-2)}${String(startingSequence + 2).padStart(5, "0")}`}…
+              </span>
             </div>
 
             <Button

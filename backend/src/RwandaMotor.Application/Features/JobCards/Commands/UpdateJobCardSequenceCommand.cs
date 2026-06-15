@@ -41,9 +41,8 @@ public class UpdateJobCardSequenceCommandHandler : IRequestHandler<UpdateJobCard
         else
         {
             seq.StartingSequence = cmd.StartingSequence;
-            // Only reset CurrentSequence if no cards have been issued yet this year
-            if (seq.CurrentSequence == 0)
-                seq.CurrentSequence = 0; // stays 0; first card will pick up StartingSequence
+            // Force reset so the very next card issued uses StartingSequence
+            seq.CurrentSequence = 0;
         }
 
         await _db.SaveChangesAsync(ct);
