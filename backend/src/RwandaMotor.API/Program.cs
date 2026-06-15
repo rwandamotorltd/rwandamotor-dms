@@ -147,17 +147,4 @@ if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI(c =>
-    {
-        c.SwaggerEndpoint("/swagger/v1/swagger.json", "RwandaMotor DMS API v1");
-        c.RoutePrefix = "swagger";
-    });
-}
-
-app.UseSerilogRequestLogging();
-app.UseMiddleware<RwandaMotor.API.Middleware.ExceptionHandlingMiddleware>();
-app.UseCors("DmsPolicy");
-app.UseAuthentication();
-app.UseAuthorization();
-app.MapControllers();
-
-app.Run();
+    

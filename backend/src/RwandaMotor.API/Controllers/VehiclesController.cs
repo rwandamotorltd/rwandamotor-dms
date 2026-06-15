@@ -93,7 +93,4 @@ public class VehiclesController : ControllerBase
         [FromQuery] RetentionStatus? retentionStatus,
         [FromQuery] bool? isSoldByDealership)
     {
-        var deleted = await _mediator.Send(new DeleteAllVehiclesCommand(search, retentionStatus, isSoldByDealership));
-        return Ok(ApiResponse<int>.Ok(deleted, $"{deleted} vehicle(s) deleted"));
-    }
-}
+        var deleted = await _mediator.Send(ne

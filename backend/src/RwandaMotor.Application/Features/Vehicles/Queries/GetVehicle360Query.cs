@@ -157,4 +157,4 @@ public record TechnicianHistoryDto(Guid TechnicianId, string TechnicianName, int
 
 public record Vehicle360KpisDto(
     int TotalServices, decimal TotalRevenue,
-    double? AverageServiceIntervalDays, int WarrantyJobCount, int? LastServiceDaysAgo);
+    double? AverageSe

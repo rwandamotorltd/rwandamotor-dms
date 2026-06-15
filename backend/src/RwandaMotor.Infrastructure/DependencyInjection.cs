@@ -52,13 +52,4 @@ public static class DependencyInjection
         {
             var jobKey = new JobKey("RetentionEvaluationJob");
             q.AddJob<RetentionEvaluationJob>(opts => opts.WithIdentity(jobKey));
-            q.AddTrigger(opts => opts
-                .ForJob(jobKey)
-                .WithIdentity("RetentionEvaluationJob-trigger")
-                .WithCronSchedule("0 0 2 * * ?"));
-        });
-        services.AddQuartzHostedService(q => q.WaitForJobsToComplete = true);
-
-        return services;
-    }
-}
+            q.AddTrigger(opts 

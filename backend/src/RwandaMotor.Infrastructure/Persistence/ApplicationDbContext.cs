@@ -51,35 +51,4 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>, IApplica
         // Store accessories list as a JSON column
         builder.Entity<JobCard>()
             .Property(j => j.AccessoriesPresent)
-            .HasColumnType("jsonb");
-
-        // PermissionGroup: store permissions list as jsonb
-        builder.Entity<PermissionGroup>()
-            .Property(p => p.Permissions)
-            .HasColumnType("jsonb");
-        builder.Entity<PermissionGroup>()
-            .HasQueryFilter(p => !p.IsDeleted);
-
-        // Unique index: one sequence row per year
-        builder.Entity<JobCardSequence>()
-            .HasIndex(s => s.Year)
-            .IsUnique();
-    }
-
-    public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
-    {
-        foreach (var entry in ChangeTracker.Entries<BaseEntity>())
-        {
-            switch (entry.State)
-            {
-                case EntityState.Added:
-                    entry.Entity.CreatedAt = DateTime.UtcNow;
-                    break;
-                case EntityState.Modified:
-                    entry.Entity.UpdatedAt = DateTime.UtcNow;
-                    break;
-            }
-        }
-        return await base.SaveChangesAsync(cancellationToken);
-    }
-}
+            .HasColumnType("jsonb")

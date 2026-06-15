@@ -60,33 +60,4 @@ public class LoginCommandHandler : IRequestHandler<LoginCommand, AuthResponseDto
         if (user.PermissionGroupId.HasValue)
         {
             var group = await _db.PermissionGroups
-                .FirstOrDefaultAsync(g => g.Id == user.PermissionGroupId.Value, ct);
-            permissions = group?.Permissions ?? DefaultPermissions.ForRole(role);
-        }
-        else
-        {
-            permissions = DefaultPermissions.ForRole(role);
-        }
-
-        return new AuthResponseDto(
-            AccessToken: accessToken,
-            RefreshToken: refreshToken,
-            UserId: user.Id,
-            FullName: user.FullName,
-            Email: user.Email!,
-            Role: role,
-            ExpiresAt: DateTime.UtcNow.AddHours(8),
-            Permissions: permissions
-        );
-    }
-}
-
-public record AuthResponseDto(
-    string AccessToken,
-    string RefreshToken,
-    string UserId,
-    string FullName,
-    string Email,
-    string Role,
-    DateTime ExpiresAt,
-    List<string> Permissions);
+                .FirstOrDefaultAsync(g => g.Id == user.PermissionGroup

@@ -259,6 +259,49 @@ export interface Vehicle360 {
 // ============================================================
 // Customers
 // ============================================================
+export interface CustomerVehicleSummary {
+  id: string;
+  vin: string;
+  plateNumber: string | null;
+  brandName: string;
+  modelName: string;
+  year: number;
+  retentionStatus: RetentionStatus;
+  currentMileage: number | null;
+  lastServiceDate: string | null;
+}
+
+export interface CustomerServiceHistoryItem {
+  id: string;
+  serviceDate: string;
+  mileageAtService: number;
+  serviceType: ServiceType;
+  vehicleLabel: string;
+  plateNumber: string | null;
+  technicianName: string | null;
+  invoiceNumber: string | null;
+  totalCost: number | null;
+  isWarrantyJob: boolean;
+}
+
+export interface Customer360 {
+  id: string;
+  fullName: string;
+  phone: string | null;
+  email: string | null;
+  city: string | null;
+  country: string | null;
+  address: string | null;
+  category: CustomerCategory;
+  companyName: string | null;
+  taxId: string | null;
+  preferredContactMethod: string;
+  isActive: boolean;
+  createdAt: string;
+  vehicles: CustomerVehicleSummary[];
+  serviceHistory: CustomerServiceHistoryItem[];
+}
+
 export interface CustomerListItem {
   id: string;
   fullName: string;
@@ -372,4 +415,19 @@ export interface JobCardDetail {
   customerName: string | null;
   customerPhone: string | null;
   technicianId: string | null;
-  technicianName:
+  technicianName: string | null;
+  serviceType: ServiceType;
+  status: JobCardStatus;
+  notes: string | null;
+  additionalInfo: string | null;
+  accessoriesPresent: string[];
+  receivedByName: string;
+  receivedByUserId: string;
+  createdAt: string;
+  updatedAt: string | null;
+  closedAt: string | null;
+  closedByName: string | null;
+  closedByUserId: string | null;
+  deliveryNoteNumber: string | null;
+  deliveryNoteGeneratedAt: string | null;
+}

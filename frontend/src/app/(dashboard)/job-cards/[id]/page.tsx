@@ -438,9 +438,6 @@ export default function JobCardDetailPage() {
         {/* Footer signature */}
         <Card>
           <CardContent className="pt-4">
-        {/* Footer signature */}
-        <Card>
-          <CardContent className="pt-4">
             <div className="grid grid-cols-2 gap-8">
               <div>
                 <div className="border-t-2 border-foreground/30 pt-3 mt-10">

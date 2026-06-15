@@ -41,21 +41,4 @@ public class GetUsersQueryHandler : IRequestHandler<GetUsersQuery, List<UserDto>
         var result = new List<UserDto>();
         foreach (var u in users)
         {
-            var roles = await _users.GetRolesAsync(u);
-            string? groupName = u.PermissionGroupId.HasValue && groups.TryGetValue(u.PermissionGroupId.Value, out var gn)
-                ? gn : null;
-
-            result.Add(new UserDto(
-                u.Id ?? "",
-                u.FullName,
-                u.Email ?? "",
-                roles.FirstOrDefault() ?? "—",
-                u.IsActive,
-                DateTime.UtcNow, // Identity doesn't expose CreatedAt by default
-                u.PermissionGroupId,
-                groupName
-            ));
-        }
-        return result;
-    }
-}
+            var roles = a
