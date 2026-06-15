@@ -84,7 +84,7 @@ export default function Customer360Page({ params }: { params: Promise<{ id: stri
       {/* KPI Strip */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <KpiCard title="Vehicles" value={customer.vehicles.length} icon={Car} variant="info" index={0} />
-        <KpiCard title="Job Cards" value={customer.jobCards.length} icon={FileText} variant="default" index={1} />
+        <KpiCard title="Job Cards" value={customer.jobCards?.length ?? 0} icon={FileText} variant="default" index={1} />
         <KpiCard title="Total Spent" value={formatCurrency(totalRevenue)} icon={DollarSign} variant="success" index={2} />
         <KpiCard
           title="Member Since"
@@ -171,19 +171,19 @@ export default function Customer360Page({ params }: { params: Promise<{ id: stri
         <div className="lg:col-span-2">
           <Tabs defaultValue="jobcards">
             <TabsList className="mb-4">
-              <TabsTrigger value="jobcards">Job Cards ({customer.jobCards.length})</TabsTrigger>
+              <TabsTrigger value="jobcards">Job Cards ({customer.jobCards?.length ?? 0})</TabsTrigger>
               <TabsTrigger value="history">Service Records ({customer.serviceHistory.length})</TabsTrigger>
             </TabsList>
 
             {/* Job Cards Tab */}
             <TabsContent value="jobcards" className="space-y-3">
-              {customer.jobCards.length === 0 ? (
+              {(customer.jobCards?.length ?? 0) === 0 ? (
                 <div className="flex flex-col items-center gap-3 py-16 text-muted-foreground">
                   <FileText className="w-12 h-12 opacity-25" />
                   <p className="text-sm">No job cards yet</p>
                 </div>
               ) : (
-                customer.jobCards.map((jc, idx) => (
+                (customer.jobCards ?? []).map((jc, idx) => (
                   <motion.div key={jc.id} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: idx * 0.04 }}>
                     <Link href={"/job-cards/" + jc.id}>
                       <Card className="hover:shadow-md transition-shadow cursor-pointer hover:border-primary/50">

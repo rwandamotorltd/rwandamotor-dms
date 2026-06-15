@@ -516,7 +516,7 @@ export default function Vehicle360Page({ params }: { params: Promise<{ id: strin
         <div className="lg:col-span-2">
           <Tabs defaultValue="jobcards">
             <TabsList className="mb-4">
-              <TabsTrigger value="jobcards">Job Cards ({vehicle.jobCards.length})</TabsTrigger>
+              <TabsTrigger value="jobcards">Job Cards ({vehicle.jobCards?.length ?? 0})</TabsTrigger>
               <TabsTrigger value="timeline">Service Records</TabsTrigger>
               <TabsTrigger value="followups">Follow-ups</TabsTrigger>
               <TabsTrigger value="technicians">Technicians</TabsTrigger>
@@ -524,10 +524,10 @@ export default function Vehicle360Page({ params }: { params: Promise<{ id: strin
 
             {/* Job Cards */}
             <TabsContent value="jobcards" className="space-y-3">
-              {vehicle.jobCards.length === 0 ? (
+              {(vehicle.jobCards?.length ?? 0) === 0 ? (
                 <EmptyState icon={FileText} message="No job cards yet" />
               ) : (
-                vehicle.jobCards.map((jc, idx) => (
+                (vehicle.jobCards ?? []).map((jc, idx) => (
                   <motion.div key={jc.id} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: idx * 0.04 }}>
                     <Link href={"/job-cards/" + jc.id}>
                       <Card className="hover:shadow-md transition-shadow cursor-pointer hover:border-primary/50">
