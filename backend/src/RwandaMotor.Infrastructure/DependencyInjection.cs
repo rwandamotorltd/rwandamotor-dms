@@ -47,9 +47,21 @@ public static class DependencyInjection
         services.AddScoped<IRetentionEngine, RetentionEngine>();
         services.AddScoped<ApplicationDbSeeder>();
 
-        // Nightly retention evaluation — runs at 2:00 AM UTC
+        // Nightly retention evaluation -- runs at 2:00 AM UTC
         services.AddQuartz(q =>
         {
             var jobKey = new JobKey("RetentionEvaluationJob");
             q.AddJob<RetentionEvaluationJob>(opts => opts.WithIdentity(jobKey));
-            q.AddTrigger(opts 
+            q.AddTrigger(opts => opts
+                .ForJob(jobKey)
+                .WithIdentity("RetentionEvaluationJob-trigger")
+                .WithCronSchedule("0 0 2 * * ?"));
+        });
+        services.AddQuartzHostedService(q => q.WaitForJobsToComplete = true);
+
+        // Startup backfill: create service records for closed job cards that predate auto-create
+        services.AddHostedService<BackfillJobCardServiceRecordsService>();
+
+        return services;
+    }
+}
