@@ -566,7 +566,10 @@ export default function Vehicle360Page({ params }: { params: Promise<{ id: strin
                                 )}
                               </div>
                               {item.notes && (
-                                <p className="text-xs text-muted-foreground mt-1.5 italic">{item.notes}</p>
+                                <p className="text-xs text-foreground mt-1.5">{item.notes}</p>
+                              )}
+                              {item.serviceDescription && !item.serviceDescription.startsWith("Auto-created") && (
+                                <p className="text-xs text-muted-foreground mt-0.5 italic">{item.serviceDescription}</p>
                               )}
                               {item.parts.length > 0 && (
                                 <div className="mt-2 flex flex-wrap gap-1.5">

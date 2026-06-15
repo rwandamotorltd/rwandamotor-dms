@@ -43,6 +43,7 @@ public class GetVehicle360QueryHandler : IRequestHandler<GetVehicle360Query, Veh
                 sr.TotalCost,
                 sr.IsWarrantyJob,
                 sr.Notes,
+                sr.ServiceDescription,
                 sr.Parts.Select(p => new ServicePartDto(p.PartNumber, p.PartName, p.Quantity, p.UnitPrice, p.TotalPrice)).ToList()
             )).ToList();
 
@@ -143,7 +144,7 @@ public record ServiceTimelineItemDto(
     Guid Id, DateTime ServiceDate, ServiceType ServiceType,
     int Mileage, string? TechnicianName, string? InvoiceNumber,
     decimal? TotalCost, bool IsWarrantyJob, string? Notes,
-    List<ServicePartDto> Parts);
+    string? ServiceDescription, List<ServicePartDto> Parts);
 
 public record ServicePartDto(string PartNumber, string PartName, int Quantity, decimal UnitPrice, decimal TotalPrice);
 

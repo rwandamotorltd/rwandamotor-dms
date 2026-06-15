@@ -254,6 +254,10 @@ export default function JobCardDetailPage() {
       toast.success(`Delivery note ${res.data} created. Job card closed.`);
       queryClient.invalidateQueries({ queryKey: ["job-card", id] });
       queryClient.invalidateQueries({ queryKey: ["job-cards"] });
+      // Invalidate vehicle 360 so service history refreshes immediately
+      if (data?.vehicleId) {
+        queryClient.invalidateQueries({ queryKey: ["vehicle-360", data.vehicleId] });
+      }
     },
     onError: (e: Error) => toast.error(e.message || "Conversion failed"),
   });
@@ -434,22 +438,4 @@ export default function JobCardDetailPage() {
         {/* Footer signature */}
         <Card>
           <CardContent className="pt-4">
-            <div className="grid grid-cols-2 gap-8">
-              <div>
-                <p className="text-sm text-muted-foreground mb-1">Customer Signature</p>
-                <div className="border-b border-dashed border-muted-foreground h-12" />
-                <p className="text-xs text-muted-foreground mt-1">{data.customerName ?? "Customer"}</p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground mb-1">Service Advisor</p>
-                <div className="border-b border-dashed border-muted-foreground h-12" />
-                <p className="text-xs font-medium mt-1">{data.receivedByName}</p>
-                <p className="text-xs text-muted-foreground">RwandaMotor</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    </>
-  );
-}
+            <div className="grid grid-

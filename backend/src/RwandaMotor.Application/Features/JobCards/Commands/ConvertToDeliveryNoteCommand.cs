@@ -62,9 +62,9 @@ public class ConvertToDeliveryNoteCommandHandler : IRequestHandler<ConvertToDeli
             ServiceDate = now,
             MileageAtService = jobCard.Mileage,
             ServiceType = jobCard.ServiceType,
-            ServiceDescription = jobCard.Notes,
+            ServiceDescription = $"Auto-created from Job Card {jobCard.JobCardNumber}",
             InvoiceNumber = dnNumber,
-            Notes = $"Auto-created from Job Card {jobCard.JobCardNumber}",
+            Notes = jobCard.Notes,
             NextServiceMileage = nextService.NextServiceMileage,
             NextServiceDate = nextService.NextServiceDate,
             CreatedBy = _currentUser.UserId

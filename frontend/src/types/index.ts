@@ -190,6 +190,7 @@ export interface ServiceTimelineItem {
   totalCost: number | null;
   isWarrantyJob: boolean;
   notes: string | null;
+  serviceDescription: string | null;
   parts: ServicePart[];
 }
 
@@ -371,74 +372,4 @@ export interface JobCardDetail {
   customerName: string | null;
   customerPhone: string | null;
   technicianId: string | null;
-  technicianName: string | null;
-  serviceType: ServiceType;
-  status: JobCardStatus;
-  notes: string | null;
-  additionalInfo: string | null;
-  accessoriesPresent: string[];
-  receivedByName: string;
-  createdAt: string;
-  closedAt: string | null;
-  closedByName: string | null;
-  deliveryNoteNumber: string | null;
-  deliveryNoteGeneratedAt: string | null;
-}
-
-export interface JobCardSequenceInfo {
-  year: number;
-  startingSequence: number;
-  currentSequence: number;
-}
-
-// ============================================================
-// Customer 360
-// ============================================================
-export interface CustomerVehicleSummary {
-  id: string;
-  vin: string;
-  plateNumber: string | null;
-  brandName: string;
-  modelName: string;
-  year: number;
-  color: string | null;
-  currentMileage: number | null;
-  retentionStatus: RetentionStatus;
-  lastServiceDate: string | null;
-  nextServiceDate: string | null;
-  nextServiceMileage: number | null;
-  warrantyEndDate: string | null;
-}
-
-export interface CustomerServiceHistory {
-  id: string;
-  vin: string;
-  plateNumber: string | null;
-  vehicleLabel: string;
-  serviceDate: string;
-  mileageAtService: number;
-  serviceType: ServiceType;
-  technicianName: string | null;
-  invoiceNumber: string | null;
-  totalCost: number | null;
-  isWarrantyJob: boolean;
-}
-
-export interface Customer360 {
-  id: string;
-  fullName: string;
-  phone: string | null;
-  email: string | null;
-  address: string | null;
-  city: string | null;
-  country: string | null;
-  category: CustomerCategory;
-  preferredContactMethod: ContactMethod;
-  companyName: string | null;
-  taxId: string | null;
-  notes: string | null;
-  isActive: boolean;
-  createdAt: string;
-  vehicles: CustomerVehicleSummary[];
-  serviceHistory: CustomerServiceHistory[];
-}
+  technicianName:
