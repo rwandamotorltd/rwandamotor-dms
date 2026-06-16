@@ -58,6 +58,11 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>, IApplica
         builder.Entity<PermissionGroup>()
             .Property(p => p.Permissions)
             .HasColumnType("jsonb");
+
+        // ApplicationUser: store per-user custom permissions as jsonb
+        builder.Entity<ApplicationUser>()
+            .Property(u => u.CustomPermissions)
+            .HasColumnType("jsonb");
         builder.Entity<PermissionGroup>()
             .HasQueryFilter(p => !p.IsDeleted);
 

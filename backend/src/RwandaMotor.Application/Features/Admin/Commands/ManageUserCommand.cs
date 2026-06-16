@@ -14,7 +14,8 @@ public record CreateUserCommand(
     string Email,
     string Password,
     string Role,
-    Guid? PermissionGroupId = null
+    Guid? PermissionGroupId = null,
+    List<string>? CustomPermissions = null
 ) : IRequest<(bool Success, string? Error)>;
 
 public class CreateUserCommandHandler : IRequestHandler<CreateUserCommand, (bool Success, string? Error)>
@@ -35,11 +36,12 @@ public class CreateUserCommandHandler : IRequestHandler<CreateUserCommand, (bool
 
         var user = new ApplicationUser
         {
-            UserName = cmd.Email,
-            Email    = cmd.Email,
-            FullName = cmd.FullName.Trim(),
-            IsActive = true,
+            UserName          = cmd.Email,
+            Email             = cmd.Email,
+            FullName          = cmd.FullName.Trim(),
+            IsActive          = true,
             PermissionGroupId = cmd.PermissionGroupId,
+            CustomPermissions = cmd.CustomPermissions ?? new(),
         };
 
         var result = await _users.CreateAsync(user, cmd.Password);
@@ -61,7 +63,8 @@ public record UpdateUserCommand(
     string FullName,
     string Role,
     bool IsActive,
-    Guid? PermissionGroupId = null
+    Guid? PermissionGroupId = null,
+    List<string>? CustomPermissions = null
 ) : IRequest<(bool Success, string? Error)>;
 
 public class UpdateUserCommandHandler : IRequestHandler<UpdateUserCommand, (bool Success, string? Error)>
@@ -80,9 +83,10 @@ public class UpdateUserCommandHandler : IRequestHandler<UpdateUserCommand, (bool
         var user = await _users.FindByIdAsync(cmd.UserId);
         if (user == null) return (false, "User not found.");
 
-        user.FullName = cmd.FullName.Trim();
-        user.IsActive = cmd.IsActive;
+        user.FullName          = cmd.FullName.Trim();
+        user.IsActive          = cmd.IsActive;
         user.PermissionGroupId = cmd.PermissionGroupId;
+        user.CustomPermissions = cmd.CustomPermissions ?? new();
         await _users.UpdateAsync(user);
 
         // Replace role

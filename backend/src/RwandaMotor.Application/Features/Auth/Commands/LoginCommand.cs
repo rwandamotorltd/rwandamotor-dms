@@ -55,9 +55,13 @@ public class LoginCommandHandler : IRequestHandler<LoginCommand, AuthResponseDto
         user.LastLoginAt = DateTime.UtcNow;
         await _userManager.UpdateAsync(user);
 
-        // Resolve effective permissions: group overrides role defaults
+        // Resolve effective permissions: custom > group > role defaults
         List<string> permissions;
-        if (user.PermissionGroupId.HasValue)
+        if (user.CustomPermissions.Count > 0)
+        {
+            permissions = user.CustomPermissions;
+        }
+        else if (user.PermissionGroupId.HasValue)
         {
             var group = await _db.PermissionGroups
                 .FirstOrDefaultAsync(g => g.Id == user.PermissionGroupId.Value, ct);

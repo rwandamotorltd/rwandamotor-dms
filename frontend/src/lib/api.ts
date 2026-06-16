@@ -313,6 +313,7 @@ export interface UserItem {
   isActive: boolean;
   permissionGroupId: string | null;
   permissionGroupName: string | null;
+  customPermissions: string[];
 }
 
 export interface CreateUserPayload {
@@ -321,6 +322,7 @@ export interface CreateUserPayload {
   password: string;
   role: string;
   permissionGroupId?: string | null;
+  customPermissions?: string[] | null;
 }
 
 export interface UpdateUserPayload {
@@ -329,6 +331,7 @@ export interface UpdateUserPayload {
   role: string;
   isActive: boolean;
   permissionGroupId?: string | null;
+  customPermissions?: string[] | null;
 }
 
 export const adminApi = {

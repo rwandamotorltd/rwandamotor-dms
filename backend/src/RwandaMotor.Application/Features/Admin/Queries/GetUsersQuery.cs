@@ -14,7 +14,8 @@ public record UserDto(
     bool IsActive,
     DateTime CreatedAt,
     Guid? PermissionGroupId,
-    string? PermissionGroupName
+    string? PermissionGroupName,
+    List<string> CustomPermissions
 );
 
 public record GetUsersQuery : IRequest<List<UserDto>>;
@@ -53,7 +54,8 @@ public class GetUsersQueryHandler : IRequestHandler<GetUsersQuery, List<UserDto>
                 u.IsActive,
                 DateTime.UtcNow,
                 u.PermissionGroupId,
-                groupName
+                groupName,
+                u.CustomPermissions
             ));
         }
         return result;

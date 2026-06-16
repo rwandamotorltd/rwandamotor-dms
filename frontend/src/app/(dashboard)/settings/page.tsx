@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import {
   Settings, Hash, AlertTriangle, Users, ShieldCheck,
-  Plus, Pencil, Trash2, X, Eye, EyeOff, KeyRound, Check, Building2, Save
+  Plus, Pencil, Trash2, X, Eye, EyeOff, KeyRound, Building2, Save
 } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
 import { useRouter } from "next/navigation";
@@ -39,59 +39,162 @@ const ROLE_COLORS: Record<string, string> = {
   CRE:               "bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400",
 };
 
-// All available permission keys with friendly labels grouped by section
-const PERMISSION_SECTIONS = [
+// ─── Permission Matrix ────────────────────────────────────────
+
+type PermLevel = "none" | "view" | "edit" | "full";
+
+interface ModuleDef {
+  key: string;
+  label: string;
+  levels: PermLevel[];
+  keys: Partial<Record<PermLevel, string[]>>;
+}
+
+const MODULES: ModuleDef[] = [
   {
-    label: "Navigation",
-    keys: [
-      { key: "nav.dashboard",       label: "Dashboard" },
-      { key: "nav.vehicles",        label: "Vehicles" },
-      { key: "nav.customers",       label: "Customers" },
-      { key: "nav.serviceRecords",  label: "Service Records" },
-      { key: "nav.jobCards",        label: "Job Cards" },
-      { key: "nav.retention",       label: "Retention" },
-      { key: "nav.import",          label: "Import Center" },
-      { key: "nav.settings",        label: "Settings" },
-    ],
+    key: "dashboard", label: "Dashboard",
+    levels: ["none", "view"],
+    keys: {
+      view: ["nav.dashboard", "dashboard.kpi", "dashboard.retention", "dashboard.jobCardsWidget"],
+    },
   },
   {
-    label: "Job Cards",
-    keys: [
-      { key: "jobCards.create",  label: "Create Job Card" },
-      { key: "jobCards.convert", label: "Convert to Delivery Note" },
-    ],
+    key: "vehicles", label: "Vehicles",
+    levels: ["none", "view", "edit", "full"],
+    keys: {
+      view: ["nav.vehicles"],
+      edit: ["nav.vehicles", "vehicles.create", "vehicles.edit"],
+      full: ["nav.vehicles", "vehicles.create", "vehicles.edit", "vehicles.delete"],
+    },
   },
   {
-    label: "Vehicles",
-    keys: [
-      { key: "vehicles.create", label: "Create Vehicle" },
-      { key: "vehicles.edit",   label: "Edit Vehicle" },
-      { key: "vehicles.delete", label: "Delete Vehicle" },
-    ],
+    key: "customers", label: "Customers",
+    levels: ["none", "view", "edit", "full"],
+    keys: {
+      view: ["nav.customers"],
+      edit: ["nav.customers", "customers.create", "customers.edit"],
+      full: ["nav.customers", "customers.create", "customers.edit", "customers.delete"],
+    },
   },
   {
-    label: "Customers",
-    keys: [
-      { key: "customers.create", label: "Create Customer" },
-      { key: "customers.edit",   label: "Edit Customer" },
-      { key: "customers.delete", label: "Delete Customer" },
-    ],
+    key: "serviceRecords", label: "Service Records",
+    levels: ["none", "view", "edit", "full"],
+    keys: {
+      view: ["nav.serviceRecords"],
+      edit: ["nav.serviceRecords", "serviceRecords.create", "serviceRecords.edit"],
+      full: ["nav.serviceRecords", "serviceRecords.create", "serviceRecords.edit", "serviceRecords.delete"],
+    },
   },
   {
-    label: "Service Records",
-    keys: [
-      { key: "serviceRecords.create", label: "Create Service Record" },
-    ],
+    key: "jobCards", label: "Job Cards",
+    levels: ["none", "view", "edit", "full"],
+    keys: {
+      view: ["nav.jobCards"],
+      edit: ["nav.jobCards", "jobCards.create", "jobCards.edit", "jobCards.convert"],
+      full: ["nav.jobCards", "jobCards.create", "jobCards.edit", "jobCards.convert", "jobCards.delete"],
+    },
   },
   {
-    label: "Dashboard Widgets",
-    keys: [
-      { key: "dashboard.kpi",             label: "KPI Cards" },
-      { key: "dashboard.retention",       label: "Retention Charts" },
-      { key: "dashboard.jobCardsWidget",  label: "Job Cards Widget" },
-    ],
+    key: "retention", label: "Retention",
+    levels: ["none", "view", "full"],
+    keys: {
+      view: ["nav.retention"],
+      full: ["nav.retention", "retention.manage"],
+    },
+  },
+  {
+    key: "import", label: "Import Center",
+    levels: ["none", "view"],
+    keys: {
+      view: ["nav.import"],
+    },
+  },
+  {
+    key: "settings", label: "Settings",
+    levels: ["none", "view", "full"],
+    keys: {
+      view: ["nav.settings"],
+      full: ["nav.settings", "settings.users", "settings.company", "settings.groups"],
+    },
   },
 ];
+
+const LEVEL_LABELS: Record<PermLevel, string> = {
+  none: "None",
+  view: "View only",
+  edit: "Edit",
+  full: "Full",
+};
+
+const ALL_LEVELS: PermLevel[] = ["none", "view", "edit", "full"];
+
+function keysToLevel(mod: ModuleDef, permissions: string[]): PermLevel {
+  for (const level of (["full", "edit", "view"] as PermLevel[])) {
+    if (!mod.levels.includes(level)) continue;
+    const required = mod.keys[level] ?? [];
+    if (required.length > 0 && required.every(k => permissions.includes(k))) return level;
+  }
+  return "none";
+}
+
+function permissionsToLevels(permissions: string[]): Record<string, PermLevel> {
+  return Object.fromEntries(MODULES.map(m => [m.key, keysToLevel(m, permissions)]));
+}
+
+function levelsToPermissions(levels: Record<string, PermLevel>): string[] {
+  const keys = new Set<string>();
+  for (const mod of MODULES) {
+    const level = levels[mod.key] ?? "none";
+    for (const k of mod.keys[level] ?? []) keys.add(k);
+  }
+  return [...keys];
+}
+
+function PermissionMatrix({
+  levels,
+  onChange,
+}: {
+  levels: Record<string, PermLevel>;
+  onChange: (levels: Record<string, PermLevel>) => void;
+}) {
+  return (
+    <div className="border border-border rounded-lg overflow-hidden text-sm">
+      <div className="grid grid-cols-5 bg-muted/50 border-b border-border">
+        <div className="px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Module</div>
+        {ALL_LEVELS.map(l => (
+          <div key={l} className="px-1 py-2 text-center text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+            {LEVEL_LABELS[l]}
+          </div>
+        ))}
+      </div>
+      {MODULES.map((mod, i) => (
+        <div key={mod.key} className={`grid grid-cols-5 border-b border-border last:border-0 ${i % 2 === 1 ? "bg-muted/20" : ""}`}>
+          <div className="px-3 py-2.5 font-medium text-sm flex items-center">{mod.label}</div>
+          {ALL_LEVELS.map(level => {
+            const supported = mod.levels.includes(level);
+            const selected = levels[mod.key] === level;
+            return (
+              <div key={level} className="flex items-center justify-center py-2.5">
+                {supported ? (
+                  <button
+                    type="button"
+                    onClick={() => onChange({ ...levels, [mod.key]: level })}
+                    className={`w-4 h-4 rounded-full border-2 transition-colors ${
+                      selected ? "bg-primary border-primary" : "border-muted-foreground/30 hover:border-primary/60"
+                    }`}
+                    aria-label={`Set ${mod.label} to ${LEVEL_LABELS[level]}`}
+                  />
+                ) : (
+                  <span className="text-muted-foreground/20 select-none">—</span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      ))}
+    </div>
+  );
+}
 
 // ─── User Form Modal ──────────────────────────────────────────
 
@@ -102,10 +205,13 @@ interface UserFormState {
   role: string;
   isActive: boolean;
   permissionGroupId: string;
+  useCustomPermissions: boolean;
+  customPermissions: string[];
 }
 
 const EMPTY_USER_FORM: UserFormState = {
   fullName: "", email: "", password: "", role: "CRE", isActive: true, permissionGroupId: "",
+  useCustomPermissions: false, customPermissions: [],
 };
 
 function UserModal({
@@ -182,21 +288,50 @@ function UserModal({
             </Select>
           </div>
 
-          <div className="space-y-1.5">
-            <Label>Permission Group <span className="text-xs text-muted-foreground">(overrides role defaults)</span></Label>
-            <Select value={form.permissionGroupId} onValueChange={v => onChange({ permissionGroupId: v ?? "" })}>
-              <SelectTrigger>
-                <span className={!form.permissionGroupId ? "text-muted-foreground" : ""}>
-                  {form.permissionGroupId
-                    ? (groups.find(g => g.id === form.permissionGroupId)?.name ?? "…")
-                    : "Use role defaults"}
-                </span>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="">Use role defaults</SelectItem>
-                {groups.map(g => <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>)}
-              </SelectContent>
-            </Select>
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => onChange({ useCustomPermissions: false, customPermissions: [] })}
+                className={`flex-1 py-1.5 px-3 rounded-lg border text-xs font-medium transition-colors ${!form.useCustomPermissions ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:border-primary/40"}`}
+              >
+                Permission Group
+              </button>
+              <button
+                type="button"
+                onClick={() => onChange({ useCustomPermissions: true, permissionGroupId: "", customPermissions: form.customPermissions.length > 0 ? form.customPermissions : levelsToPermissions(Object.fromEntries(MODULES.map(m => [m.key, "none"]))) })}
+                className={`flex-1 py-1.5 px-3 rounded-lg border text-xs font-medium transition-colors ${form.useCustomPermissions ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:border-primary/40"}`}
+              >
+                Custom Permissions
+              </button>
+            </div>
+
+            {!form.useCustomPermissions ? (
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Group (overrides role defaults)</Label>
+                <Select value={form.permissionGroupId} onValueChange={v => onChange({ permissionGroupId: v ?? "" })}>
+                  <SelectTrigger>
+                    <span className={!form.permissionGroupId ? "text-muted-foreground" : ""}>
+                      {form.permissionGroupId
+                        ? (groups.find(g => g.id === form.permissionGroupId)?.name ?? "…")
+                        : "Use role defaults"}
+                    </span>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Use role defaults</SelectItem>
+                    {groups.map(g => <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : (
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Module permissions for this user</Label>
+                <PermissionMatrix
+                  levels={permissionsToLevels(form.customPermissions)}
+                  onChange={levels => onChange({ customPermissions: levelsToPermissions(levels) })}
+                />
+              </div>
+            )}
           </div>
 
           {!isCreate && (
@@ -290,20 +425,7 @@ function PermissionGroupModal({
 }) {
   const [name, setName] = useState(initial.name);
   const [description, setDescription] = useState(initial.description);
-  const [selected, setSelected] = useState<Set<string>>(new Set(initial.permissions));
-
-  const toggle = (key: string) =>
-    setSelected(prev => { const n = new Set(prev); if (n.has(key)) n.delete(key); else n.add(key); return n; });
-
-  const toggleSection = (keys: string[]) => {
-    const allOn = keys.every(k => selected.has(k));
-    setSelected(prev => {
-      const n = new Set(prev);
-      if (allOn) keys.forEach(k => n.delete(k));
-      else keys.forEach(k => n.add(k));
-      return n;
-    });
-  };
+  const [levels, setLevels] = useState<Record<string, PermLevel>>(() => permissionsToLevels(initial.permissions));
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -330,50 +452,18 @@ function PermissionGroupModal({
 
           <Separator />
 
-          <div className="space-y-4">
+          <div className="space-y-3">
             <Label className="text-sm font-semibold">Permissions</Label>
-            {PERMISSION_SECTIONS.map(section => {
-              const sectionKeys = section.keys.map(k => k.key);
-              const allOn = sectionKeys.every(k => selected.has(k));
-              const someOn = sectionKeys.some(k => selected.has(k));
-              return (
-                <div key={section.label} className="space-y-2">
-                  <button
-                    onClick={() => toggleSection(sectionKeys)}
-                    className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground transition-colors group"
-                  >
-                    <div className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${allOn ? "bg-primary border-primary" : someOn ? "bg-primary/30 border-primary/50" : "border-border"}`}>
-                      {allOn && <Check className="w-2.5 h-2.5 text-white" />}
-                      {someOn && !allOn && <div className="w-2 h-2 rounded-sm bg-primary" />}
-                    </div>
-                    {section.label}
-                  </button>
-                  <div className="grid grid-cols-2 gap-1.5 pl-1">
-                    {section.keys.map(({ key, label }) => (
-                      <button key={key} onClick={() => toggle(key)}
-                        className="flex items-center gap-2 text-sm text-left rounded-md px-2 py-1.5 hover:bg-muted transition-colors">
-                        <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors ${selected.has(key) ? "bg-primary border-primary" : "border-border"}`}>
-                          {selected.has(key) && <Check className="w-2.5 h-2.5 text-white" />}
-                        </div>
-                        <span className="text-xs">{label}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
+            <PermissionMatrix levels={levels} onChange={setLevels} />
           </div>
         </div>
 
-        <div className="flex justify-between items-center p-5 border-t">
-          <span className="text-xs text-muted-foreground">{selected.size} permissions selected</span>
-          <div className="flex gap-3">
-            <Button variant="outline" onClick={onClose} disabled={saving}>Cancel</Button>
-            <Button onClick={() => onSave({ name: name.trim(), description: description.trim() || null, permissions: [...selected] })}
-              disabled={saving || !name.trim()} className="gradient-primary text-white">
-              {saving ? "Saving…" : "Save Group"}
-            </Button>
-          </div>
+        <div className="flex justify-end gap-3 p-5 border-t">
+          <Button variant="outline" onClick={onClose} disabled={saving}>Cancel</Button>
+          <Button onClick={() => onSave({ name: name.trim(), description: description.trim() || null, permissions: levelsToPermissions(levels) })}
+            disabled={saving || !name.trim()} className="gradient-primary text-white">
+            {saving ? "Saving…" : "Save Group"}
+          </Button>
         </div>
       </motion.div>
     </div>
@@ -435,7 +525,12 @@ function UsersTab({ groups }: { groups: PermissionGroupItem[] }) {
 
   const openEdit = (u: UserItem) => {
     setEditingUser(u);
-    setEditForm({ fullName: u.fullName, email: u.email, password: "", role: u.role, isActive: u.isActive, permissionGroupId: u.permissionGroupId ?? "" });
+    setEditForm({
+      fullName: u.fullName, email: u.email, password: "", role: u.role, isActive: u.isActive,
+      permissionGroupId: u.permissionGroupId ?? "",
+      useCustomPermissions: u.customPermissions.length > 0,
+      customPermissions: u.customPermissions,
+    });
     setEditError(null);
   };
 
@@ -481,7 +576,9 @@ function UsersTab({ groups }: { groups: PermissionGroupItem[] }) {
                       </span>
                     </TableCell>
                     <TableCell className="py-3 hidden md:table-cell">
-                      {u.permissionGroupName
+                      {u.customPermissions.length > 0
+                        ? <Badge variant="outline" className="text-xs border-primary/40 text-primary">Custom</Badge>
+                        : u.permissionGroupName
                         ? <Badge variant="outline" className="text-xs">{u.permissionGroupName}</Badge>
                         : <span className="text-xs text-muted-foreground">Role defaults</span>}
                     </TableCell>
@@ -513,14 +610,14 @@ function UsersTab({ groups }: { groups: PermissionGroupItem[] }) {
       {showCreate && (
         <UserModal title="New User" form={createForm} isCreate groups={groups}
           onChange={p => setCreateForm(f => ({ ...f, ...p }))}
-          onSave={() => createMutation.mutate({ fullName: createForm.fullName.trim(), email: createForm.email.trim(), password: createForm.password, role: createForm.role, permissionGroupId: createForm.permissionGroupId || null })}
+          onSave={() => createMutation.mutate({ fullName: createForm.fullName.trim(), email: createForm.email.trim(), password: createForm.password, role: createForm.role, permissionGroupId: createForm.permissionGroupId || null, customPermissions: createForm.useCustomPermissions ? createForm.customPermissions : null })}
           onClose={() => setShowCreate(false)} saving={createMutation.isPending} error={createError} />
       )}
 
       {editingUser && (
         <UserModal title={`Edit — ${editingUser.fullName}`} form={editForm} isCreate={false} groups={groups}
           onChange={p => setEditForm(f => ({ ...f, ...p }))}
-          onSave={() => updateMutation.mutate({ userId: editingUser.id, fullName: editForm.fullName.trim(), role: editForm.role, isActive: editForm.isActive, permissionGroupId: editForm.permissionGroupId || null })}
+          onSave={() => updateMutation.mutate({ userId: editingUser.id, fullName: editForm.fullName.trim(), role: editForm.role, isActive: editForm.isActive, permissionGroupId: editForm.permissionGroupId || null, customPermissions: editForm.useCustomPermissions ? editForm.customPermissions : null })}
           onClose={() => setEditingUser(null)} saving={updateMutation.isPending} error={editError} />
       )}
 

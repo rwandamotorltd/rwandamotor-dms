@@ -14,4 +14,7 @@ public class ApplicationUser : IdentityUser
 
     /// <summary>Optional permission group — overrides role-based defaults when set.</summary>
     public Guid? PermissionGroupId { get; set; }
+
+    /// <summary>Per-user permission keys. When non-empty, takes priority over PermissionGroupId and role defaults.</summary>
+    public List<string> CustomPermissions { get; set; } = new();
 }

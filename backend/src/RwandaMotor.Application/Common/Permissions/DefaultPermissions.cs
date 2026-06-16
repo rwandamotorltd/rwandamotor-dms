@@ -15,6 +15,8 @@ public static class DefaultPermissions
 
     // ── Job Cards ─────────────────────────────────────────────────────────────
     public const string JobCardsCreate  = "jobCards.create";
+    public const string JobCardsEdit    = "jobCards.edit";
+    public const string JobCardsDelete  = "jobCards.delete";
     public const string JobCardsConvert = "jobCards.convert";
 
     // ── Vehicles ──────────────────────────────────────────────────────────────
@@ -29,6 +31,16 @@ public static class DefaultPermissions
 
     // ── Service Records ───────────────────────────────────────────────────────
     public const string ServiceRecordsCreate = "serviceRecords.create";
+    public const string ServiceRecordsEdit   = "serviceRecords.edit";
+    public const string ServiceRecordsDelete = "serviceRecords.delete";
+
+    // ── Retention ─────────────────────────────────────────────────────────────
+    public const string RetentionManage = "retention.manage";
+
+    // ── Settings ──────────────────────────────────────────────────────────────
+    public const string SettingsUsers   = "settings.users";
+    public const string SettingsCompany = "settings.company";
+    public const string SettingsGroups  = "settings.groups";
 
     // ── Dashboard widgets ─────────────────────────────────────────────────────
     public const string DashboardKpi            = "dashboard.kpi";
@@ -40,14 +52,16 @@ public static class DefaultPermissions
     {
         NavDashboard, NavVehicles, NavCustomers, NavServiceRecords,
         NavJobCards, NavRetention, NavImport, NavSettings,
-        JobCardsCreate, JobCardsConvert,
+        JobCardsCreate, JobCardsEdit, JobCardsDelete, JobCardsConvert,
         VehiclesCreate, VehiclesEdit, VehiclesDelete,
         CustomersCreate, CustomersEdit, CustomersDelete,
-        ServiceRecordsCreate,
+        ServiceRecordsCreate, ServiceRecordsEdit, ServiceRecordsDelete,
+        RetentionManage,
+        SettingsUsers, SettingsCompany, SettingsGroups,
         DashboardKpi, DashboardRetention, DashboardJobCardsWidget,
     };
 
-    /// <summary>Returns default permissions when a user has no permission group assigned.</summary>
+    /// <summary>Returns default permissions when a user has no permission group or custom permissions assigned.</summary>
     public static List<string> ForRole(string role) => role switch
     {
         "Admin" => All,
@@ -56,10 +70,11 @@ public static class DefaultPermissions
         {
             NavDashboard, NavVehicles, NavCustomers, NavServiceRecords,
             NavJobCards, NavRetention, NavImport,
-            JobCardsCreate, JobCardsConvert,
+            JobCardsCreate, JobCardsEdit, JobCardsConvert,
             VehiclesCreate, VehiclesEdit,
             CustomersCreate, CustomersEdit,
-            ServiceRecordsCreate,
+            ServiceRecordsCreate, ServiceRecordsEdit,
+            RetentionManage,
             DashboardKpi, DashboardRetention, DashboardJobCardsWidget,
         },
 
