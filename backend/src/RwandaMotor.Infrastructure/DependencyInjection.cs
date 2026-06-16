@@ -48,6 +48,16 @@ public static class DependencyInjection
         services.AddScoped<ApplicationDbSeeder>();
 
         services.Configure<SmtpSettings>(configuration.GetSection("Email"));
+        // PostConfigure picks up EMAIL_* env vars that don't follow the Email__ double-underscore convention
+        services.PostConfigure<SmtpSettings>(s =>
+        {
+            if (Env("EMAIL_HOST")      is { Length: > 0 } h) s.Host     = h;
+            if (Env("EMAIL_USERNAME")  is { Length: > 0 } u) s.Username = u;
+            if (Env("EMAIL_PASSWORD")  is { Length: > 0 } p) s.Password = p;
+            if (Env("EMAIL_ALERT_RECIPIENT") is { Length: > 0 } a) s.AlertRecipient = a;
+            if (int.TryParse(Env("EMAIL_PORT"), out var port)) s.Port = port;
+            static string? Env(string k) => Environment.GetEnvironmentVariable(k);
+        });
         services.AddScoped<IEmailService, SmtpEmailService>();
 
         // Nightly retention evaluation -- runs at 2:00 AM UTC

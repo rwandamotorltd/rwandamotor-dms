@@ -50,7 +50,8 @@ public class SmtpEmailService : IEmailService
             Body = htmlBody,
             IsBodyHtml = true,
         };
-        message.To.Add(to);
+        foreach (var addr in to.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            message.To.Add(addr);
 
         await client.SendMailAsync(message, ct);
         _log.LogInformation("Email sent to {To}: {Subject}", to, subject);
