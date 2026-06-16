@@ -386,9 +386,11 @@ export const permissionGroupsApi = {
 // Admin — Company Settings
 // ============================================================
 export const companySettingsApi = {
+  // GET is on its own route accessible to all authenticated users (needed for job card print)
   get: () =>
-    api.get<ApiResponse<CompanySettings>>('/admin/company-settings').then(r => r.data.data!),
+    api.get<ApiResponse<CompanySettings>>('/company-settings').then(r => r.data.data!),
 
+  // PUT remains admin-only
   update: (payload: CompanySettings) =>
     api.put<ApiResponse<boolean>>('/admin/company-settings', payload).then(r => r.data),
 };
@@ -406,6 +408,17 @@ export interface CreateJobCardPayload {
   notes?: string | null;
   additionalInfo?: string | null;
   accessoriesPresent?: string[];
+}
+
+export interface UpdateJobCardPayload {
+  id: string;
+  serviceType: ServiceType;
+  technicianId?: string | null;
+  fuelLevel: FuelLevel;
+  mileage: number;
+  notes?: string | null;
+  additionalInfo?: string | null;
+  accessoriesPresent: string[];
 }
 
 export interface ShareJobCardPayload {
@@ -429,6 +442,9 @@ export const jobCardsApi = {
 
   create: (payload: CreateJobCardPayload) =>
     api.post<ApiResponse<{ id: string; jobCardNumber: string }>>('/jobcards', payload).then(r => r.data),
+
+  update: (payload: UpdateJobCardPayload) =>
+    api.put<ApiResponse<boolean>>(`/jobcards/${payload.id}`, payload).then(r => r.data),
 
   convertToDeliveryNote: (id: string) =>
     api.post<ApiResponse<string>>(`/jobcards/${id}/convert`).then(r => r.data),

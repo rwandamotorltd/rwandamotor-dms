@@ -1,17 +1,30 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { jobCardsApi, companySettingsApi } from "@/lib/api";
-import type { CompanySettings } from "@/types";
+import { jobCardsApi, companySettingsApi, techniciansApi } from "@/lib/api";
+import type { CompanySettings, ServiceType, FuelLevel } from "@/types";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { format } from "date-fns";
-import { ArrowLeft, Printer, ArrowRight, CheckCircle, XCircle } from "lucide-react";
+import { ArrowLeft, Printer, ArrowRight, CheckCircle, XCircle, Pencil, X, Save } from "lucide-react";
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const SERVICE_TYPES: ServiceType[] = [
+  "RoutineMaintenance","OilChange","MajorService","TyreRotation",
+  "BrakeService","TransmissionService","AirConditioningService","ElectricalDiagnostics",
+  "BodyRepair","WarrantyRepair","RecallRepair","PDI","EmergencyRepair","Inspection","Other",
+];
+
+const FUEL_LEVELS: FuelLevel[] = ["Empty","Quarter","Half","ThreeQuarter","Full"];
 
 // ─── Fuel bar visual ──────────────────────────────────────────────────────────
 
@@ -287,11 +300,12 @@ function printJobCard(jobCardNumber: string) {
   w.document.write(`<!DOCTYPE html>
 <html>
 <head>
-  <title>${jobCardNumber}</title>
+  <title></title>
   <style>
     * { box-sizing: border-box; }
-    body { margin: 0; padding: 16px; font-family: Arial, sans-serif; font-size: 12px; }
-    @page { margin: 1cm; size: A4 portrait; }
+    /* margin:0 removes the browser's header/footer margin area (date, URL, page number) */
+    @page { margin: 0; size: A4 portrait; }
+    body { margin: 0; padding: 14mm 12mm; font-family: Arial, sans-serif; font-size: 12px; }
   </style>
 </head>
 <body>${el.innerHTML}</body>
@@ -303,6 +317,16 @@ function printJobCard(jobCardNumber: string) {
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
+interface EditForm {
+  serviceType: ServiceType;
+  technicianId: string | null;
+  fuelLevel: FuelLevel;
+  mileage: number;
+  notes: string;
+  additionalInfo: string;
+  accessoriesPresent: string[];
+}
+
 export default function JobCardDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
@@ -310,11 +334,19 @@ export default function JobCardDetailPage() {
   const queryClient = useQueryClient();
   const printRef = useRef<HTMLDivElement>(null);
 
+  const [isEditing, setIsEditing] = useState(false);
+  const [editForm, setEditForm] = useState<EditForm | null>(null);
+
   const { data, isLoading } = useJobCard(id);
 
   const { data: companySettings } = useQuery({
     queryKey: ["company-settings"],
     queryFn: () => companySettingsApi.get(),
+  });
+
+  const { data: technicians = [] } = useQuery({
+    queryKey: ["technicians"],
+    queryFn: () => techniciansApi.list(),
   });
 
   // Auto-print if ?print=1
@@ -330,13 +362,60 @@ export default function JobCardDetailPage() {
       toast.success(`Delivery note ${res.data} created. Job card closed.`);
       queryClient.invalidateQueries({ queryKey: ["job-card", id] });
       queryClient.invalidateQueries({ queryKey: ["job-cards"] });
-      // Invalidate vehicle 360 so service history refreshes immediately
       if (data?.vehicleId) {
         queryClient.invalidateQueries({ queryKey: ["vehicle-360", data.vehicleId] });
       }
     },
     onError: (e: Error) => toast.error(e.message || "Conversion failed"),
   });
+
+  const updateMutation = useMutation({
+    mutationFn: () => jobCardsApi.update({
+      id,
+      serviceType: editForm!.serviceType,
+      technicianId: editForm!.technicianId || null,
+      fuelLevel: editForm!.fuelLevel,
+      mileage: editForm!.mileage,
+      notes: editForm!.notes || null,
+      additionalInfo: editForm!.additionalInfo || null,
+      accessoriesPresent: editForm!.accessoriesPresent,
+    }),
+    onSuccess: () => {
+      toast.success("Job card updated");
+      setIsEditing(false);
+      queryClient.invalidateQueries({ queryKey: ["job-card", id] });
+    },
+    onError: () => toast.error("Failed to update job card"),
+  });
+
+  function startEdit() {
+    if (!data) return;
+    setEditForm({
+      serviceType: data.serviceType,
+      technicianId: data.technicianId ?? null,
+      fuelLevel: data.fuelLevel,
+      mileage: data.mileage,
+      notes: data.notes ?? "",
+      additionalInfo: data.additionalInfo ?? "",
+      accessoriesPresent: [...data.accessoriesPresent],
+    });
+    setIsEditing(true);
+  }
+
+  function cancelEdit() {
+    setIsEditing(false);
+    setEditForm(null);
+  }
+
+  function toggleAccessory(acc: string) {
+    if (!editForm) return;
+    setEditForm(f => f ? ({
+      ...f,
+      accessoriesPresent: f.accessoriesPresent.includes(acc)
+        ? f.accessoriesPresent.filter(a => a !== acc)
+        : [...f.accessoriesPresent, acc],
+    }) : f);
+  }
 
   if (isLoading) return <div className="p-8 text-muted-foreground">Loading…</div>;
   if (!data) return <div className="p-8 text-muted-foreground">Job card not found</div>;
@@ -347,9 +426,11 @@ export default function JobCardDetailPage() {
     "Owner's Manual","Locking Wheel Nut Key",
   ];
 
+  const ef = editForm;
+
   return (
     <>
-      {/* Off-screen print template — rendered to DOM so we can extract innerHTML */}
+      {/* Off-screen print template */}
       <div
         ref={printRef}
         aria-hidden="true"
@@ -380,28 +461,47 @@ export default function JobCardDetailPage() {
               <p className="text-muted-foreground text-sm">
                 {data.status === "Closed" && data.deliveryNoteNumber
                   ? `Delivery Note: ${data.deliveryNoteNumber}`
-                  : "Open Job Card"}
+                  : isEditing ? "Editing…" : "Open Job Card"}
               </p>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={() => printJobCard(data.jobCardNumber)}>
-              <Printer className="w-4 h-4 mr-2" /> Print
-            </Button>
-            {data.status === "Open" && (
-              <Button
-                size="sm"
-                className="bg-orange-500 hover:bg-orange-600 text-white"
-                disabled={convertMutation.isPending}
-                onClick={() => {
-                  if (confirm(`Convert ${data.jobCardNumber} to a Delivery Note? This will close it permanently.`)) {
-                    convertMutation.mutate();
-                  }
-                }}
-              >
-                <ArrowRight className="w-4 h-4 mr-2" />
-                {convertMutation.isPending ? "Converting…" : "Convert to Delivery Note"}
-              </Button>
+            {isEditing ? (
+              <>
+                <Button variant="outline" size="sm" onClick={cancelEdit} disabled={updateMutation.isPending}>
+                  <X className="w-4 h-4 mr-2" /> Cancel
+                </Button>
+                <Button size="sm" onClick={() => updateMutation.mutate()} disabled={updateMutation.isPending}>
+                  <Save className="w-4 h-4 mr-2" />
+                  {updateMutation.isPending ? "Saving…" : "Save Changes"}
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button variant="outline" size="sm" onClick={() => printJobCard(data.jobCardNumber)}>
+                  <Printer className="w-4 h-4 mr-2" /> Print
+                </Button>
+                {data.status === "Open" && (
+                  <>
+                    <Button variant="outline" size="sm" onClick={startEdit}>
+                      <Pencil className="w-4 h-4 mr-2" /> Edit
+                    </Button>
+                    <Button
+                      size="sm"
+                      className="bg-orange-500 hover:bg-orange-600 text-white"
+                      disabled={convertMutation.isPending}
+                      onClick={() => {
+                        if (confirm(`Convert ${data.jobCardNumber} to a Delivery Note? This will close it permanently.`)) {
+                          convertMutation.mutate();
+                        }
+                      }}
+                    >
+                      <ArrowRight className="w-4 h-4 mr-2" />
+                      {convertMutation.isPending ? "Converting…" : "Convert to Delivery Note"}
+                    </Button>
+                  </>
+                )}
+              </>
             )}
           </div>
         </div>
@@ -423,7 +523,7 @@ export default function JobCardDetailPage() {
 
         {/* Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Vehicle Info */}
+          {/* Vehicle Info — always read-only */}
           <Card>
             <CardHeader className="pb-3"><CardTitle className="text-base">Vehicle</CardTitle></CardHeader>
             <CardContent className="space-y-2 text-sm">
@@ -442,14 +542,38 @@ export default function JobCardDetailPage() {
                 </div>
               ))}
               <Separator />
-              <div>
-                <p className="text-muted-foreground mb-1">Fuel Level</p>
-                <FuelGauge level={data.fuelLevel} />
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Mileage In</span>
-                <span className="font-medium">{data.mileage.toLocaleString()} km</span>
-              </div>
+              {isEditing && ef ? (
+                <>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-muted-foreground">Fuel Level</Label>
+                    <Select value={ef.fuelLevel} onValueChange={v => setEditForm(f => f ? { ...f, fuelLevel: v as FuelLevel } : f)}>
+                      <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {FUEL_LEVELS.map(l => <SelectItem key={l} value={l}>{FUEL_LABELS[l]}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-muted-foreground">Mileage In (km)</Label>
+                    <Input
+                      type="number" className="h-8 text-sm"
+                      value={ef.mileage}
+                      onChange={e => setEditForm(f => f ? { ...f, mileage: parseInt(e.target.value) || 0 } : f)}
+                    />
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div>
+                    <p className="text-muted-foreground mb-1">Fuel Level</p>
+                    <FuelGauge level={data.fuelLevel} />
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Mileage In</span>
+                    <span className="font-medium">{data.mileage.toLocaleString()} km</span>
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
 
@@ -457,11 +581,57 @@ export default function JobCardDetailPage() {
           <Card>
             <CardHeader className="pb-3"><CardTitle className="text-base">Customer & Service</CardTitle></CardHeader>
             <CardContent className="space-y-2 text-sm">
+              {/* Customer info always read-only */}
               {[
                 ["Customer", data.customerName ?? "—"],
                 ["Phone", data.customerPhone ?? "—"],
-                ["Service Type", data.serviceType.replace(/([A-Z])/g, " $1").trim()],
-                ["Technician", data.technicianName ?? "Unassigned"],
+              ].map(([k, v]) => (
+                <div key={k as string} className="flex justify-between gap-2">
+                  <span className="text-muted-foreground">{k}</span>
+                  <span className="font-medium text-right">{v}</span>
+                </div>
+              ))}
+              <Separator />
+              {isEditing && ef ? (
+                <>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-muted-foreground">Service Type</Label>
+                    <Select value={ef.serviceType} onValueChange={v => setEditForm(f => f ? { ...f, serviceType: v as ServiceType } : f)}>
+                      <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {SERVICE_TYPES.map(s => (
+                          <SelectItem key={s} value={s}>{s.replace(/([A-Z])/g, " $1").trim()}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-muted-foreground">Technician</Label>
+                    <Select value={ef.technicianId ?? "none"} onValueChange={v => setEditForm(f => f ? { ...f, technicianId: v === "none" ? null : v } : f)}>
+                      <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Unassigned</SelectItem>
+                        {technicians.filter((t: { isActive: boolean }) => t.isActive).map((t: { id: string; fullName: string }) => (
+                          <SelectItem key={t.id} value={t.id}>{t.fullName}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </>
+              ) : (
+                <>
+                  {[
+                    ["Service Type", data.serviceType.replace(/([A-Z])/g, " $1").trim()],
+                    ["Technician", data.technicianName ?? "Unassigned"],
+                  ].map(([k, v]) => (
+                    <div key={k as string} className="flex justify-between gap-2">
+                      <span className="text-muted-foreground">{k}</span>
+                      <span className="font-medium text-right">{v}</span>
+                    </div>
+                  ))}
+                </>
+              )}
+              {[
                 ["Received By", data.receivedByName],
                 ["Date", format(new Date(data.createdAt), "dd MMM yyyy HH:mm")],
               ].map(([k, v]) => (
@@ -470,7 +640,7 @@ export default function JobCardDetailPage() {
                   <span className="font-medium text-right">{v}</span>
                 </div>
               ))}
-              {data.serviceType === "PDI" && (
+              {(isEditing ? ef?.serviceType === "PDI" : data.serviceType === "PDI") && (
                 <div className="rounded-md bg-blue-50 dark:bg-blue-950/20 border border-blue-200 px-3 py-2 text-blue-700 dark:text-blue-300 text-xs mt-2">
                   PDI — Conversion will auto-create a Sales History entry
                 </div>
@@ -484,14 +654,26 @@ export default function JobCardDetailPage() {
             <CardContent>
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
                 {accessories_all.map(acc => {
-                  const present = data.accessoriesPresent.includes(acc);
+                  const present = isEditing && ef
+                    ? ef.accessoriesPresent.includes(acc)
+                    : data.accessoriesPresent.includes(acc);
                   return (
-                    <div key={acc} className={`flex items-center gap-2 rounded-md border px-3 py-2 text-sm ${present ? "border-emerald-200 bg-emerald-50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-400" : "border-dashed text-muted-foreground"}`}>
+                    <button
+                      key={acc}
+                      type="button"
+                      disabled={!isEditing}
+                      onClick={() => toggleAccessory(acc)}
+                      className={`flex items-center gap-2 rounded-md border px-3 py-2 text-sm text-left transition-colors
+                        ${present
+                          ? "border-emerald-200 bg-emerald-50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-400"
+                          : "border-dashed text-muted-foreground"}
+                        ${isEditing ? "cursor-pointer hover:border-primary" : "cursor-default"}`}
+                    >
                       {present
                         ? <CheckCircle className="w-4 h-4 shrink-0" />
                         : <XCircle className="w-4 h-4 shrink-0 opacity-30" />}
                       {acc}
-                    </div>
+                    </button>
                   );
                 })}
               </div>
@@ -499,25 +681,49 @@ export default function JobCardDetailPage() {
           </Card>
 
           {/* Notes */}
-          {(data.notes || data.additionalInfo) && (
+          {isEditing && ef ? (
+            <Card className="md:col-span-2">
+              <CardHeader className="pb-3"><CardTitle className="text-base">Notes</CardTitle></CardHeader>
+              <CardContent className="space-y-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">Notes / Work Done</Label>
+                  <textarea
+                    className="w-full min-h-[80px] rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-y"
+                    value={ef.notes}
+                    onChange={e => setEditForm(f => f ? { ...f, notes: e.target.value } : f)}
+                    placeholder="Describe work performed (one item per line for clean print output)…"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">Additional Info / Remarks</Label>
+                  <textarea
+                    className="w-full min-h-[60px] rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-y"
+                    value={ef.additionalInfo}
+                    onChange={e => setEditForm(f => f ? { ...f, additionalInfo: e.target.value } : f)}
+                    placeholder="Additional remarks…"
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          ) : (data.notes || data.additionalInfo) ? (
             <Card className="md:col-span-2">
               <CardHeader className="pb-3"><CardTitle className="text-base">Notes</CardTitle></CardHeader>
               <CardContent className="space-y-3 text-sm">
                 {data.notes && (
                   <div>
                     <p className="text-muted-foreground text-xs mb-1">Notes</p>
-                    <p>{data.notes}</p>
+                    <p className="whitespace-pre-wrap">{data.notes}</p>
                   </div>
                 )}
                 {data.additionalInfo && (
                   <div>
                     <p className="text-muted-foreground text-xs mb-1">Additional Info</p>
-                    <p>{data.additionalInfo}</p>
+                    <p className="whitespace-pre-wrap">{data.additionalInfo}</p>
                   </div>
                 )}
               </CardContent>
             </Card>
-          )}
+          ) : null}
         </div>
 
         {/* Footer signature */}

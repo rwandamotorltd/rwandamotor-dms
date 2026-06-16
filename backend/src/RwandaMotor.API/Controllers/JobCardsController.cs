@@ -57,6 +57,25 @@ public class JobCardsController : ControllerBase
     }
 
     // ──────────────────────────────────────────────────────────────
+    // UPDATE (Open job cards only)
+    // ──────────────────────────────────────────────────────────────
+    [HttpPut("{id:guid}")]
+    public async Task<IActionResult> UpdateJobCard(Guid id, [FromBody] UpdateJobCardCommand command)
+    {
+        if (id != command.Id)
+            return BadRequest(ApiResponse<bool>.Fail("ID mismatch"));
+        try
+        {
+            await _mediator.Send(command);
+            return Ok(ApiResponse<bool>.Ok(true, "Job card updated"));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(ApiResponse<bool>.Fail(ex.Message));
+        }
+    }
+
+    // ──────────────────────────────────────────────────────────────
     // CONVERT TO DELIVERY NOTE
     // ──────────────────────────────────────────────────────────────
     [HttpPost("{id:guid}/convert")]

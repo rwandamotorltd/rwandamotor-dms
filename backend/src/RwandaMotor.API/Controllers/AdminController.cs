@@ -49,15 +49,6 @@ public class AdminController : ControllerBase
         return Ok(ApiResponse<bool>.Ok(true, "Password reset successfully"));
     }
 
-    // ── Company Settings ──────────────────────────────────────
-
-    [HttpGet("company-settings")]
-    public async Task<IActionResult> GetCompanySettings()
-    {
-        var result = await _mediator.Send(new GetCompanySettingsQuery());
-        return Ok(ApiResponse<CompanySettingsDto>.Ok(result));
-    }
-
     [HttpPut("company-settings")]
     public async Task<IActionResult> UpdateCompanySettings([FromBody] UpdateCompanySettingsCommand command)
     {

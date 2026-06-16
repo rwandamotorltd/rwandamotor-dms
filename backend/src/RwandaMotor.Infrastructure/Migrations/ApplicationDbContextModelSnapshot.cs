@@ -1306,4 +1306,385 @@ namespace RwandaMotor.Infrastructure.Migrations
                         .HasColumnType("boolean");
 
                     b.Property<bool>("IsDeleted")
-                
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("Segment")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BrandId", "Code")
+                        .IsUnique();
+
+                    b.ToTable("VehicleModels");
+                });
+
+            modelBuilder.Entity("RwandaMotor.Domain.Entities.WorkshopBay", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("BayType")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<string>("DeletedBy")
+                        .HasColumnType("text");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("WorkshopBays");
+                });
+
+            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<string>", b =>
+                {
+                    b.HasOne("Microsoft.AspNetCore.Identity.IdentityRole", null)
+                        .WithMany()
+                        .HasForeignKey("RoleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserClaim<string>", b =>
+                {
+                    b.HasOne("RwandaMotor.Domain.Entities.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserLogin<string>", b =>
+                {
+                    b.HasOne("RwandaMotor.Domain.Entities.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserRole<string>", b =>
+                {
+                    b.HasOne("Microsoft.AspNetCore.Identity.IdentityRole", null)
+                        .WithMany()
+                        .HasForeignKey("RoleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("RwandaMotor.Domain.Entities.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserToken<string>", b =>
+                {
+                    b.HasOne("RwandaMotor.Domain.Entities.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("RwandaMotor.Domain.Entities.CompanySettings", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Address")
+                        .HasColumnType("text");
+
+                    b.Property<string>("CompanyName")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<bool>("DeliveryNoteShowFooter")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("DeliveryNoteShowHeader")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Email")
+                        .HasColumnType("text");
+
+                    b.Property<string>("FooterDisclaimer")
+                        .HasColumnType("text");
+
+                    b.Property<bool>("JobCardShowFooter")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("JobCardShowHeader")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Phone")
+                        .HasColumnType("text");
+
+                    b.Property<string>("TinNumber")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Website")
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("CompanySettings");
+                });
+
+            modelBuilder.Entity("RwandaMotor.Domain.Entities.FollowUp", b =>
+                {
+                    b.HasOne("RwandaMotor.Domain.Entities.Customer", "Customer")
+                        .WithMany("FollowUps")
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("RwandaMotor.Domain.Entities.Vehicle", "Vehicle")
+                        .WithMany("FollowUps")
+                        .HasForeignKey("VehicleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Customer");
+
+                    b.Navigation("Vehicle");
+                });
+
+            modelBuilder.Entity("RwandaMotor.Domain.Entities.ImportLogRow", b =>
+                {
+                    b.HasOne("RwandaMotor.Domain.Entities.ImportLog", "ImportLog")
+                        .WithMany("Rows")
+                        .HasForeignKey("ImportLogId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ImportLog");
+                });
+
+            modelBuilder.Entity("RwandaMotor.Domain.Entities.JobCard", b =>
+                {
+                    b.HasOne("RwandaMotor.Domain.Entities.Customer", "Customer")
+                        .WithMany()
+                        .HasForeignKey("CustomerId");
+
+                    b.HasOne("RwandaMotor.Domain.Entities.Technician", "Technician")
+                        .WithMany()
+                        .HasForeignKey("TechnicianId");
+
+                    b.HasOne("RwandaMotor.Domain.Entities.Vehicle", "Vehicle")
+                        .WithMany()
+                        .HasForeignKey("VehicleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Customer");
+
+                    b.Navigation("Technician");
+
+                    b.Navigation("Vehicle");
+                });
+
+            modelBuilder.Entity("RwandaMotor.Domain.Entities.SalesHistory", b =>
+                {
+                    b.HasOne("RwandaMotor.Domain.Entities.Customer", "Customer")
+                        .WithMany()
+                        .HasForeignKey("CustomerId");
+
+                    b.HasOne("RwandaMotor.Domain.Entities.Vehicle", "Vehicle")
+                        .WithMany()
+                        .HasForeignKey("VehicleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Customer");
+
+                    b.Navigation("Vehicle");
+                });
+
+            modelBuilder.Entity("RwandaMotor.Domain.Entities.ServicePart", b =>
+                {
+                    b.HasOne("RwandaMotor.Domain.Entities.ServiceRecord", "ServiceRecord")
+                        .WithMany("Parts")
+                        .HasForeignKey("ServiceRecordId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ServiceRecord");
+                });
+
+            modelBuilder.Entity("RwandaMotor.Domain.Entities.ServicePolicy", b =>
+                {
+                    b.HasOne("RwandaMotor.Domain.Entities.Brand", "Brand")
+                        .WithMany("ServicePolicies")
+                        .HasForeignKey("BrandId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("RwandaMotor.Domain.Entities.VehicleModel", "Model")
+                        .WithMany("ServicePolicies")
+                        .HasForeignKey("ModelId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Brand");
+
+                    b.Navigation("Model");
+                });
+
+            modelBuilder.Entity("RwandaMotor.Domain.Entities.ServiceRecord", b =>
+                {
+                    b.HasOne("RwandaMotor.Domain.Entities.WorkshopBay", "Bay")
+                        .WithMany("ServiceRecords")
+                        .HasForeignKey("BayId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("RwandaMotor.Domain.Entities.Technician", "Technician")
+                        .WithMany("ServiceRecords")
+                        .HasForeignKey("TechnicianId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("RwandaMotor.Domain.Entities.Vehicle", "Vehicle")
+                        .WithMany("ServiceRecords")
+                        .HasForeignKey("VehicleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Bay");
+
+                    b.Navigation("Technician");
+
+                    b.Navigation("Vehicle");
+                });
+
+            modelBuilder.Entity("RwandaMotor.Domain.Entities.Vehicle", b =>
+                {
+                    b.HasOne("RwandaMotor.Domain.Entities.Brand", "Brand")
+                        .WithMany()
+                        .HasForeignKey("BrandId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("RwandaMotor.Domain.Entities.Customer", "Customer")
+                        .WithMany("Vehicles")
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("RwandaMotor.Domain.Entities.VehicleModel", "Model")
+                        .WithMany()
+                        .HasForeignKey("ModelId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("RwandaMotor.Domain.Entities.ServicePolicy", "ServicePolicy")
+                        .WithMany()
+                        .HasForeignKey("ServicePolicyId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Brand");
+
+                    b.Navigation("Customer");
+
+                    b.Navigation("Model");
+
+                    b.Navigation("ServicePolicy");
+                });
+
+            modelBuilder.Entity("RwandaMotor.Domain.Entities.VehicleModel", b =>
+                {
+                    b.HasOne("RwandaMotor.Domain.Entities.Brand", "Brand")
+                        .WithMany("Models")
+                        .HasForeignKey("BrandId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                                         .IsRequired();
+                });
+
+            modelBuilder.Entity("RwandaMotor.Domain.Entities.Brand", b =>
+                {
+                    b.Navigation("Models");
+
+                    b.Navigation("ServicePolicies");
+                });
+
+            modelBuilder.Entity("RwandaMotor.Domain.Entities.Customer", b =>
+                {
+                    b.Navigation("FollowUps");
+
+                    b.Navigation("Vehicles");
+                });
+
+            modelBuilder.Entity("RwandaMotor.Domain.Entities.ImportLog", b =>
+                {
+                    b.Navigation("Rows");
+                });
+
+            modelBuilder.Entity("RwandaMotor.Domain.Entities.ServiceRecord", b =>
+                {
+                    b.Navigation("Parts");
+                });
+
+            modelBuilder.Entity("RwandaMotor.Domain.Entities.Technician", b =>
+                {
+                    b.Navigation("ServiceRecords");
+                });
+
+            modelBuilder.Entity("RwandaMotor.Domain.Entities.Vehicle", b =>
+                {
+                    b.Navigation("FollowUps");
+
+                    b.Navigation("ServiceRecords");
+                });
+
+            modelBuilder.Entity("RwandaMotor.Domain.Entities.VehicleModel", b =>
+                {
+                    b.Navigation("ServicePolicies");
+                });
+
+            modelBuilder.Entity("RwandaMotor.Domain.Entities.WorkshopBay", b =>
+                {
+                    b.Navigation("ServiceRecords");
+                });
+#pragma warning restore 612, 618
+        }
+    }
+}
