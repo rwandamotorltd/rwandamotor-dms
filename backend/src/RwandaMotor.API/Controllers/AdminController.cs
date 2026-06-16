@@ -52,6 +52,9 @@ public class AdminController : ControllerBase
     [HttpPut("company-settings")]
     public async Task<IActionResult> UpdateCompanySettings([FromBody] UpdateCompanySettingsCommand command)
     {
+        if (command is null || string.IsNullOrWhiteSpace(command.CompanyName))
+            return BadRequest(ApiResponse<bool>.Fail("Company name is required"));
+
         await _mediator.Send(command);
         return Ok(ApiResponse<bool>.Ok(true, "Company settings updated successfully"));
     }

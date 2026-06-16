@@ -749,7 +749,12 @@ function CompanyTab() {
       qc.invalidateQueries({ queryKey: ["company-settings"] });
       toast.success("Company settings saved");
     },
-    onError: () => toast.error("Failed to save company settings"),
+    onError: (err: unknown) => {
+      const msg =
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+        ?? "Failed to save company settings";
+      toast.error(msg);
+    },
   });
 
   const patch = (p: Partial<CompanySettings>) => setForm(f => ({ ...f, ...p }));
