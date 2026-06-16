@@ -47,6 +47,9 @@ public static class DependencyInjection
         services.AddScoped<IRetentionEngine, RetentionEngine>();
         services.AddScoped<ApplicationDbSeeder>();
 
+        services.Configure<SmtpSettings>(configuration.GetSection("Email"));
+        services.AddScoped<IEmailService, SmtpEmailService>();
+
         // Nightly retention evaluation -- runs at 2:00 AM UTC
         services.AddQuartz(q =>
         {

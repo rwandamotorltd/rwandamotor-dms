@@ -15,8 +15,13 @@ namespace RwandaMotor.API.Controllers;
 public class JobCardsController : ControllerBase
 {
     private readonly IMediator _mediator;
+    private readonly IEmailService _email;
 
-    public JobCardsController(IMediator mediator) => _mediator = mediator;
+    public JobCardsController(IMediator mediator, IEmailService email)
+    {
+        _mediator = mediator;
+        _email = email;
+    }
 
     // ──────────────────────────────────────────────────────────────
     // LIST
@@ -109,15 +114,47 @@ public class JobCardsController : ControllerBase
         // The frontend handles the actual email composition for delivery notes
         // This endpoint records the sharing intent and returns success
         var subject = $"Job Card {jobCard.JobCardNumber} — {jobCard.VIN}";
-        var bodyPreview = req.CustomMessage ?? $"Please find attached the job card details for vehicle {jobCard.VIN} ({jobCard.PlateNumber}).";
-
-        // TODO: Inject IEmailService and send actual email
-        // await _emailService.SendAsync(req.RecipientEmail, subject, bodyPreview);
-
-        return Ok(ApiResponse<object>.Ok(new { subject, preview = bodyPreview }, "Email queued successfully"));
+        var html = JobCardEmailBuilder.BuildShareEmail(jobCard, req.CustomMessage);
+        await _email.SendAsync(req.RecipientEmail, subject, html);
+        return Ok(ApiResponse<object>.Ok(new { subject }, "Email sent successfully"));
     }
 }
 
 public record CreateJobCardResult(Guid Id, string JobCardNumber);
 
 public record ShareJobCardRequest(string RecipientEmail, string? CustomMessage);
+
+file static class JobCardEmailBuilder
+{
+    private static string E(string? s) => System.Net.WebUtility.HtmlEncode(s ?? "—");
+    private const string TD = "padding:8px 0;border-bottom:1px solid #eee";
+    private const string TDL = "padding:8px 0;border-bottom:1px solid #eee;color:#666;width:40%";
+
+    internal static string BuildShareEmail(JobCardDetailDto jc, string? customMessage)
+    {
+        var msg = E(customMessage ?? $"Please find the job card details for vehicle {jc.VIN}.");
+        var notesRow = string.IsNullOrWhiteSpace(jc.Notes)
+            ? ""
+            : $"<tr><td style='{TDL}'>Notes</td><td style='{TD};font-weight:500'>{E(jc.Notes)}</td></tr>";
+
+        return "<html><head><meta charset='utf-8'></head>"
+            + "<body style='font-family:Arial,sans-serif;color:#1a1a1a;margin:0;padding:20px;background:#f5f5f5'>"
+            + "<div style='background:#fff;border-radius:8px;padding:32px;max-width:600px;margin:0 auto'>"
+            + $"<h1 style='font-size:20px;margin:0 0 4px;color:#111'>Job Card {E(jc.JobCardNumber)}</h1>"
+            + "<p style='color:#666;font-size:14px;margin:0 0 24px'>Rwanda Motor Ltd &mdash; Service Department</p>"
+            + $"<div style='background:#f0f4ff;border-left:3px solid #3b5bdb;padding:12px 16px;border-radius:4px;margin:20px 0;font-size:14px'>{msg}</div>"
+            + "<table style='width:100%;border-collapse:collapse;font-size:14px'>"
+            + $"<tr><td style='{TDL}'>VIN</td><td style='{TD};font-weight:500'>{E(jc.VIN)}</td></tr>"
+            + $"<tr><td style='{TDL}'>Plate Number</td><td style='{TD};font-weight:500'>{E(jc.PlateNumber)}</td></tr>"
+            + $"<tr><td style='{TDL}'>Vehicle</td><td style='{TD};font-weight:500'>{E($"{jc.Year} {jc.BrandName} {jc.ModelName}")}</td></tr>"
+            + $"<tr><td style='{TDL}'>Customer</td><td style='{TD};font-weight:500'>{E(jc.CustomerName)}</td></tr>"
+            + $"<tr><td style='{TDL}'>Service Type</td><td style='{TD};font-weight:500'>{E(jc.ServiceType.ToString())}</td></tr>"
+            + $"<tr><td style='{TDL}'>Mileage In</td><td style='{TD};font-weight:500'>{jc.Mileage:N0} km</td></tr>"
+            + $"<tr><td style='{TDL}'>Technician</td><td style='{TD};font-weight:500'>{E(jc.TechnicianName)}</td></tr>"
+            + $"<tr><td style='{TDL}'>Status</td><td style='{TD};font-weight:500'>{jc.Status}</td></tr>"
+            + notesRow
+            + "</table>"
+            + "<p style='margin-top:24px;font-size:12px;color:#999;text-align:center'>Rwanda Motor Ltd &middot; Sent from the DMS system</p>"
+            + "</div></body></html>";
+    }
+}
