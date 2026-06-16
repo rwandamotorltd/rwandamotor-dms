@@ -7,12 +7,11 @@ import { motion } from "framer-motion";
 import {
   LayoutDashboard, Car, Users, Wrench, TrendingUp,
   Upload, Settings, LogOut, Shield, ChevronLeft, ChevronRight,
-  UserCog, Activity, X, ClipboardList
+  Activity, X, ClipboardList
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/auth-context";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface NavItem {

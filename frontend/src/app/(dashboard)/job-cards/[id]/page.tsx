@@ -5,7 +5,6 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { jobCardsApi, companySettingsApi, techniciansApi } from "@/lib/api";
 import type { CompanySettings, ServiceType, FuelLevel } from "@/types";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -292,7 +291,7 @@ function useJobCard(id: string) {
 
 // ─── Print helper ─────────────────────────────────────────────────────────────
 
-function printJobCard(jobCardNumber: string) {
+function printJobCard() {
   const el = document.getElementById("job-card-print");
   if (!el) return;
   const w = window.open("", "_blank");
@@ -352,7 +351,7 @@ export default function JobCardDetailPage() {
   // Auto-print if ?print=1
   useEffect(() => {
     if (searchParams.get("print") === "1" && data && companySettings) {
-      setTimeout(() => printJobCard(data.jobCardNumber), 400);
+      setTimeout(() => printJobCard(), 400);
     }
   }, [searchParams, data, companySettings]);
 
@@ -478,7 +477,7 @@ export default function JobCardDetailPage() {
               </>
             ) : (
               <>
-                <Button variant="outline" size="sm" onClick={() => printJobCard(data.jobCardNumber)}>
+                <Button variant="outline" size="sm" onClick={() => printJobCard()}>
                   <Printer className="w-4 h-4 mr-2" /> Print
                 </Button>
                 {data.status === "Open" && (

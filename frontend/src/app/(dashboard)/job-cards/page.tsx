@@ -10,7 +10,7 @@ import type { JobCardListItem, JobCardStatus, ServiceType, FuelLevel, VehicleLis
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
@@ -116,6 +116,7 @@ function AddVehicleDialog({ open, onClose, onCreated }: {
   // Reset form on close
   useEffect(() => {
     if (!open) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setVin(""); setPlateNumber(""); setBrandId(""); setModelId("");
       setYear(String(new Date().getFullYear()));
       setColor(""); setFuelType(""); setTransmission(""); setCurrentMileage("");
@@ -311,6 +312,7 @@ function CreateJobCardDialog({ open, onClose, onCreated }: {
   // Reset on close
   useEffect(() => {
     if (!open) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setVehicleSearch(""); setDebouncedSearch(""); setShowSuggestions(false);
       setSelectedVehicleId(""); setSelectedVehicle(null);
       setServiceType("RoutineMaintenance"); setFuelLevel("Half");

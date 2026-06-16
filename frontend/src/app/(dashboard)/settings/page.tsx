@@ -293,7 +293,7 @@ function PermissionGroupModal({
   const [selected, setSelected] = useState<Set<string>>(new Set(initial.permissions));
 
   const toggle = (key: string) =>
-    setSelected(prev => { const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n; });
+    setSelected(prev => { const n = new Set(prev); if (n.has(key)) n.delete(key); else n.add(key); return n; });
 
   const toggleSection = (keys: string[]) => {
     const allOn = keys.every(k => selected.has(k));
@@ -739,6 +739,7 @@ function CompanyTab() {
   const [form, setForm] = useState<CompanySettings>(EMPTY_COMPANY);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (data) setForm(data);
   }, [data]);
 

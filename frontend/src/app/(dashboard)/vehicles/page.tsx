@@ -12,10 +12,10 @@ import {
 import {
   Search, Filter, Car, ChevronLeft, ChevronRight,
   Pencil, Check, X, Layers, CheckSquare, SquareDashed,
-  Save, RefreshCw, AlertTriangle, Trash2, Download
+  Save, AlertTriangle, Trash2, Download
 } from "lucide-react";
-import { vehiclesApi, servicePoliciesApi, type UpdateVehiclePayload, type BulkUpdatePayload } from "@/lib/api";
-import type { VehicleListItem, RetentionStatus, ServicePolicy } from "@/types";
+import { vehiclesApi, type UpdateVehiclePayload, type BulkUpdatePayload } from "@/lib/api";
+import type { VehicleListItem, RetentionStatus } from "@/types";
 import { RetentionBadge } from "@/components/shared/retention-badge";
 import { cn, formatDate, formatMileage } from "@/lib/utils";
 import { useAuth } from "@/contexts/auth-context";
@@ -196,7 +196,7 @@ export default function VehiclesPage() {
     setStatusFilter(val as RetentionStatus | "all");
     setPagination(p => ({ ...p, pageIndex: 0 }));
     const params = new URLSearchParams(window.location.search);
-    val === "all" ? params.delete("status") : params.set("status", val);
+    if (val === "all") params.delete("status"); else params.set("status", val);
     router.replace(`/vehicles?${params.toString()}`, { scroll: false });
   };
 
@@ -210,12 +210,6 @@ export default function VehiclesPage() {
       pageNumber: pagination.pageIndex + 1,
       pageSize: pagination.pageSize,
     }),
-  });
-
-  const { data: policies } = useQuery({
-    queryKey: ["service-policies"],
-    queryFn: () => servicePoliciesApi.list(),
-    staleTime: 5 * 60_000,
   });
 
   // Mutations

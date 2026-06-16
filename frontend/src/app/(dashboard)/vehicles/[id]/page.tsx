@@ -5,9 +5,9 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import {
-  ArrowLeft, Car, User, Wrench, Shield, TrendingUp, Clock,
-  CheckCircle2, AlertTriangle, Calendar, Gauge, DollarSign,
-  MapPin, Phone, Mail, Star, Pencil, X, FileText
+  ArrowLeft, Car, User, Wrench, Shield, Clock,
+  CheckCircle2, Calendar, Gauge, DollarSign,
+  Phone, Mail, Star, Pencil, X, FileText
 } from "lucide-react";
 import { vehiclesApi, servicePoliciesApi, type UpdateVehiclePayload } from "@/lib/api";
 import { useAuth } from "@/contexts/auth-context";

@@ -6,7 +6,7 @@ import { motion } from "framer-motion";
 import Link from "next/link";
 import {
   ArrowLeft, User, Car, Wrench, Calendar, Phone, Mail, MapPin,
-  Building2, DollarSign, Hash, CheckCircle2, FileText, Gauge
+  DollarSign, FileText, Gauge
 } from "lucide-react";
 import { customersApi } from "@/lib/api";
 import { useAuth } from "@/contexts/auth-context";
@@ -44,7 +44,6 @@ export default function Customer360Page({ params }: { params: Promise<{ id: stri
   if (isLoading) return <Customer360Skeleton />;
   if (!customer) return <div className="text-center py-20 text-muted-foreground">Customer not found.</div>;
 
-  const initials = customer.fullName.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2);
   const totalRevenue = customer.serviceHistory.reduce((sum, s) => sum + (s.totalCost ?? 0), 0);
   const memberSince = new Date(customer.createdAt);
   const memberYears = Math.floor((Date.now() - memberSince.getTime()) / (365.25 * 24 * 3600 * 1000));

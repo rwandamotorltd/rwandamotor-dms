@@ -10,13 +10,12 @@ import {
 } from "recharts";
 import {
   TrendingUp, TrendingDown, RefreshCw, AlertTriangle,
-  ChevronLeft, ChevronRight, X, Car, ExternalLink
+  X, Car, ExternalLink
 } from "lucide-react";
 import { retentionApi } from "@/lib/api";
 import { KpiCard } from "@/components/shared/kpi-card";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Button } from "@/components/ui/button";
 import { formatPercentage } from "@/lib/utils";
 import type { YearWiseCohortRow, ModelWiseCohortRow, CohortVehicle } from "@/types";
 

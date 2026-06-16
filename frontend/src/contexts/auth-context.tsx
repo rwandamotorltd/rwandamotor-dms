@@ -28,6 +28,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const parsed: AuthUser = JSON.parse(stored);
         // Back-fill for sessions created before permissions were added
         if (!parsed.permissions) parsed.permissions = [];
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setUser(parsed);
       }
     } catch { /* ignore */ }

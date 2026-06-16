@@ -3,8 +3,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import {
-  Car, Users, TrendingUp, AlertTriangle, CheckCircle2,
-  Clock, RefreshCw, Activity, Wrench, BarChart3, ClipboardList, FileCheck
+  Car, Users, TrendingUp, AlertTriangle,
+  Clock, RefreshCw, Activity, Wrench, ClipboardList, FileCheck
 } from "lucide-react";
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid,
