@@ -12,7 +12,7 @@ export type CustomerCategory = 'Retail' | 'Corporate' | 'Government' | 'NGO' | '
 export type ContactMethod = 'Phone' | 'SMS' | 'Email' | 'WhatsApp' | 'InPerson';
 export type FollowUpStatus = 'Pending' | 'Contacted' | 'AppointmentBooked' | 'Recovered' | 'Unreachable' | 'Declined' | 'Closed';
 export type FollowUpPriority = 'Low' | 'Medium' | 'High' | 'Critical';
-export type ImportType = 'Vehicles' | 'Customers' | 'ServiceRecords';
+export type ImportType = 'Vehicles' | 'Customers' | 'ServiceRecords' | 'JobCards';
 export type ImportStatus = 'Pending' | 'Validating' | 'Valid' | 'Invalid' | 'Importing' | 'Completed' | 'CompletedWithErrors' | 'RolledBack' | 'Failed';
 
 // ============================================================

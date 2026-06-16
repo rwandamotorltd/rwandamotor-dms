@@ -16,8 +16,8 @@ public class VehicleConfiguration : IEntityTypeConfiguration<Vehicle>
         builder.Property(v => v.SalePrice).HasPrecision(18, 2);
         builder.Property(v => v.RetentionStatus).HasConversion<int>();
 
-        builder.HasOne(v => v.Brand).WithMany().HasForeignKey(v => v.BrandId).OnDelete(DeleteBehavior.Restrict);
-        builder.HasOne(v => v.Model).WithMany().HasForeignKey(v => v.ModelId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne(v => v.Brand).WithMany().HasForeignKey(v => v.BrandId).IsRequired(false).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne(v => v.Model).WithMany().HasForeignKey(v => v.ModelId).IsRequired(false).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne(v => v.Customer).WithMany(c => c.Vehicles).HasForeignKey(v => v.CustomerId).OnDelete(DeleteBehavior.SetNull);
         builder.HasOne(v => v.ServicePolicy).WithMany().HasForeignKey(v => v.ServicePolicyId).OnDelete(DeleteBehavior.SetNull);
         builder.HasMany(v => v.ServiceRecords).WithOne(sr => sr.Vehicle).HasForeignKey(sr => sr.VehicleId).OnDelete(DeleteBehavior.Cascade);

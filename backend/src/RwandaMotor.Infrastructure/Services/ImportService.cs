@@ -138,11 +138,23 @@ public class ValidateImportFileCommandHandler
                 return (false, false, "VIN is required");
             if (!row.TryGetValue("ServiceDate", out var dateStr) || !DateTime.TryParse(dateStr, out _))
                 return (false, false, "ServiceDate must be a valid date (YYYY-MM-DD)");
-            // Warn (but still accept) if mileage is present but invalid
             if (row.TryGetValue("MileageAtService", out var mileStr)
                 && !string.IsNullOrWhiteSpace(mileStr)
                 && (!int.TryParse(mileStr, out var m) || m < 0))
                 return (false, false, "MileageAtService must be a non-negative integer when provided");
+            return (true, false, null);
+        }
+
+        if (type == ImportType.JobCards)
+        {
+            if (!row.TryGetValue("VIN", out var vin) || string.IsNullOrWhiteSpace(vin))
+                return (false, false, "VIN is required");
+            if (!row.TryGetValue("JobCardDate", out var dateStr) || !DateTime.TryParse(dateStr, out _))
+                return (false, false, "JobCardDate must be a valid date (YYYY-MM-DD)");
+            if (row.TryGetValue("Mileage", out var mileStr)
+                && !string.IsNullOrWhiteSpace(mileStr)
+                && (!int.TryParse(mileStr, out var m) || m < 0))
+                return (false, false, "Mileage must be a non-negative integer when provided");
             return (true, false, null);
         }
 
@@ -246,6 +258,8 @@ public class ProcessImportCommandHandler
             (imported, errors) = await ImportVehiclesBatch(rowsToProcess, allData, ct);
         else if (importLog.ImportType == ImportType.ServiceRecords)
             (imported, errors) = await ImportServiceRecordsBatch(rowsToProcess, allData, ct);
+        else if (importLog.ImportType == ImportType.JobCards)
+            (imported, errors) = await ImportJobCardsBatch(rowsToProcess, allData, ct);
 
         foreach (var e in errors)
         {
@@ -490,6 +504,9 @@ public class ProcessImportCommandHandler
         var vehicleMap = allVehicles
             .ToDictionary(v => v.VIN, StringComparer.OrdinalIgnoreCase);
 
+        // Pre-pass: auto-create external vehicles for unknown VINs
+        vehicleMap = await EnsureExternalVehicles(allData.Select(d => Get(d, "VIN")).ToList(), vehicleMap, ct);
+
         var policies = await _db.ServicePolicies
             .Where(p => !p.IsDeleted && p.IsActive)
             .ToListAsync(ct);
@@ -522,15 +539,13 @@ public class ProcessImportCommandHandler
                 var invoiceNumber  = Get(data, "InvoiceNumber");
 
                 if (!vehicleMap.TryGetValue(vin, out var vehicle))
-                    throw new Exception($"Vehicle with VIN '{vin}' not found.");
+                    throw new Exception($"Vehicle with VIN '{vin}' could not be resolved.");
 
                 var serviceDate = DateTime.Parse(serviceDateStr, null, DateTimeStyles.AssumeUniversal);
 
-                // Mileage is optional — default to 0 so CRE can fill it in later
                 var mileage = (!string.IsNullOrWhiteSpace(mileageStr) && int.TryParse(mileageStr, out var parsedMileage) && parsedMileage >= 0)
                     ? parsedMileage : 0;
 
-                // ServiceType is optional — default to RoutineMaintenance
                 if (!Enum.TryParse<ServiceType>(serviceTypeStr, ignoreCase: true, out var serviceType))
                     serviceType = ServiceType.RoutineMaintenance;
 
@@ -582,6 +597,163 @@ public class ProcessImportCommandHandler
         }
 
         return (imported, errors);
+    }
+
+    // -- Job Cards — historical import --------------------------------------------
+
+    private async Task<(int imported, List<ImportRowErrorDto> errors)> ImportJobCardsBatch(
+        List<ImportLogRow> logRows, List<Dictionary<string, string>> allData, CancellationToken ct)
+    {
+        var errors = new List<ImportRowErrorDto>();
+        int imported = 0;
+
+        var allVehicles = await _db.Vehicles
+            .Where(v => !v.IsDeleted)
+            .ToListAsync(ct);
+        var vehicleMap = allVehicles
+            .ToDictionary(v => v.VIN, StringComparer.OrdinalIgnoreCase);
+
+        // Pre-pass: auto-create external vehicles for unknown VINs
+        vehicleMap = await EnsureExternalVehicles(allData.Select(d => Get(d, "VIN")).ToList(), vehicleMap, ct);
+
+        var technicians = await _db.Technicians
+            .Where(t => !t.IsDeleted)
+            .ToListAsync(ct);
+
+        var jobCardsToAdd = new List<JobCard>();
+
+        for (int i = 0; i < allData.Count; i++)
+        {
+            var data   = allData[i];
+            var logRow = logRows[i];
+
+            try
+            {
+                var vin            = Get(data, "VIN").ToUpperInvariant();
+                var jobCardDateStr = Get(data, "JobCardDate");
+                var mileageStr     = Get(data, "Mileage");
+                var serviceTypeStr = Get(data, "ServiceType");
+                var fuelLevelStr   = Get(data, "FuelLevel");
+                var technicianName = Get(data, "TechnicianName");
+                var statusStr      = Get(data, "Status");
+                var notes          = Get(data, "Notes");
+                var jobCardNumber  = Get(data, "JobCardNumber");
+                var customerName   = Get(data, "CustomerName");
+                var customerPhone  = Get(data, "CustomerPhone");
+
+                if (!vehicleMap.TryGetValue(vin, out var vehicle))
+                    throw new Exception($"Vehicle with VIN '{vin}' could not be resolved.");
+
+                var jobCardDate = DateTime.Parse(jobCardDateStr, null, DateTimeStyles.AssumeUniversal);
+
+                var mileage = (!string.IsNullOrWhiteSpace(mileageStr) && int.TryParse(mileageStr, out var parsedMileage) && parsedMileage >= 0)
+                    ? parsedMileage : 0;
+
+                if (!Enum.TryParse<ServiceType>(serviceTypeStr, ignoreCase: true, out var serviceType))
+                    serviceType = ServiceType.RoutineMaintenance;
+
+                if (!Enum.TryParse<FuelLevel>(fuelLevelStr, ignoreCase: true, out var fuelLevel))
+                    fuelLevel = FuelLevel.Half;
+
+                // Historical job cards default to Closed; override from CSV if present
+                if (!Enum.TryParse<JobCardStatus>(statusStr, ignoreCase: true, out var status))
+                    status = JobCardStatus.Closed;
+
+                Technician? technician = null;
+                if (!string.IsNullOrWhiteSpace(technicianName))
+                    technician = technicians.FirstOrDefault(t =>
+                        t.FullName.Contains(technicianName, StringComparison.OrdinalIgnoreCase));
+
+                // Use provided number or generate a placeholder from VIN + date
+                var number = !string.IsNullOrWhiteSpace(jobCardNumber)
+                    ? jobCardNumber
+                    : $"HIST-{vin[..Math.Min(8, vin.Length)]}-{jobCardDate:yyyyMMdd}";
+
+                jobCardsToAdd.Add(new JobCard
+                {
+                    JobCardNumber    = number,
+                    VehicleId        = vehicle.Id,
+                    CustomerId       = vehicle.CustomerId,
+                    TechnicianId     = technician?.Id,
+                    VIN              = vehicle.VIN,
+                    PlateNumber      = vehicle.PlateNumber,
+                    Year             = vehicle.Year,
+                    Color            = vehicle.Color,
+                    Transmission     = vehicle.Transmission,
+                    FuelType         = vehicle.FuelType,
+                    FuelLevel        = fuelLevel,
+                    Mileage          = mileage,
+                    CustomerName     = !string.IsNullOrWhiteSpace(customerName) ? customerName : null,
+                    CustomerPhone    = !string.IsNullOrWhiteSpace(customerPhone) ? customerPhone : null,
+                    ServiceType      = serviceType,
+                    Notes            = string.IsNullOrWhiteSpace(notes) ? null : notes,
+                    Status           = status,
+                    ReceivedByName   = "Import",
+                    CreatedAt        = jobCardDate,
+                    ClosedAt         = status == JobCardStatus.Closed ? jobCardDate : null,
+                });
+
+                vehicle.CurrentMileage = Math.Max(vehicle.CurrentMileage ?? 0, mileage);
+                vehicle.UpdatedAt      = DateTime.UtcNow;
+
+                logRow.IsImported = true;
+                imported++;
+            }
+            catch (Exception ex)
+            {
+                _log.LogWarning(ex, "Job card row {Row} failed", logRow.RowNumber);
+                errors.Add(new ImportRowErrorDto(logRow.RowNumber, "Row", ex.Message));
+            }
+        }
+
+        if (jobCardsToAdd.Count > 0)
+        {
+            // Capture historical dates before DbContext override sets CreatedAt = UtcNow
+            var historicalDates = jobCardsToAdd.ToDictionary(jc => jc.Id, jc => jc.CreatedAt);
+            _db.JobCards.AddRange(jobCardsToAdd);
+            await _db.SaveChangesAsync(ct);
+
+            // Restore original job card dates so historical records sort correctly
+            var dbCtx = _db as Microsoft.EntityFrameworkCore.DbContext;
+            if (dbCtx != null)
+                foreach (var (id, date) in historicalDates)
+                    await dbCtx.Database.ExecuteSqlRawAsync(
+                        @"UPDATE ""JobCards"" SET ""CreatedAt"" = {0} WHERE ""Id"" = {1}", date, id);
+        }
+
+        return (imported, errors);
+    }
+
+    // -- Shared: ensure external vehicles exist for all unknown VINs ---------------
+
+    private async Task<Dictionary<string, Vehicle>> EnsureExternalVehicles(
+        List<string> vins, Dictionary<string, Vehicle> vehicleMap, CancellationToken ct)
+    {
+        var unknownVins = vins
+            .Select(v => v.Trim().ToUpperInvariant())
+            .Where(v => !string.IsNullOrWhiteSpace(v) && !vehicleMap.ContainsKey(v))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (unknownVins.Count == 0) return vehicleMap;
+
+        var newVehicles = unknownVins.Select(vin => new Vehicle
+        {
+            VIN                = vin.Length > 17 ? vin[..17] : vin,
+            IsSoldByDealership = false,
+            RetentionStatus    = RetentionStatus.External,
+            Year               = 0,
+        }).ToList();
+
+        _db.Vehicles.AddRange(newVehicles);
+        await _db.SaveChangesAsync(ct);
+
+        foreach (var v in newVehicles)
+            vehicleMap[v.VIN] = v;
+
+        _log.LogInformation("Auto-created {Count} external vehicle(s) for import", newVehicles.Count);
+
+        return vehicleMap;
     }
 
     // -- In-memory policy resolution ----------------------------------------------
