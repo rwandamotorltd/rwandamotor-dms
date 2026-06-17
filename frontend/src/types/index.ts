@@ -160,6 +160,7 @@ export interface VehicleListItem {
   brandCode: string;
   modelName: string;
   year: number;
+  customerId: string | null;
   customerName: string | null;
   customerPhone: string | null;
   saleDate: string | null;

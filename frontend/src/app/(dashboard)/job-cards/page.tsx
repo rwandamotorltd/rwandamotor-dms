@@ -96,6 +96,7 @@ function AddVehicleDialog({ open, onClose, onCreated }: {
           brandCode: "",
           modelName: models.find(m => m.id === modelId)?.name ?? "",
           year: parseInt(year),
+          customerId: null,
           customerName: null,
           customerPhone: null,
           saleDate: null,
@@ -371,7 +372,8 @@ function CreateJobCardDialog({ open, onClose, onCreated }: {
     if (!selectedVehicleId) return toast.error("Please select a vehicle");
     if (!mileage)           return toast.error("Please enter mileage");
     mutation.mutate({
-      vehicleId: selectedVehicleId,
+      vehicleId:  selectedVehicleId,
+      customerId: selectedVehicle?.customerId ?? null,
       technicianId: technicianId || null,
       serviceType,
       fuelLevel,
@@ -477,9 +479,25 @@ function CreateJobCardDialog({ open, onClose, onCreated }: {
                   <span className="font-medium">{selectedVehicle.brandName} {selectedVehicle.modelName}</span>
                   <span className="text-muted-foreground">
                     {selectedVehicle.year}
-                    {selectedVehicle.customerName ? " · " + selectedVehicle.customerName : ""}
-                    {selectedVehicle.isSoldByDealership ? " · Dealership" : ""}
+                    {selectedVehicle.isSoldByDealership ? " · Dealership" : " · External"}
                   </span>
+                </div>
+              )}
+
+              {/* Customer panel — auto-filled from vehicle */}
+              {selectedVehicle && (
+                <div className={`rounded-md border px-3 py-2 text-sm ${selectedVehicle.customerId ? "border-emerald-500/30 bg-emerald-500/5" : "border-amber-500/30 bg-amber-500/5"}`}>
+                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide mr-2">Customer:</span>
+                  {selectedVehicle.customerId ? (
+                    <span>
+                      <span className="font-medium">{selectedVehicle.customerName}</span>
+                      {selectedVehicle.customerPhone && (
+                        <span className="text-muted-foreground ml-2">· {selectedVehicle.customerPhone}</span>
+                      )}
+                    </span>
+                  ) : (
+                    <span className="text-amber-600 dark:text-amber-400">No customer linked to this vehicle</span>
+                  )}
                 </div>
               )}
 

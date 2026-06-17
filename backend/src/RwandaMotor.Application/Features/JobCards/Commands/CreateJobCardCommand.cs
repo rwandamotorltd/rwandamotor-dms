@@ -54,16 +54,25 @@ public class CreateJobCardCommandHandler : IRequestHandler<CreateJobCardCommand,
         // Generate job card number
         var jobCardNumber = await GenerateNumberAsync(ct);
 
-        // Resolve customer
+        // Resolve customer — prefer explicit customerId from caller, fall back to vehicle's link
         var customerId = cmd.CustomerId ?? vehicle.CustomerId;
-        var customerName = vehicle.Customer?.FullName;
+        var customerName  = vehicle.Customer?.FullName;
         var customerPhone = vehicle.Customer?.Phone;
         var customerEmail = vehicle.Customer?.Email;
 
         if (cmd.CustomerId.HasValue && cmd.CustomerId != vehicle.CustomerId)
         {
+            // Caller explicitly chose a different customer — look them up
             var cust = await _db.Customers.FindAsync(new object[] { cmd.CustomerId.Value }, ct);
-            customerName = cust?.FullName;
+            customerName  = cust?.FullName;
+            customerPhone = cust?.Phone;
+            customerEmail = cust?.Email;
+        }
+        else if (vehicle.Customer == null && customerId.HasValue)
+        {
+            // Include() produced null (e.g. global filter edge case) but FK is set — direct lookup
+            var cust = await _db.Customers.FindAsync(new object[] { customerId.Value }, ct);
+            customerName  = cust?.FullName;
             customerPhone = cust?.Phone;
             customerEmail = cust?.Email;
         }

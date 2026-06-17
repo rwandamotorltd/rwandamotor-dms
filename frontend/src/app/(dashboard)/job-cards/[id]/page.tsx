@@ -71,13 +71,13 @@ interface PrintViewProps {
   settings: CompanySettings;
 }
 
-function PrintView({ data, settings }: PrintViewProps) {
-  const isDelivery = data.status === "Closed" && !!data.deliveryNoteNumber;
-  const docNumber  = isDelivery ? data.deliveryNoteNumber! : data.jobCardNumber;
-  const docDate    = format(new Date(data.createdAt), "dd/MM/yyyy");
-  const serviceLabel = data.serviceType.replace(/([A-Z])/g, " $1").trim().toUpperCase();
+// ─── Delivery Note Print (separate layout) ────────────────────────────────────
 
-  // Split notes into numbered work items
+function DeliveryPrintView({ data, settings }: PrintViewProps) {
+  const docNumber    = data.deliveryNoteNumber!;
+  const deliveryDate = data.closedAt ? format(new Date(data.closedAt), "dd/MM/yyyy") : format(new Date(), "dd/MM/yyyy");
+  const receiptDate  = format(new Date(data.createdAt), "dd/MM/yyyy");
+
   const workItems = (data.notes ?? "")
     .split(/\n/)
     .map(l => l.trim())
@@ -87,8 +87,200 @@ function PrintView({ data, settings }: PrintViewProps) {
     border: "1px solid #000", padding: "3px 6px", ...style,
   });
 
-  const showHeader  = isDelivery ? settings.deliveryNoteShowHeader : settings.jobCardShowHeader;
-  const showFooter  = isDelivery ? settings.deliveryNoteShowFooter : settings.jobCardShowFooter;
+  const th = (style?: React.CSSProperties): React.CSSProperties => ({
+    ...cell({ background: "#f0f0f0", fontWeight: "bold", textAlign: "left", fontSize: 10, ...style }),
+  });
+
+  return (
+    <div
+      id="job-card-print"
+      style={{ fontFamily: "Arial, sans-serif", fontSize: 11, padding: 28, maxWidth: 770, margin: "0 auto", color: "#000" }}
+    >
+      {/* HEADER */}
+      {settings.deliveryNoteShowHeader && (
+        <table style={{ width: "100%", marginBottom: 14, borderCollapse: "collapse" }}>
+          <tbody>
+            <tr>
+              <td style={{ verticalAlign: "top", width: "60%" }}>
+                <div style={{ border: "1.5px solid #000", padding: "8px 12px", display: "inline-block", minWidth: 220 }}>
+                  <div style={{ fontWeight: "bold", fontSize: 14, marginBottom: 3 }}>{settings.companyName.toUpperCase()}</div>
+                  {settings.address   && <div style={{ fontSize: 10 }}>{settings.address}</div>}
+                  {settings.phone     && <div style={{ fontSize: 10 }}>Tel: {settings.phone}</div>}
+                  {settings.email     && <div style={{ fontSize: 10 }}>Email: {settings.email}</div>}
+                  {settings.tinNumber && <div style={{ fontSize: 10 }}>TIN: {settings.tinNumber}</div>}
+                </div>
+              </td>
+              <td style={{ verticalAlign: "top", textAlign: "right" }}>
+                <div style={{ fontSize: 11, marginBottom: 3 }}>Date: <strong>{deliveryDate}</strong></div>
+                <div style={{ fontSize: 10, color: "#555", marginBottom: 6 }}>Job Card: {data.jobCardNumber}</div>
+                <div style={{ border: "1.5px solid #000", width: 80, height: 60, display: "inline-block" }} />
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      )}
+
+      {/* TITLE */}
+      <div style={{ textAlign: "center", marginBottom: 10, borderBottom: "2px solid #000", paddingBottom: 8 }}>
+        <div style={{ fontSize: 17, fontWeight: "bold", letterSpacing: 2 }}>VEHICLE DELIVERY NOTE</div>
+        <div style={{ fontSize: 13, fontWeight: "bold", marginTop: 2 }}>N°: {docNumber}</div>
+      </div>
+
+      {/* CLIENT + VEHICLE side by side */}
+      <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: 10 }}>
+        <tbody>
+          <tr>
+            {/* Client */}
+            <td style={{ width: "50%", verticalAlign: "top", paddingRight: 6 }}>
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead><tr><th colSpan={2} style={th()}>CLIENT INFORMATION</th></tr></thead>
+                <tbody>
+                  {[
+                    ["Name",    data.customerName ?? "—"],
+                    ["Phone",   data.customerPhone ?? "—"],
+                    ["Email",   data.customerEmail ?? "—"],
+                    ["Address", data.customerAddress ?? "—"],
+                  ].map(([k, v]) => (
+                    <tr key={k}>
+                      <td style={cell({ fontWeight: "bold", width: "38%", fontSize: 10 })}>{k}</td>
+                      <td style={cell({ fontSize: 10 })}>{v}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </td>
+
+            {/* Vehicle */}
+            <td style={{ width: "50%", verticalAlign: "top", paddingLeft: 6 }}>
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead><tr><th colSpan={2} style={th()}>VEHICLE DETAILS</th></tr></thead>
+                <tbody>
+                  {[
+                    ["Brand",     data.brandName],
+                    ["Model",     data.modelName],
+                    ["Year",      String(data.year)],
+                    ["VIN",       data.vin],
+                    ["Plate N°",  data.plateNumber ?? "—"],
+                    ["Mileage",   `${data.mileage.toLocaleString()} km`],
+                    ["Fuel",      FUEL_LABELS[data.fuelLevel] ?? data.fuelLevel],
+                  ].map(([k, v]) => (
+                    <tr key={k}>
+                      <td style={cell({ fontWeight: "bold", width: "38%", fontSize: 10 })}>{k}</td>
+                      <td style={cell({ fontSize: 10 })}>{v}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      {/* WORK COMPLETED */}
+      <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: 10 }}>
+        <thead><tr><th colSpan={2} style={th({ fontSize: 10 })}>WORK COMPLETED</th></tr></thead>
+        <tbody>
+          {workItems.length > 0
+            ? workItems.map((item, i) => (
+                <tr key={i}>
+                  <td style={cell({ width: 24, textAlign: "center", fontSize: 10 })}>{i + 1}.</td>
+                  <td style={cell({ fontSize: 10 })}>{item}</td>
+                </tr>
+              ))
+            : [1, 2, 3, 4].map(i => (
+                <tr key={i}>
+                  <td style={cell({ width: 24, textAlign: "center", fontSize: 10 })}>{i}.</td>
+                  <td style={cell({ minHeight: 16, fontSize: 10 })}>&nbsp;</td>
+                </tr>
+              ))
+          }
+        </tbody>
+      </table>
+
+      {/* ACCESSORIES RETURNED */}
+      <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: 10 }}>
+        <thead>
+          <tr><th colSpan={10} style={th({ fontSize: 10 })}>ACCESSORIES RETURNED WITH VEHICLE</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            {PRINT_ACCESSORIES.map(({ label, key }) => {
+              const present = data.accessoriesPresent.includes(key);
+              return (
+                <td key={key} style={cell({ textAlign: "center", width: `${100 / PRINT_ACCESSORIES.length}%`, fontSize: 10 })}>
+                  <div style={{ fontSize: 14, marginBottom: 2 }}>{present ? "☒" : "☐"}</div>
+                  <div>{label}</div>
+                </td>
+              );
+            })}
+          </tr>
+        </tbody>
+      </table>
+
+      {/* ACKNOWLEDGMENT */}
+      <div style={{ border: "1px solid #000", padding: "8px 12px", marginBottom: 14, background: "#fafafa" }}>
+        <div style={{ fontWeight: "bold", fontSize: 10, marginBottom: 4 }}>ACKNOWLEDGMENT OF VEHICLE RECEIPT</div>
+        <div style={{ fontSize: 10, lineHeight: 1.6 }}>
+          I, the undersigned, confirm that the above-described vehicle has been collected and returned to me in satisfactory condition.
+          All work items listed above have been completed to my satisfaction. I acknowledge receipt of the vehicle and all accessories noted above.
+        </div>
+      </div>
+
+      {/* SIGNATURES */}
+      <table style={{ width: "100%", marginTop: 12 }}>
+        <tbody>
+          <tr>
+            <td style={{ width: "50%", paddingRight: 20, verticalAlign: "bottom" }}>
+              <div style={{ fontSize: 10, marginBottom: 4 }}>Customer Name: ___________________________</div>
+              <div style={{ borderTop: "1.5px solid #000", paddingTop: 4, marginTop: 24 }}>
+                <div style={{ fontWeight: "bold", fontSize: 10 }}>Customer Signature &amp; Date</div>
+              </div>
+            </td>
+            <td style={{ width: "50%", paddingLeft: 20, verticalAlign: "bottom" }}>
+              <div style={{ fontSize: 10, marginBottom: 4 }}>Date of Delivery: <strong>{deliveryDate}</strong></div>
+              <div style={{ fontSize: 10, marginBottom: 4 }}>Job Card Date: {receiptDate}</div>
+              <div style={{ borderTop: "1.5px solid #000", paddingTop: 4, marginTop: 10 }}>
+                <div style={{ fontWeight: "bold", fontSize: 10 }}>Released By: {data.receivedByName}</div>
+                {data.closedByName && (
+                  <div style={{ fontSize: 10, color: "#444" }}>Closed by: {data.closedByName}</div>
+                )}
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      {/* FOOTER */}
+      {settings.deliveryNoteShowFooter && settings.footerDisclaimer && (
+        <div style={{ marginTop: 16, borderTop: "1px solid #000", paddingTop: 6, fontSize: 9, textAlign: "center", color: "#333" }}>
+          {settings.footerDisclaimer}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Job Card Print (repair order) ────────────────────────────────────────────
+
+function PrintView({ data, settings }: PrintViewProps) {
+  if (data.status === "Closed" && !!data.deliveryNoteNumber)
+    return <DeliveryPrintView data={data} settings={settings} />;
+
+  const docNumber    = data.jobCardNumber;
+  const docDate      = format(new Date(data.createdAt), "dd/MM/yyyy");
+  const serviceLabel = data.serviceType.replace(/([A-Z])/g, " $1").trim().toUpperCase();
+
+  const workItems = (data.notes ?? "")
+    .split(/\n/)
+    .map(l => l.trim())
+    .filter(Boolean);
+
+  const cell = (style?: React.CSSProperties): React.CSSProperties => ({
+    border: "1px solid #000", padding: "3px 6px", ...style,
+  });
+
+  const showHeader = settings.jobCardShowHeader;
+  const showFooter = settings.jobCardShowFooter;
 
   return (
     <div
@@ -123,7 +315,7 @@ function PrintView({ data, settings }: PrintViewProps) {
       {/* ── TITLE ──────────────────────────────────────────────── */}
       <div style={{ textAlign: "center", marginBottom: 4 }}>
         <div style={{ fontSize: 15, fontWeight: "bold", letterSpacing: 1 }}>
-          {isDelivery ? "DELIVERY NOTE N°:" : "REPAIR ORDER N°:"} {docNumber}
+          REPAIR ORDER N°: {docNumber}
         </div>
         <div style={{ fontSize: 12, fontWeight: "bold", marginTop: 2 }}>{serviceLabel}</div>
       </div>
