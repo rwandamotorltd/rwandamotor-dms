@@ -442,12 +442,15 @@ public class ProcessImportCommandHandler
             }
         }
 
+        var savedVehicles = new List<Vehicle>();
+
         if (vehiclesToAdd.Count > 0)
         {
             try
             {
                 _db.Vehicles.AddRange(vehiclesToAdd);
                 await _db.SaveChangesAsync(ct);
+                savedVehicles.AddRange(vehiclesToAdd);
             }
             catch (Exception batchEx)
             {
@@ -474,6 +477,7 @@ public class ProcessImportCommandHandler
                         _db.Vehicles.Add(vehicle);
                         await _db.SaveChangesAsync(ct);
                         imported++;
+                        savedVehicles.Add(vehicle);
                     }
                     catch (Exception rowEx)
                     {
@@ -489,6 +493,26 @@ public class ProcessImportCommandHandler
                     }
                 }
             }
+        }
+
+        // Create a SalesHistory record for every successfully saved vehicle
+        if (savedVehicles.Count > 0)
+        {
+            var customerIdToName = customerMap.ToDictionary(kv => kv.Value.Id, kv => kv.Key);
+            _db.SalesHistories.AddRange(savedVehicles.Select(v => new SalesHistory
+            {
+                VehicleId    = v.Id,
+                CustomerId   = v.CustomerId,
+                SaleDate     = v.SaleDate ?? DateTime.UtcNow,
+                SaleType     = "Import",
+                VIN          = v.VIN,
+                PlateNumber  = v.PlateNumber,
+                CustomerName = v.CustomerId.HasValue &&
+                               customerIdToName.TryGetValue(v.CustomerId.Value, out var cName)
+                               ? cName : null,
+                Notes        = "Imported from Vehicle Sales Data",
+            }));
+            await _db.SaveChangesAsync(ct);
         }
 
         return (imported, errors);
