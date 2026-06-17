@@ -33,11 +33,12 @@ public class CompanySettings
         "RwandaMotor declines all responsibility for materials not listed above.";
 
     // ── Email Templates ───────────────────────────────────────
-    // Supports {CustomerName} and {ReferenceNumber} placeholders
+    // Job card supports: {CustomerName}
+    // Delivery note supports: {CustomerName}, {VehicleModel}
     public string? EmailJobCardMessage { get; set; } =
         "Dear {CustomerName}, your vehicle has been received and a repair order has been opened. Our team will keep you informed of progress.";
     public string? EmailDeliveryNoteMessage { get; set; } =
-        "Dear {CustomerName}, your vehicle service is complete and ready for collection. Please bring this reference number {ReferenceNumber} when collecting.";
+        "Dear {CustomerName}, thank you for trusting us with your {VehicleModel}. Your vehicle service is now complete and ready for collection. We are glad to have served you.";
 
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 }

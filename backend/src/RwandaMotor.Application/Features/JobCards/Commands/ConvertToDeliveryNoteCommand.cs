@@ -126,8 +126,8 @@ public class ConvertToDeliveryNoteCommandHandler : IRequestHandler<ConvertToDeli
             settings ??= new Domain.Entities.CompanySettings();
             var brand   = jobCard.Vehicle?.Brand?.Name ?? "";
             var model   = jobCard.Vehicle?.Model?.Name ?? "";
-            var html    = DeliveryNoteEmailBuilder.Build(jobCard, dnNumber, brand, model, settings.EmailDeliveryNoteMessage);
-            var subject = $"Delivery Note {dnNumber} — Your Vehicle Is Ready for Collection";
+            var html    = DeliveryNoteEmailBuilder.Build(jobCard, brand, model, settings.EmailDeliveryNoteMessage);
+            var subject = "Your Vehicle Is Ready for Collection — RWANDAMOTOR LTD";
             var _ = _email.SendAsync(customerEmail, subject, html, CancellationToken.None);
         }
 
@@ -142,31 +142,33 @@ file static class DeliveryNoteEmailBuilder
     private static string E(string? s) => System.Net.WebUtility.HtmlEncode(s ?? "—");
 
     private const string DefaultMessage =
-        "Dear {CustomerName}, your vehicle service is complete and ready for collection. Please bring this reference number {ReferenceNumber} when collecting.";
+        "Dear {CustomerName}, thank you for trusting us with your {VehicleModel}. Your vehicle service is now complete and ready for collection. We are glad to have served you.";
 
-    internal static string Build(JobCard jc, string dnNumber, string brand, string model, string? messageTemplate)
+    internal static string Build(JobCard jc, string brand, string model, string? messageTemplate)
     {
+        var vehicleLabel = $"{brand} {model}".Trim();
+
         var msg = (messageTemplate ?? DefaultMessage)
-            .Replace("{CustomerName}",    E(jc.CustomerName))
-            .Replace("{ReferenceNumber}", E(dnNumber));
+            .Replace("{CustomerName}",  E(jc.CustomerName))
+            .Replace("{VehicleModel}",  E(vehicleLabel));
 
         return "<html><head><meta charset='utf-8'></head>"
              + "<body style='font-family:Arial,sans-serif;color:#1a1a1a;margin:0;padding:20px;background:#f5f5f5'>"
-             + "<div style='background:#fff;border-radius:8px;padding:28px 32px;max-width:580px;margin:0 auto'>"
-             + $"<h2 style='font-size:17px;margin:0 0 2px;color:#111;font-weight:600'>Delivery Note {E(dnNumber)}</h2>"
-             + "<p style='color:#888;font-size:12px;margin:0 0 20px;letter-spacing:.3px'>RWANDAMOTOR LTD &mdash; Service Department</p>"
-             + "<hr style='border:none;border-top:1px solid #f0f0f0;margin:0 0 18px'>"
-             + $"<p style='font-size:13px;color:#333;margin:0 0 20px;line-height:1.65'>{msg}</p>"
-             + "<table style='width:100%;border-collapse:collapse'>"
-             + $"<tr><td style='{TDL}'>Delivery Note</td><td style='{TD}'>{E(dnNumber)}</td></tr>"
-             + $"<tr><td style='{TDL}'>Repair Order</td><td style='{TD}'>{E(jc.JobCardNumber)}</td></tr>"
-             + $"<tr><td style='{TDL}'>Vehicle</td><td style='{TD}'>{E($"{brand} {model}")} ({jc.Year})</td></tr>"
-             + $"<tr><td style='{TDL}'>VIN</td><td style='{TD}'>{E(jc.VIN)}</td></tr>"
+             + "<div style='background:#fff;border-radius:8px;padding:28px 32px;max-width:560px;margin:0 auto'>"
+             + "<p style='color:#888;font-size:12px;margin:0 0 20px;letter-spacing:.4px;text-transform:uppercase'>RWANDAMOTOR LTD &mdash; Service Department</p>"
+             + "<hr style='border:none;border-top:1px solid #f0f0f0;margin:0 0 20px'>"
+             + $"<p style='font-size:14px;color:#333;margin:0 0 22px;line-height:1.75'>{msg}</p>"
+             + "<table style='width:100%;border-collapse:collapse;margin-bottom:22px'>"
+             + $"<tr><td style='{TDL}'>Vehicle</td><td style='{TD}'>{E(vehicleLabel)}{(jc.Year > 0 ? $" ({jc.Year})" : "")}</td></tr>"
              + $"<tr><td style='{TDL}'>Plate Number</td><td style='{TD}'>{E(jc.PlateNumber)}</td></tr>"
-             + $"<tr><td style='{TDL}'>Service</td><td style='{TD}'>{E(jc.ServiceType.ToString())}</td></tr>"
-             + $"<tr><td style='{TDL}'>Released By</td><td style='{TD}'>{E(jc.ClosedByName)}</td></tr>"
              + "</table>"
-             + "<p style='margin-top:24px;font-size:11px;color:#bbb;text-align:center'>RWANDAMOTOR LTD</p>"
+             + "<div style='background:#f6faf8;border-left:3px solid #2d7d52;border-radius:0 4px 4px 0;padding:12px 16px;margin-bottom:26px'>"
+             + "<p style='font-size:13px;color:#333;margin:0;line-height:1.65'>"
+             + "<strong>Our recommendation:</strong> For the best performance and long life of your vehicle, "
+             + "we always recommend using <strong>genuine manufacturer-approved parts</strong>. "
+             + "Our team is here to help whenever you need us."
+             + "</p></div>"
+             + "<p style='margin:0;font-size:11px;color:#ccc;text-align:center'>RWANDAMOTOR LTD &mdash; We care about your vehicle</p>"
              + "</div></body></html>";
     }
 }

@@ -829,7 +829,7 @@ function SequenceTab() {
 // ─── Company Tab ───────────────────────────────────────────────
 
 const DEFAULT_JC_MSG  = "Dear {CustomerName}, your vehicle has been received and a repair order has been opened. Our team will keep you informed of progress.";
-const DEFAULT_DN_MSG  = "Dear {CustomerName}, your vehicle service is complete and ready for collection. Please bring this reference number {ReferenceNumber} when collecting.";
+const DEFAULT_DN_MSG  = "Dear {CustomerName}, thank you for trusting us with your {VehicleModel}. Your vehicle service is now complete and ready for collection. We are glad to have served you.";
 
 const EMPTY_COMPANY: CompanySettings = {
   companyName: "RwandaMotor",
@@ -1005,9 +1005,10 @@ function CompanyTab() {
         <CardHeader>
           <CardTitle className="text-base">Customer Email Messages</CardTitle>
           <CardDescription>
-            Personalise the messages sent to customers. Use{" "}
-            <code className="text-xs bg-muted px-1 py-0.5 rounded">{"{CustomerName}"}</code> and{" "}
-            <code className="text-xs bg-muted px-1 py-0.5 rounded">{"{ReferenceNumber}"}</code> as placeholders.
+            Personalise the messages sent to customers. Job card supports{" "}
+            <code className="text-xs bg-muted px-1 py-0.5 rounded">{"{CustomerName}"}</code>.
+            Delivery note also supports{" "}
+            <code className="text-xs bg-muted px-1 py-0.5 rounded">{"{VehicleModel}"}</code>.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-5">
