@@ -62,7 +62,10 @@ function useIdleLogout() {
 // ─── Layout ───────────────────────────────────────────────────────────────────
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const [collapsed, setCollapsed] = useState(false);
+  // Start collapsed on tablet (md), expanded on desktop (lg+)
+  const [collapsed, setCollapsed] = useState(() =>
+    typeof window !== "undefined" && window.innerWidth < 1024
+  );
   const [mobileOpen, setMobileOpen] = useState(false);
   const { user, isLoading } = useAuth();
   const router = useRouter();
