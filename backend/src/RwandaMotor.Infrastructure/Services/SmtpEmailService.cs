@@ -14,7 +14,7 @@ public class SmtpSettings
     public string Password { get; set; } = "";
     public bool EnableSsl { get; set; } = true;
     public string FromAddress { get; set; } = "noreply@rwandamotor.com";
-    public string FromName { get; set; } = "Rwanda Motor DMS";
+    public string FromName { get; set; } = "RWANDAMOTOR LTD";
     public string AlertRecipient { get; set; } = "";
 }
 
