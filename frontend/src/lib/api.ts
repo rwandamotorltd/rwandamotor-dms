@@ -334,6 +334,49 @@ export interface UpdateUserPayload {
   customPermissions?: string[] | null;
 }
 
+// ============================================================
+// Admin — Catalogue (Brands & Models)
+// ============================================================
+export interface CatalogueModelDto {
+  id: string;
+  name: string;
+  code: string;
+  segment: string | null;
+  isActive: boolean;
+}
+
+export interface CatalogueBrandDto {
+  id: string;
+  name: string;
+  code: string;
+  country: string | null;
+  isActive: boolean;
+  models: CatalogueModelDto[];
+}
+
+export const catalogueApi = {
+  getBrands: () =>
+    api.get<ApiResponse<CatalogueBrandDto[]>>('/admin/catalogue/brands').then(r => r.data.data!),
+
+  createBrand: (payload: { name: string; code: string; country?: string }) =>
+    api.post<ApiResponse<string>>('/admin/catalogue/brands', payload).then(r => r.data),
+
+  updateBrand: (id: string, payload: { name: string; code: string; country?: string; isActive: boolean }) =>
+    api.put<ApiResponse<boolean>>(`/admin/catalogue/brands/${id}`, payload).then(r => r.data),
+
+  deleteBrand: (id: string) =>
+    api.delete<ApiResponse<boolean>>(`/admin/catalogue/brands/${id}`).then(r => r.data),
+
+  createModel: (brandId: string, payload: { name: string; code: string; segment?: string }) =>
+    api.post<ApiResponse<string>>(`/admin/catalogue/brands/${brandId}/models`, payload).then(r => r.data),
+
+  updateModel: (id: string, payload: { name: string; code: string; segment?: string; isActive: boolean }) =>
+    api.put<ApiResponse<boolean>>(`/admin/catalogue/models/${id}`, payload).then(r => r.data),
+
+  deleteModel: (id: string) =>
+    api.delete<ApiResponse<boolean>>(`/admin/catalogue/models/${id}`).then(r => r.data),
+};
+
 export const adminApi = {
   getUsers: () =>
     api.get<ApiResponse<UserItem[]>>('/admin/users').then(r => r.data.data!),

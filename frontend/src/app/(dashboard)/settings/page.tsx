@@ -5,14 +5,16 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import {
   Settings, Hash, AlertTriangle, Users, ShieldCheck,
-  Plus, Pencil, Trash2, X, Eye, EyeOff, KeyRound, Building2, Save
+  Plus, Pencil, Trash2, X, Eye, EyeOff, KeyRound, Building2, Save,
+  ChevronDown, ChevronRight, Database, Car, Wrench
 } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
 import { useRouter } from "next/navigation";
 import {
-  adminApi, permissionGroupsApi, companySettingsApi,
+  adminApi, permissionGroupsApi, companySettingsApi, catalogueApi,
   type UserItem, type CreateUserPayload, type UpdateUserPayload,
   type PermissionGroupItem, type CreatePermissionGroupPayload,
+  type CatalogueBrandDto, type CatalogueModelDto,
 } from "@/lib/api";
 import { jobCardsApi } from "@/lib/api";
 import type { CompanySettings } from "@/types";
@@ -1005,6 +1007,258 @@ function CompanyTab() {
 
 // ─── Main Page ─────────────────────────────────────────────────
 
+// ─── Catalogue Tab ─────────────────────────────────────────────────────────────
+
+const SERVICE_TYPE_LABELS: { key: string; label: string }[] = [
+  { key: "RoutineMaintenance",     label: "Routine Maintenance" },
+  { key: "OilChange",             label: "Oil Change" },
+  { key: "MajorService",          label: "Major Service" },
+  { key: "TyreRotation",          label: "Tyre Rotation" },
+  { key: "BrakeService",          label: "Brake Service" },
+  { key: "TransmissionService",   label: "Transmission Service" },
+  { key: "AirConditioningService",label: "Air Conditioning" },
+  { key: "ElectricalDiagnostics", label: "Electrical Diagnostics" },
+  { key: "BodyRepair",            label: "Body Repair" },
+  { key: "WarrantyRepair",        label: "Warranty Repair" },
+  { key: "RecallRepair",          label: "Recall Repair" },
+  { key: "PDI",                   label: "PDI (Pre-Delivery Inspection)" },
+  { key: "EmergencyRepair",       label: "Emergency Repair" },
+  { key: "Inspection",            label: "Inspection" },
+  { key: "Other",                 label: "Other" },
+];
+
+interface BrandForm { name: string; code: string; country: string; }
+interface ModelForm  { name: string; code: string; segment: string; }
+
+function CatalogueTab() {
+  const qc = useQueryClient();
+  const [expandedBrand, setExpanded]   = useState<string | null>(null);
+  const [editingBrand,  setEditBrand]  = useState<CatalogueBrandDto | null>(null);
+  const [addingBrand,   setAddBrand]   = useState(false);
+  const [editingModel,  setEditModel]  = useState<(CatalogueModelDto & { brandId: string }) | null>(null);
+  const [addingModel,   setAddModel]   = useState<string | null>(null); // brandId
+  const [brandForm,     setBrandForm]  = useState<BrandForm>({ name: "", code: "", country: "" });
+  const [modelForm,     setModelForm]  = useState<ModelForm>({ name: "", code: "", segment: "" });
+
+  const { data: brands = [], isLoading } = useQuery({
+    queryKey: ["catalogue-brands"],
+    queryFn:  () => catalogueApi.getBrands(),
+  });
+
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ["catalogue-brands"] });
+    qc.invalidateQueries({ queryKey: ["brands"] });
+  };
+
+  const createBrand = useMutation({
+    mutationFn: () => catalogueApi.createBrand({ name: brandForm.name, code: brandForm.code, country: brandForm.country || undefined }),
+    onSuccess: () => { toast.success("Brand created"); setAddBrand(false); setBrandForm({ name: "", code: "", country: "" }); invalidate(); },
+    onError:   () => toast.error("Failed to create brand"),
+  });
+
+  const updateBrand = useMutation({
+    mutationFn: (b: CatalogueBrandDto) => catalogueApi.updateBrand(b.id, { name: brandForm.name, code: brandForm.code, country: brandForm.country || undefined, isActive: b.isActive }),
+    onSuccess: () => { toast.success("Brand updated"); setEditBrand(null); invalidate(); },
+    onError:   () => toast.error("Failed to update brand"),
+  });
+
+  const deleteBrand = useMutation({
+    mutationFn: (id: string) => catalogueApi.deleteBrand(id),
+    onSuccess: () => { toast.success("Brand removed"); invalidate(); },
+    onError:   () => toast.error("Failed to remove brand"),
+  });
+
+  const createModel = useMutation({
+    mutationFn: (brandId: string) => catalogueApi.createModel(brandId, { name: modelForm.name, code: modelForm.code, segment: modelForm.segment || undefined }),
+    onSuccess: () => { toast.success("Model created"); setAddModel(null); setModelForm({ name: "", code: "", segment: "" }); invalidate(); },
+    onError:   () => toast.error("Failed to create model"),
+  });
+
+  const updateModel = useMutation({
+    mutationFn: (m: CatalogueModelDto & { brandId: string }) => catalogueApi.updateModel(m.id, { name: modelForm.name, code: modelForm.code, segment: modelForm.segment || undefined, isActive: m.isActive }),
+    onSuccess: () => { toast.success("Model updated"); setEditModel(null); invalidate(); },
+    onError:   () => toast.error("Failed to update model"),
+  });
+
+  const deleteModel = useMutation({
+    mutationFn: (id: string) => catalogueApi.deleteModel(id),
+    onSuccess: () => { toast.success("Model removed"); invalidate(); },
+    onError:   () => toast.error("Failed to remove model"),
+  });
+
+  const openEditBrand = (b: CatalogueBrandDto) => {
+    setBrandForm({ name: b.name, code: b.code, country: b.country ?? "" });
+    setEditBrand(b);
+  };
+
+  const openEditModel = (m: CatalogueModelDto, brandId: string) => {
+    setModelForm({ name: m.name, code: m.code, segment: m.segment ?? "" });
+    setEditModel({ ...m, brandId });
+  };
+
+  return (
+    <div className="space-y-8">
+      {/* Brands & Models */}
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Car className="w-4 h-4 text-muted-foreground" />
+              <CardTitle className="text-base">Brands &amp; Models</CardTitle>
+            </div>
+            <Button size="sm" className="gap-1.5 gradient-primary text-white"
+              onClick={() => { setAddBrand(true); setBrandForm({ name: "", code: "", country: "" }); }}>
+              <Plus className="w-4 h-4" /> Add Brand
+            </Button>
+          </div>
+          <CardDescription>Manage vehicle brands and their model lines</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {/* Add Brand form */}
+          {addingBrand && (
+            <div className="border border-primary/30 rounded-lg p-3 bg-primary/5 space-y-3 mb-4">
+              <p className="text-sm font-medium">New Brand</p>
+              <div className="grid grid-cols-3 gap-2">
+                <div className="col-span-2 space-y-1"><Label className="text-xs">Name *</Label><Input value={brandForm.name} onChange={e => setBrandForm(f => ({ ...f, name: e.target.value }))} placeholder="Toyota" className="h-8 text-sm" /></div>
+                <div className="space-y-1"><Label className="text-xs">Code *</Label><Input value={brandForm.code} onChange={e => setBrandForm(f => ({ ...f, code: e.target.value.toUpperCase() }))} placeholder="TYT" className="h-8 text-sm" /></div>
+                <div className="col-span-3 space-y-1"><Label className="text-xs">Country of origin</Label><Input value={brandForm.country} onChange={e => setBrandForm(f => ({ ...f, country: e.target.value }))} placeholder="Japan" className="h-8 text-sm" /></div>
+              </div>
+              <div className="flex gap-2 justify-end">
+                <Button variant="ghost" size="sm" onClick={() => setAddBrand(false)}>Cancel</Button>
+                <Button size="sm" disabled={!brandForm.name || !brandForm.code || createBrand.isPending}
+                  onClick={() => createBrand.mutate()}>Save</Button>
+              </div>
+            </div>
+          )}
+
+          {isLoading ? (
+            <div className="space-y-2">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
+          ) : brands.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-8">No brands yet. Add the first one above.</p>
+          ) : brands.map(brand => (
+            <div key={brand.id} className="border border-border rounded-lg overflow-hidden">
+              {/* Brand row */}
+              {editingBrand?.id === brand.id ? (
+                <div className="p-3 bg-primary/5 space-y-2">
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="col-span-2 space-y-1"><Label className="text-xs">Name</Label><Input value={brandForm.name} onChange={e => setBrandForm(f => ({ ...f, name: e.target.value }))} className="h-8 text-sm" /></div>
+                    <div className="space-y-1"><Label className="text-xs">Code</Label><Input value={brandForm.code} onChange={e => setBrandForm(f => ({ ...f, code: e.target.value.toUpperCase() }))} className="h-8 text-sm" /></div>
+                    <div className="col-span-3 space-y-1"><Label className="text-xs">Country</Label><Input value={brandForm.country} onChange={e => setBrandForm(f => ({ ...f, country: e.target.value }))} className="h-8 text-sm" /></div>
+                  </div>
+                  <div className="flex gap-2 justify-end">
+                    <Button variant="ghost" size="sm" onClick={() => setEditBrand(null)}>Cancel</Button>
+                    <Button size="sm" disabled={updateBrand.isPending} onClick={() => updateBrand.mutate(brand)}><Save className="w-3.5 h-3.5 mr-1" />Save</Button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-muted/40 transition-colors text-left"
+                  onClick={() => setExpanded(expandedBrand === brand.id ? null : brand.id)}
+                >
+                  {expandedBrand === brand.id
+                    ? <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />
+                    : <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />}
+                  <span className="font-medium text-sm flex-1">{brand.name}</span>
+                  <span className="text-xs text-muted-foreground font-mono">{brand.code}</span>
+                  {brand.country && <span className="text-xs text-muted-foreground hidden sm:inline">· {brand.country}</span>}
+                  <Badge variant="outline" className="text-[10px] hidden sm:inline-flex">{brand.models.length} models</Badge>
+                  {!brand.isActive && <Badge variant="outline" className="text-[10px] text-muted-foreground">Inactive</Badge>}
+                  <div className="flex items-center gap-1 ml-2" onClick={e => e.stopPropagation()}>
+                    <button className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground" onClick={() => openEditBrand(brand)}><Pencil className="w-3.5 h-3.5" /></button>
+                    <button className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive" onClick={() => { if (confirm(`Remove brand "${brand.name}"?`)) deleteBrand.mutate(brand.id); }}><Trash2 className="w-3.5 h-3.5" /></button>
+                  </div>
+                </button>
+              )}
+
+              {/* Models (expanded) */}
+              {expandedBrand === brand.id && (
+                <div className="border-t border-border bg-muted/20">
+                  {brand.models.map(model => (
+                    <div key={model.id} className="border-b border-border/50 last:border-0">
+                      {editingModel?.id === model.id ? (
+                        <div className="p-3 space-y-2">
+                          <div className="grid grid-cols-3 gap-2">
+                            <div className="col-span-2 space-y-1"><Label className="text-xs">Name</Label><Input value={modelForm.name} onChange={e => setModelForm(f => ({ ...f, name: e.target.value }))} className="h-8 text-sm" /></div>
+                            <div className="space-y-1"><Label className="text-xs">Code</Label><Input value={modelForm.code} onChange={e => setModelForm(f => ({ ...f, code: e.target.value.toUpperCase() }))} className="h-8 text-sm" /></div>
+                            <div className="col-span-3 space-y-1"><Label className="text-xs">Segment</Label><Input value={modelForm.segment} onChange={e => setModelForm(f => ({ ...f, segment: e.target.value }))} placeholder="SUV, Sedan…" className="h-8 text-sm" /></div>
+                          </div>
+                          <div className="flex gap-2 justify-end">
+                            <Button variant="ghost" size="sm" onClick={() => setEditModel(null)}>Cancel</Button>
+                            <Button size="sm" disabled={updateModel.isPending} onClick={() => updateModel.mutate(editingModel!)}><Save className="w-3.5 h-3.5 mr-1" />Save</Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-3 px-4 py-2 text-sm">
+                          <span className="flex-1 font-medium">{model.name}</span>
+                          <span className="text-xs text-muted-foreground font-mono">{model.code}</span>
+                          {model.segment && <span className="text-xs text-muted-foreground hidden sm:inline">{model.segment}</span>}
+                          {!model.isActive && <Badge variant="outline" className="text-[10px] text-muted-foreground">Inactive</Badge>}
+                          <div className="flex items-center gap-1">
+                            <button className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground" onClick={() => openEditModel(model, brand.id)}><Pencil className="w-3 h-3" /></button>
+                            <button className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive" onClick={() => { if (confirm(`Remove model "${model.name}"?`)) deleteModel.mutate(model.id); }}><Trash2 className="w-3 h-3" /></button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+
+                  {/* Add model form */}
+                  {addingModel === brand.id ? (
+                    <div className="p-3 space-y-2 border-t border-border/50">
+                      <div className="grid grid-cols-3 gap-2">
+                        <div className="col-span-2 space-y-1"><Label className="text-xs">Model Name *</Label><Input value={modelForm.name} onChange={e => setModelForm(f => ({ ...f, name: e.target.value }))} placeholder="Corolla" className="h-8 text-sm" /></div>
+                        <div className="space-y-1"><Label className="text-xs">Code *</Label><Input value={modelForm.code} onChange={e => setModelForm(f => ({ ...f, code: e.target.value.toUpperCase() }))} placeholder="COR" className="h-8 text-sm" /></div>
+                        <div className="col-span-3 space-y-1"><Label className="text-xs">Segment</Label><Input value={modelForm.segment} onChange={e => setModelForm(f => ({ ...f, segment: e.target.value }))} placeholder="Sedan, SUV, Pickup…" className="h-8 text-sm" /></div>
+                      </div>
+                      <div className="flex gap-2 justify-end">
+                        <Button variant="ghost" size="sm" onClick={() => { setAddModel(null); setModelForm({ name: "", code: "", segment: "" }); }}>Cancel</Button>
+                        <Button size="sm" disabled={!modelForm.name || !modelForm.code || createModel.isPending}
+                          onClick={() => createModel.mutate(brand.id)}>Add Model</Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      className="w-full flex items-center gap-2 px-4 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors border-t border-border/50"
+                      onClick={() => { setAddModel(brand.id); setModelForm({ name: "", code: "", segment: "" }); }}
+                    >
+                      <Plus className="w-3.5 h-3.5" /> Add model to {brand.name}
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+
+      {/* Service Types */}
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-center gap-2">
+            <Wrench className="w-4 h-4 text-muted-foreground" />
+            <CardTitle className="text-base">Service Types</CardTitle>
+          </div>
+          <CardDescription>System-defined service types available on job cards</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            {SERVICE_TYPE_LABELS.map(({ key, label }) => (
+              <div key={key} className="flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm">
+                <div className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+                <span className="truncate">{label}</span>
+              </div>
+            ))}
+          </div>
+          <p className="text-xs text-muted-foreground mt-3 flex items-center gap-1.5">
+            <Database className="w-3.5 h-3.5" />
+            Service types are system-defined. Contact your administrator to add new types.
+          </p>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 export default function SettingsPage() {
   const { user } = useAuth();
   const router = useRouter();
@@ -1040,6 +1294,7 @@ export default function SettingsPage() {
           <TabsTrigger value="groups" className="gap-2"><ShieldCheck className="w-4 h-4" />Permission Groups</TabsTrigger>
           <TabsTrigger value="sequence" className="gap-2"><Hash className="w-4 h-4" />Sequence</TabsTrigger>
           <TabsTrigger value="company" className="gap-2"><Building2 className="w-4 h-4" />Company</TabsTrigger>
+          <TabsTrigger value="catalogue" className="gap-2"><Database className="w-4 h-4" />Catalogue</TabsTrigger>
         </TabsList>
 
         <TabsContent value="users">
@@ -1056,6 +1311,10 @@ export default function SettingsPage() {
 
         <TabsContent value="company">
           <CompanyTab />
+        </TabsContent>
+
+        <TabsContent value="catalogue">
+          <CatalogueTab />
         </TabsContent>
       </Tabs>
     </div>
