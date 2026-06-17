@@ -255,9 +255,9 @@ function EditVehicleModal({ form, policies, onChange, onSave, onClose, saving, e
 
 export default function Vehicle360Page({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  const { user } = useAuth();
+  const { hasPermission } = useAuth();
   const qc = useQueryClient();
-  const isAdmin = user?.role === "Admin";
+  const canEdit = hasPermission("vehicles.edit");
 
   const [showEdit, setShowEdit] = useState(false);
   const [editForm, setEditForm] = useState<EditFormState | null>(null);
@@ -271,7 +271,7 @@ export default function Vehicle360Page({ params }: { params: Promise<{ id: strin
   const { data: policies = [] } = useQuery({
     queryKey: ["service-policies"],
     queryFn: () => servicePoliciesApi.list(),
-    enabled: isAdmin,
+    enabled: canEdit,
   });
 
   const editMutation = useMutation({
@@ -379,8 +379,7 @@ export default function Vehicle360Page({ params }: { params: Promise<{ id: strin
             </div>
           </div>
 
-          {/* Admin-only Edit button */}
-          {isAdmin && (
+          {canEdit && (
             <Button
               onClick={openEdit}
               variant="outline"

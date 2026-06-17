@@ -276,10 +276,10 @@ function DeleteConfirmDialog({
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function ServiceRecordsPage() {
-  const { user } = useAuth();
+  const { hasPermission } = useAuth();
   const qc = useQueryClient();
-  const canEdit = user?.role === "CRE" || user?.role === "Admin";
-  const isAdmin = user?.role === "Admin";
+  const canEdit   = hasPermission("serviceRecords.edit");
+  const canDelete = hasPermission("serviceRecords.delete");
 
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -373,7 +373,7 @@ export default function ServiceRecordsPage() {
   };
 
   const COLUMNS: ColumnDef<ServiceRecordListItem>[] = [
-    ...(isAdmin ? [{
+    ...(canDelete ? [{
       id: "select",
       header: () => (
         <input
@@ -510,7 +510,7 @@ export default function ServiceRecordsPage() {
           <span className="text-muted-foreground text-sm">to</span>
           <Input type="date" className="w-36 text-sm" value={dateTo} onChange={e => setDateTo(e.target.value)} />
         </div>
-        {isAdmin && (selectedIds.size > 0 || deleteAllRecords) && (
+        {canDelete && (selectedIds.size > 0 || deleteAllRecords) && (
           <Button
             variant="destructive"
             className="gap-2 shrink-0"
@@ -529,7 +529,7 @@ export default function ServiceRecordsPage() {
           <p className="text-sm text-muted-foreground">
             Showing <span className="font-medium text-foreground">{data.items.length}</span> of{" "}
             <span className="font-medium text-foreground">{totalCount}</span> records
-            {isAdmin && (deleteAllRecords
+            {canDelete && (deleteAllRecords
               ? <span className="ml-2 text-destructive font-medium">· All {totalCount} selected</span>
               : selectedIds.size > 0
                 ? <span className="ml-2 text-primary font-medium">· {selectedIds.size} selected</span>
@@ -539,7 +539,7 @@ export default function ServiceRecordsPage() {
         )}
 
         {/* "Select all records across pages" banner */}
-        {isAdmin && allSelected && hasMultiplePages && !deleteAllRecords && (
+        {canDelete && allSelected && hasMultiplePages && !deleteAllRecords && (
           <motion.div
             initial={{ opacity: 0, y: -4 }}
             animate={{ opacity: 1, y: 0 }}
@@ -559,7 +559,7 @@ export default function ServiceRecordsPage() {
         )}
 
         {/* "All records selected" banner */}
-        {isAdmin && deleteAllRecords && (
+        {canDelete && deleteAllRecords && (
           <motion.div
             initial={{ opacity: 0, y: -4 }}
             animate={{ opacity: 1, y: 0 }}
@@ -607,7 +607,7 @@ export default function ServiceRecordsPage() {
               ) : table.getRowModel().rows.map(row => (
                 <TableRow
                   key={row.id}
-                  className={"border-border hover:bg-muted/30 transition-colors" + (isAdmin && selectedIds.has(row.original.id) ? " bg-primary/5" : "")}
+                  className={"border-border hover:bg-muted/30 transition-colors" + (canDelete && selectedIds.has(row.original.id) ? " bg-primary/5" : "")}
                 >
                   {row.getVisibleCells().map(cell => (
                     <TableCell key={cell.id} className="py-3">

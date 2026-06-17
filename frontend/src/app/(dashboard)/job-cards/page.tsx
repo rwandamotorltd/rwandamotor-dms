@@ -661,7 +661,10 @@ export default function JobCardsPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { hasPermission } = useAuth();
-  const canCreate = hasPermission("jobCards.create");
+  const canCreate  = hasPermission("jobCards.create");
+  const canPrint   = hasPermission("jobCards.print");
+  const canShare   = hasPermission("jobCards.share");
+  const canConvert = hasPermission("jobCards.convert");
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<JobCardStatus | "">("");
@@ -811,21 +814,25 @@ export default function JobCardsPage() {
                         className="flex items-center justify-end gap-1"
                         onClick={e => e.stopPropagation()}
                       >
-                        <Button
-                          variant="ghost" size="icon" className="h-8 w-8"
-                          title="Print"
-                          onClick={() => router.push(`/job-cards/${jc.id}?print=1`)}
-                        >
-                          <Printer className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          variant="ghost" size="icon" className="h-8 w-8"
-                          title="Share via email"
-                          onClick={() => setShareTarget(jc)}
-                        >
-                          <Mail className="w-4 h-4" />
-                        </Button>
-                        {jc.status === "Open" && (
+                        {canPrint && (
+                          <Button
+                            variant="ghost" size="icon" className="h-8 w-8"
+                            title="Print"
+                            onClick={() => router.push(`/job-cards/${jc.id}?print=1`)}
+                          >
+                            <Printer className="w-4 h-4" />
+                          </Button>
+                        )}
+                        {canShare && (
+                          <Button
+                            variant="ghost" size="icon" className="h-8 w-8"
+                            title="Share via email"
+                            onClick={() => setShareTarget(jc)}
+                          >
+                            <Mail className="w-4 h-4" />
+                          </Button>
+                        )}
+                        {jc.status === "Open" && canConvert && (
                           <Button
                             variant="ghost" size="icon" className="h-8 w-8 text-orange-500"
                             title="Convert to Delivery Note"

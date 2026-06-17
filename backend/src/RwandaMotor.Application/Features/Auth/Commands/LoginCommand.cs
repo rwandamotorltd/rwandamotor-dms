@@ -55,6 +55,19 @@ public class LoginCommandHandler : IRequestHandler<LoginCommand, AuthResponseDto
         user.LastLoginAt = DateTime.UtcNow;
         await _userManager.UpdateAsync(user);
 
+        _db.AuditLogs.Add(new AuditLog
+        {
+            UserId     = user.Id,
+            UserEmail  = user.Email!,
+            UserName   = user.FullName,
+            Action     = "Login",
+            EntityType = "Session",
+            EntityId   = null,
+            EntityLabel = null,
+            OccurredAt = DateTime.UtcNow,
+        });
+        await _db.SaveChangesAsync(ct);
+
         // Resolve effective permissions: custom > group > role defaults
         List<string> permissions;
         if (user.CustomPermissions.Count > 0)

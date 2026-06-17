@@ -308,8 +308,10 @@ function DeleteConfirmDialog({ count, onConfirm, onCancel, deleting }: DeleteCon
 
 export default function CustomersPage() {
   const qc = useQueryClient();
-  const { user } = useAuth();
-  const isAdmin = user?.role === "Admin";
+  const { hasPermission } = useAuth();
+  const canDeleteCustomers = hasPermission("customers.delete");
+  const canEditCustomers   = hasPermission("customers.edit");
+  const canCreateCustomers = hasPermission("customers.create");
 
   // Filters & pagination
   const [search, setSearch] = useState("");
@@ -482,8 +484,8 @@ export default function CustomersPage() {
 
   // ─── Columns ─────────────────────────────────────────────────
   const columns: ColumnDef<CustomerListItem>[] = [
-    // Checkbox (admin only)
-    ...(isAdmin ? [{
+    // Checkbox (delete permission only)
+    ...(canDeleteCustomers ? [{
       id: "select",
       header: ({ table }: { table: ReturnType<typeof useReactTable<CustomerListItem>> }) => (
         <input
@@ -600,7 +602,7 @@ export default function CustomersPage() {
     {
       id: "actions",
       header: "",
-      cell: ({ row }) => (
+      cell: ({ row }) => canEditCustomers ? (
         <button
           onClick={() => openEdit(row.original)}
           className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
@@ -608,7 +610,7 @@ export default function CustomersPage() {
         >
           <Pencil className="w-4 h-4" />
         </button>
-      ),
+      ) : null,
     },
   ];
 
@@ -621,7 +623,7 @@ export default function CustomersPage() {
     onRowSelectionChange: setRowSelection,
     manualPagination: true,
     getCoreRowModel: getCoreRowModel(),
-    enableRowSelection: isAdmin,
+    enableRowSelection: canDeleteCustomers,
   });
 
   return (
@@ -653,8 +655,8 @@ export default function CustomersPage() {
           {exporting ? "Exporting..." : "Export CSV"}
         </Button>
 
-        {/* Delete selected (admin only) */}
-        {isAdmin && (selectedIds.length > 0 || deleteAllRecords) && (
+        {/* Delete selected */}
+        {canDeleteCustomers && (selectedIds.length > 0 || deleteAllRecords) && (
           <Button
             variant="destructive"
             className="gap-2 shrink-0"
@@ -665,13 +667,15 @@ export default function CustomersPage() {
           </Button>
         )}
 
-        <Button
-          className="gradient-primary text-white gap-2 shrink-0"
-          onClick={() => { setCreateForm(EMPTY_FORM); setCreateError(null); setShowCreate(true); }}
-        >
-          <Plus className="w-4 h-4" />
-          New Customer
-        </Button>
+        {canCreateCustomers && (
+          <Button
+            className="gradient-primary text-white gap-2 shrink-0"
+            onClick={() => { setCreateForm(EMPTY_FORM); setCreateError(null); setShowCreate(true); }}
+          >
+            <Plus className="w-4 h-4" />
+            New Customer
+          </Button>
+        )}
       </motion.div>
 
       {/* Count + selection controls */}
@@ -681,7 +685,7 @@ export default function CustomersPage() {
             <p className="text-sm text-muted-foreground">
               Showing <span className="font-medium text-foreground">{data.items.length}</span> of{" "}
               <span className="font-medium text-foreground">{data.totalCount}</span> customers
-              {isAdmin && (deleteAllRecords
+              {canDeleteCustomers && (deleteAllRecords
                 ? <span className="ml-2 text-destructive font-medium">· All {totalCount} selected</span>
                 : selectedIds.length > 0
                   ? <span className="ml-2 text-primary font-medium">· {selectedIds.length} selected</span>
@@ -689,7 +693,7 @@ export default function CustomersPage() {
               )}
             </p>
           )}
-          {isAdmin && data && data.items.length > 0 && (
+          {canDeleteCustomers && data && data.items.length > 0 && (
             <button
               className="text-xs text-muted-foreground hover:text-primary flex items-center gap-1 transition-colors"
               onClick={() => {
@@ -710,7 +714,7 @@ export default function CustomersPage() {
         </div>
 
         {/* "Select all records across pages" banner */}
-        {isAdmin && allPageSelected && hasMultiplePages && !deleteAllRecords && (
+        {canDeleteCustomers && allPageSelected && hasMultiplePages && !deleteAllRecords && (
           <motion.div
             initial={{ opacity: 0, y: -4 }}
             animate={{ opacity: 1, y: 0 }}
@@ -729,7 +733,7 @@ export default function CustomersPage() {
         )}
 
         {/* "All records selected" banner */}
-        {isAdmin && deleteAllRecords && (
+        {canDeleteCustomers && deleteAllRecords && (
           <motion.div
             initial={{ opacity: 0, y: -4 }}
             animate={{ opacity: 1, y: 0 }}

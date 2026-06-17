@@ -481,3 +481,30 @@ export interface UpdateTechnicianPayload {
   certificationLevel?: string | null;
   isActive: boolean;
 }
+
+// ============================================================
+// Activity Log
+// ============================================================
+export interface ActivityLogEntry {
+  id: number;
+  userId: string;
+  userEmail: string;
+  userName: string;
+  action: string;
+  entityType: string;
+  entityId: string | null;
+  entityLabel: string | null;
+  occurredAt: string;
+}
+
+export const activityApi = {
+  list: (params: {
+    userId?: string;
+    entityType?: string;
+    action?: string;
+    dateFrom?: string;
+    dateTo?: string;
+    pageNumber?: number;
+    pageSize?: number;
+  }) => api.get<ApiResponse<PaginatedResult<ActivityLogEntry>>>('/activity', { params }).then(r => r.data.data!),
+};

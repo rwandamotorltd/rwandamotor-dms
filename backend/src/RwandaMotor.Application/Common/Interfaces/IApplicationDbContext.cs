@@ -22,6 +22,7 @@ public interface IApplicationDbContext
     DbSet<SalesHistory> SalesHistories { get; }
     DbSet<PermissionGroup> PermissionGroups { get; }
     DbSet<CompanySettings> CompanySettings { get; }
+    DbSet<AuditLog> AuditLogs { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

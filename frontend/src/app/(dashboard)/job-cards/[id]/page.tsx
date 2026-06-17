@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { jobCardsApi, companySettingsApi, techniciansApi } from "@/lib/api";
 import type { CompanySettings, ServiceType, FuelLevel } from "@/types";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useAuth } from "@/contexts/auth-context";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -331,6 +332,10 @@ export default function JobCardDetailPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
+  const { hasPermission } = useAuth();
+  const canPrint   = hasPermission("jobCards.print");
+  const canEdit    = hasPermission("jobCards.edit");
+  const canConvert = hasPermission("jobCards.convert");
   const printRef = useRef<HTMLDivElement>(null);
 
   const [isEditing, setIsEditing] = useState(false);
@@ -477,27 +482,33 @@ export default function JobCardDetailPage() {
               </>
             ) : (
               <>
-                <Button variant="outline" size="sm" onClick={() => printJobCard()}>
-                  <Printer className="w-4 h-4 mr-2" /> Print
-                </Button>
+                {canPrint && (
+                  <Button variant="outline" size="sm" onClick={() => printJobCard()}>
+                    <Printer className="w-4 h-4 mr-2" /> Print
+                  </Button>
+                )}
                 {data.status === "Open" && (
                   <>
-                    <Button variant="outline" size="sm" onClick={startEdit}>
-                      <Pencil className="w-4 h-4 mr-2" /> Edit
-                    </Button>
-                    <Button
-                      size="sm"
-                      className="bg-orange-500 hover:bg-orange-600 text-white"
-                      disabled={convertMutation.isPending}
-                      onClick={() => {
-                        if (confirm(`Convert ${data.jobCardNumber} to a Delivery Note? This will close it permanently.`)) {
-                          convertMutation.mutate();
-                        }
-                      }}
-                    >
-                      <ArrowRight className="w-4 h-4 mr-2" />
-                      {convertMutation.isPending ? "Converting…" : "Convert to Delivery Note"}
-                    </Button>
+                    {canEdit && (
+                      <Button variant="outline" size="sm" onClick={startEdit}>
+                        <Pencil className="w-4 h-4 mr-2" /> Edit
+                      </Button>
+                    )}
+                    {canConvert && (
+                      <Button
+                        size="sm"
+                        className="bg-orange-500 hover:bg-orange-600 text-white"
+                        disabled={convertMutation.isPending}
+                        onClick={() => {
+                          if (confirm(`Convert ${data.jobCardNumber} to a Delivery Note? This will close it permanently.`)) {
+                            convertMutation.mutate();
+                          }
+                        }}
+                      >
+                        <ArrowRight className="w-4 h-4 mr-2" />
+                        {convertMutation.isPending ? "Converting…" : "Convert to Delivery Note"}
+                      </Button>
+                    )}
                   </>
                 )}
               </>

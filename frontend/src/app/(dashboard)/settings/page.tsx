@@ -90,8 +90,8 @@ const MODULES: ModuleDef[] = [
     levels: ["none", "view", "edit", "full"],
     keys: {
       view: ["nav.jobCards"],
-      edit: ["nav.jobCards", "jobCards.create", "jobCards.edit", "jobCards.convert"],
-      full: ["nav.jobCards", "jobCards.create", "jobCards.edit", "jobCards.convert", "jobCards.delete"],
+      edit: ["nav.jobCards", "jobCards.create", "jobCards.edit", "jobCards.convert", "jobCards.print", "jobCards.share"],
+      full: ["nav.jobCards", "jobCards.create", "jobCards.edit", "jobCards.convert", "jobCards.print", "jobCards.share", "jobCards.delete"],
     },
   },
   {
@@ -115,6 +115,13 @@ const MODULES: ModuleDef[] = [
     keys: {
       view: ["nav.settings"],
       full: ["nav.settings", "settings.users", "settings.company", "settings.groups"],
+    },
+  },
+  {
+    key: "activity", label: "Activity Log",
+    levels: ["none", "view"],
+    keys: {
+      view: ["nav.activity"],
     },
   },
 ];

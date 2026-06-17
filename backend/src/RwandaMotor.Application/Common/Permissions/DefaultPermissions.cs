@@ -11,13 +11,16 @@ public static class DefaultPermissions
     public const string NavJobCards       = "nav.jobCards";
     public const string NavRetention      = "nav.retention";
     public const string NavImport         = "nav.import";
-    public const string NavSettings       = "nav.settings";
+    public const string NavSettings        = "nav.settings";
+    public const string NavActivity        = "nav.activity";
 
     // ── Job Cards ─────────────────────────────────────────────────────────────
     public const string JobCardsCreate  = "jobCards.create";
     public const string JobCardsEdit    = "jobCards.edit";
     public const string JobCardsDelete  = "jobCards.delete";
     public const string JobCardsConvert = "jobCards.convert";
+    public const string JobCardsPrint   = "jobCards.print";
+    public const string JobCardsShare   = "jobCards.share";
 
     // ── Vehicles ──────────────────────────────────────────────────────────────
     public const string VehiclesCreate = "vehicles.create";
@@ -51,8 +54,8 @@ public static class DefaultPermissions
     public static readonly List<string> All = new()
     {
         NavDashboard, NavVehicles, NavCustomers, NavServiceRecords,
-        NavJobCards, NavRetention, NavImport, NavSettings,
-        JobCardsCreate, JobCardsEdit, JobCardsDelete, JobCardsConvert,
+        NavJobCards, NavRetention, NavImport, NavSettings, NavActivity,
+        JobCardsCreate, JobCardsEdit, JobCardsDelete, JobCardsConvert, JobCardsPrint, JobCardsShare,
         VehiclesCreate, VehiclesEdit, VehiclesDelete,
         CustomersCreate, CustomersEdit, CustomersDelete,
         ServiceRecordsCreate, ServiceRecordsEdit, ServiceRecordsDelete,
@@ -70,7 +73,7 @@ public static class DefaultPermissions
         {
             NavDashboard, NavVehicles, NavCustomers, NavServiceRecords,
             NavJobCards, NavRetention, NavImport,
-            JobCardsCreate, JobCardsEdit, JobCardsConvert,
+            JobCardsCreate, JobCardsEdit, JobCardsConvert, JobCardsPrint, JobCardsShare,
             VehiclesCreate, VehiclesEdit,
             CustomersCreate, CustomersEdit,
             ServiceRecordsCreate, ServiceRecordsEdit,

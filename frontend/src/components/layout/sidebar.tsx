@@ -7,7 +7,7 @@ import { motion } from "framer-motion";
 import {
   LayoutDashboard, Car, Users, Wrench, TrendingUp,
   Upload, Settings, LogOut, Shield, ChevronLeft, ChevronRight,
-  Activity, X, ClipboardList
+  Activity, X, ClipboardList, History
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/auth-context";
@@ -30,6 +30,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/job-cards",         label: "Job Cards",       icon: ClipboardList,   permission: "nav.jobCards" },
   { href: "/retention",         label: "Retention",       icon: TrendingUp,      permission: "nav.retention" },
   { href: "/import",            label: "Import Center",   icon: Upload,          permission: "nav.import" },
+  { href: "/activity",          label: "Activity Log",    icon: History,         permission: "nav.activity" },
   { href: "/admin/technicians", label: "Technicians",     icon: Activity,        permission: null, adminOnly: true },
 ];
 
