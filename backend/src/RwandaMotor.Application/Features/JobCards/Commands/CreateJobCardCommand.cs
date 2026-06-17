@@ -109,8 +109,10 @@ public class CreateJobCardCommandHandler : IRequestHandler<CreateJobCardCommand,
         // Fire-and-forget: notify customer their vehicle is in for service
         if (!string.IsNullOrWhiteSpace(customerEmail))
         {
-            var settings   = await _db.CompanySettings.FindAsync(new object[] { Domain.Entities.CompanySettings.SingletonId }, ct)
-                             ?? new Domain.Entities.CompanySettings();
+            Domain.Entities.CompanySettings? settings = null;
+            try { settings = await _db.CompanySettings.FindAsync(new object[] { Domain.Entities.CompanySettings.SingletonId }, ct); }
+            catch { /* columns not yet migrated — fall back to defaults */ }
+            settings ??= new Domain.Entities.CompanySettings();
             var brandName  = vehicle.Brand?.Name ?? "";
             var modelName  = vehicle.Model?.Name ?? "";
             var html       = JobCardCreatedEmailBuilder.Build(jobCard, brandName, modelName,

@@ -130,17 +130,47 @@ var app = builder.Build();
 // Run migrations and seed database on startup
 using (var scope = app.Services.CreateScope())
 {
+    var db = scope.ServiceProvider.GetRequiredService<RwandaMotor.Infrastructure.Persistence.ApplicationDbContext>();
+
+    // EF Core migrations
+    try { await db.Database.MigrateAsync(); }
+    catch (Exception ex) { Log.Error(ex, "EF Core migrations failed"); }
+
+    // Belt-and-suspenders: add email template columns directly if they were
+    // not yet created by migrations (idempotent, runs on every startup).
     try
     {
-        var db = scope.ServiceProvider.GetRequiredService<RwandaMotor.Infrastructure.Persistence.ApplicationDbContext>();
-        await db.Database.MigrateAsync();
+        await db.Database.ExecuteSqlRawAsync(@"
+            DO $$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_schema = 'public'
+                      AND table_name   = 'CompanySettings'
+                      AND column_name  = 'EmailJobCardMessage'
+                ) THEN
+                    ALTER TABLE ""CompanySettings"" ADD COLUMN ""EmailJobCardMessage"" text;
+                END IF;
+
+                IF NOT EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_schema = 'public'
+                      AND table_name   = 'CompanySettings'
+                      AND column_name  = 'EmailDeliveryNoteMessage'
+                ) THEN
+                    ALTER TABLE ""CompanySettings"" ADD COLUMN ""EmailDeliveryNoteMessage"" text;
+                END IF;
+            END $$;");
+    }
+    catch (Exception ex) { Log.Error(ex, "Schema column patch failed"); }
+
+    // Seed reference data
+    try
+    {
         var seeder = scope.ServiceProvider.GetRequiredService<ApplicationDbSeeder>();
         await seeder.SeedAsync();
     }
-    catch (Exception ex)
-    {
-        Log.Error(ex, "Database migration/seeding failed");
-    }
+    catch (Exception ex) { Log.Error(ex, "Database seeding failed"); }
 }
 
 if (app.Environment.IsDevelopment())

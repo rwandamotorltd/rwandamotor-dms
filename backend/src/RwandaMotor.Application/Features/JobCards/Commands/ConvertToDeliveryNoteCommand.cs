@@ -120,8 +120,10 @@ public class ConvertToDeliveryNoteCommandHandler : IRequestHandler<ConvertToDeli
                              : null);
         if (!string.IsNullOrWhiteSpace(customerEmail))
         {
-            var settings = await _db.CompanySettings.FindAsync(new object[] { Domain.Entities.CompanySettings.SingletonId }, ct)
-                           ?? new Domain.Entities.CompanySettings();
+            Domain.Entities.CompanySettings? settings = null;
+            try { settings = await _db.CompanySettings.FindAsync(new object[] { Domain.Entities.CompanySettings.SingletonId }, ct); }
+            catch { /* columns not yet migrated — fall back to defaults */ }
+            settings ??= new Domain.Entities.CompanySettings();
             var brand   = jobCard.Vehicle?.Brand?.Name ?? "";
             var model   = jobCard.Vehicle?.Model?.Name ?? "";
             var html    = DeliveryNoteEmailBuilder.Build(jobCard, dnNumber, brand, model, settings.EmailDeliveryNoteMessage);
