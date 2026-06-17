@@ -127,7 +127,7 @@ public class ConvertToDeliveryNoteCommandHandler : IRequestHandler<ConvertToDeli
             var brand   = jobCard.Vehicle?.Brand?.Name ?? "";
             var model   = jobCard.Vehicle?.Model?.Name ?? "";
             var html    = DeliveryNoteEmailBuilder.Build(jobCard, brand, model, settings.EmailDeliveryNoteMessage);
-            var subject = "Your Vehicle Is Ready for Collection — RWANDAMOTOR LTD";
+            var subject = "Thank You for Choosing RWANDAMOTOR LTD";
             var _ = _email.SendAsync(customerEmail, subject, html, CancellationToken.None);
         }
 
@@ -142,7 +142,7 @@ file static class DeliveryNoteEmailBuilder
     private static string E(string? s) => System.Net.WebUtility.HtmlEncode(s ?? "—");
 
     private const string DefaultMessage =
-        "Dear {CustomerName}, thank you for trusting us with your {VehicleModel}. Your vehicle service is now complete and ready for collection. We are glad to have served you.";
+        "Dear {CustomerName}, thank you for trusting RWANDAMOTOR LTD with your {VehicleModel}. It was a pleasure serving you and we hope our service met your expectations. We look forward to welcoming you again.";
 
     internal static string Build(JobCard jc, string brand, string model, string? messageTemplate)
     {
@@ -164,9 +164,9 @@ file static class DeliveryNoteEmailBuilder
              + "</table>"
              + "<div style='background:#f6faf8;border-left:3px solid #2d7d52;border-radius:0 4px 4px 0;padding:12px 16px;margin-bottom:26px'>"
              + "<p style='font-size:13px;color:#333;margin:0;line-height:1.65'>"
-             + "<strong>Our recommendation:</strong> For the best performance and long life of your vehicle, "
+             + $"<strong>Our recommendation:</strong> To keep your {E(vehicleLabel)} performing at its best, "
              + "we always recommend using <strong>genuine manufacturer-approved parts</strong>. "
-             + "Our team is here to help whenever you need us."
+             + "Our team remains at your service for any future needs."
              + "</p></div>"
              + "<p style='margin:0;font-size:11px;color:#ccc;text-align:center'>RWANDAMOTOR LTD &mdash; We care about your vehicle</p>"
              + "</div></body></html>";

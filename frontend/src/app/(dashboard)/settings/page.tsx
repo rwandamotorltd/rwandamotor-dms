@@ -829,7 +829,7 @@ function SequenceTab() {
 // ─── Company Tab ───────────────────────────────────────────────
 
 const DEFAULT_JC_MSG  = "Dear {CustomerName}, your vehicle has been received and a repair order has been opened. Our team will keep you informed of progress.";
-const DEFAULT_DN_MSG  = "Dear {CustomerName}, thank you for trusting us with your {VehicleModel}. Your vehicle service is now complete and ready for collection. We are glad to have served you.";
+const DEFAULT_DN_MSG  = "Dear {CustomerName}, thank you for trusting RWANDAMOTOR LTD with your {VehicleModel}. It was a pleasure serving you and we hope our service met your expectations. We look forward to welcoming you again.";
 
 const EMPTY_COMPANY: CompanySettings = {
   companyName: "RwandaMotor",
