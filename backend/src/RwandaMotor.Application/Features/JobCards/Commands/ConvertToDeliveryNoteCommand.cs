@@ -114,12 +114,17 @@ public class ConvertToDeliveryNoteCommandHandler : IRequestHandler<ConvertToDeli
         await _retentionEngine.EvaluateVehicleStatusAsync(jobCard.VehicleId, ct);
 
         // Fire-and-forget: notify customer their vehicle is ready
-        var customerEmail = jobCard.Customer?.Email;
+        var customerEmail = jobCard.Customer?.Email
+                         ?? (jobCard.CustomerId.HasValue
+                             ? (await _db.Customers.FindAsync(new object[] { jobCard.CustomerId.Value }, ct))?.Email
+                             : null);
         if (!string.IsNullOrWhiteSpace(customerEmail))
         {
+            var settings = await _db.CompanySettings.FindAsync(new object[] { Domain.Entities.CompanySettings.SingletonId }, ct)
+                           ?? new Domain.Entities.CompanySettings();
             var brand   = jobCard.Vehicle?.Brand?.Name ?? "";
             var model   = jobCard.Vehicle?.Model?.Name ?? "";
-            var html    = DeliveryNoteEmailBuilder.Build(jobCard, dnNumber, brand, model);
+            var html    = DeliveryNoteEmailBuilder.Build(jobCard, dnNumber, brand, model, settings.EmailDeliveryNoteMessage);
             var subject = $"Delivery Note {dnNumber} — Your Vehicle Is Ready for Collection";
             var _ = _email.SendAsync(customerEmail, subject, html, CancellationToken.None);
         }
@@ -130,27 +135,36 @@ public class ConvertToDeliveryNoteCommandHandler : IRequestHandler<ConvertToDeli
 
 file static class DeliveryNoteEmailBuilder
 {
-    private static string TDL => "padding:8px 0;border-bottom:1px solid #eee;color:#666;width:40%;font-size:14px";
-    private static string TD  => "padding:8px 0;border-bottom:1px solid #eee;font-weight:500;font-size:14px";
+    private static string TDL => "padding:8px 0;border-bottom:1px solid #eee;color:#666;width:40%;font-size:13px";
+    private static string TD  => "padding:8px 0;border-bottom:1px solid #eee;font-weight:500;font-size:13px";
     private static string E(string? s) => System.Net.WebUtility.HtmlEncode(s ?? "—");
 
-    internal static string Build(JobCard jc, string dnNumber, string brand, string model)
-        => "<html><head><meta charset='utf-8'></head>"
-         + "<body style='font-family:Arial,sans-serif;color:#1a1a1a;margin:0;padding:20px;background:#f5f5f5'>"
-         + "<div style='background:#fff;border-radius:8px;padding:32px;max-width:600px;margin:0 auto'>"
-         + $"<h1 style='font-size:20px;margin:0 0 4px;color:#111'>Delivery Note {E(dnNumber)}</h1>"
-         + "<p style='color:#666;font-size:14px;margin:0 0 24px'>Rwanda Motor Ltd &mdash; Service Department</p>"
-         + "<div style='background:#f0fff4;border-left:3px solid #22c55e;padding:12px 16px;border-radius:4px;margin:0 0 20px;font-size:14px'>"
-         + $"Dear {E(jc.CustomerName)}, your vehicle service is complete and ready for collection. Please bring this reference number when collecting.</div>"
-         + "<table style='width:100%;border-collapse:collapse'>"
-         + $"<tr><td style='{TDL}'>Delivery Note</td><td style='{TD}'>{E(dnNumber)}</td></tr>"
-         + $"<tr><td style='{TDL}'>Repair Order</td><td style='{TD}'>{E(jc.JobCardNumber)}</td></tr>"
-         + $"<tr><td style='{TDL}'>Vehicle</td><td style='{TD}'>{E($"{brand} {model}")} ({jc.Year})</td></tr>"
-         + $"<tr><td style='{TDL}'>VIN</td><td style='{TD}'>{E(jc.VIN)}</td></tr>"
-         + $"<tr><td style='{TDL}'>Plate Number</td><td style='{TD}'>{E(jc.PlateNumber)}</td></tr>"
-         + $"<tr><td style='{TDL}'>Service</td><td style='{TD}'>{E(jc.ServiceType.ToString())}</td></tr>"
-         + $"<tr><td style='{TDL}'>Closed By</td><td style='{TD}'>{E(jc.ClosedByName)}</td></tr>"
-         + "</table>"
-         + "<p style='margin-top:24px;font-size:12px;color:#999;text-align:center'>Rwanda Motor Ltd &middot; Sent automatically by the DMS</p>"
-         + "</div></body></html>";
+    private const string DefaultMessage =
+        "Dear {CustomerName}, your vehicle service is complete and ready for collection. Please bring this reference number {ReferenceNumber} when collecting.";
+
+    internal static string Build(JobCard jc, string dnNumber, string brand, string model, string? messageTemplate)
+    {
+        var msg = (messageTemplate ?? DefaultMessage)
+            .Replace("{CustomerName}",    E(jc.CustomerName))
+            .Replace("{ReferenceNumber}", E(dnNumber));
+
+        return "<html><head><meta charset='utf-8'></head>"
+             + "<body style='font-family:Arial,sans-serif;color:#1a1a1a;margin:0;padding:20px;background:#f5f5f5'>"
+             + "<div style='background:#fff;border-radius:8px;padding:28px 32px;max-width:580px;margin:0 auto'>"
+             + $"<h2 style='font-size:17px;margin:0 0 2px;color:#111;font-weight:600'>Delivery Note {E(dnNumber)}</h2>"
+             + "<p style='color:#888;font-size:12px;margin:0 0 20px;letter-spacing:.3px'>RWANDAMOTOR LTD &mdash; Service Department</p>"
+             + "<hr style='border:none;border-top:1px solid #f0f0f0;margin:0 0 18px'>"
+             + $"<p style='font-size:13px;color:#333;margin:0 0 20px;line-height:1.65'>{msg}</p>"
+             + "<table style='width:100%;border-collapse:collapse'>"
+             + $"<tr><td style='{TDL}'>Delivery Note</td><td style='{TD}'>{E(dnNumber)}</td></tr>"
+             + $"<tr><td style='{TDL}'>Repair Order</td><td style='{TD}'>{E(jc.JobCardNumber)}</td></tr>"
+             + $"<tr><td style='{TDL}'>Vehicle</td><td style='{TD}'>{E($"{brand} {model}")} ({jc.Year})</td></tr>"
+             + $"<tr><td style='{TDL}'>VIN</td><td style='{TD}'>{E(jc.VIN)}</td></tr>"
+             + $"<tr><td style='{TDL}'>Plate Number</td><td style='{TD}'>{E(jc.PlateNumber)}</td></tr>"
+             + $"<tr><td style='{TDL}'>Service</td><td style='{TD}'>{E(jc.ServiceType.ToString())}</td></tr>"
+             + $"<tr><td style='{TDL}'>Released By</td><td style='{TD}'>{E(jc.ClosedByName)}</td></tr>"
+             + "</table>"
+             + "<p style='margin-top:24px;font-size:11px;color:#bbb;text-align:center'>RWANDAMOTOR LTD</p>"
+             + "</div></body></html>";
+    }
 }

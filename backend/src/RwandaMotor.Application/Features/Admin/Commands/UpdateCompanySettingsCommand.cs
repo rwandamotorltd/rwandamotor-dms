@@ -16,7 +16,9 @@ public record UpdateCompanySettingsCommand(
     bool JobCardShowFooter,
     bool DeliveryNoteShowHeader,
     bool DeliveryNoteShowFooter,
-    string? FooterDisclaimer
+    string? FooterDisclaimer,
+    string? EmailJobCardMessage,
+    string? EmailDeliveryNoteMessage
 ) : IRequest<bool>;
 
 public class UpdateCompanySettingsCommandHandler : IRequestHandler<UpdateCompanySettingsCommand, bool>
@@ -47,8 +49,10 @@ public class UpdateCompanySettingsCommandHandler : IRequestHandler<UpdateCompany
         settings.JobCardShowFooter        = request.JobCardShowFooter;
         settings.DeliveryNoteShowHeader   = request.DeliveryNoteShowHeader;
         settings.DeliveryNoteShowFooter   = request.DeliveryNoteShowFooter;
-        settings.FooterDisclaimer         = request.FooterDisclaimer;
-        settings.UpdatedAt                = DateTime.UtcNow;
+        settings.FooterDisclaimer          = request.FooterDisclaimer;
+        settings.EmailJobCardMessage       = request.EmailJobCardMessage;
+        settings.EmailDeliveryNoteMessage  = request.EmailDeliveryNoteMessage;
+        settings.UpdatedAt                 = DateTime.UtcNow;
 
         await _db.SaveChangesAsync(ct);
         return true;

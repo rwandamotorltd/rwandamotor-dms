@@ -365,6 +365,12 @@ namespace RwandaMotor.Infrastructure.Migrations
                     b.Property<string>("Email")
                         .HasColumnType("text");
 
+                    b.Property<string>("EmailDeliveryNoteMessage")
+                        .HasColumnType("text");
+
+                    b.Property<string>("EmailJobCardMessage")
+                        .HasColumnType("text");
+
                     b.Property<string>("FooterDisclaimer")
                         .HasColumnType("text");
 

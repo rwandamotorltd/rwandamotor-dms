@@ -646,6 +646,7 @@ export default function JobCardDetailPage() {
             jobCardShowHeader: true, jobCardShowFooter: true,
             deliveryNoteShowHeader: true, deliveryNoteShowFooter: true,
             footerDisclaimer: "RwandaMotor declines all responsibility for materials not listed above.",
+            emailJobCardMessage: null, emailDeliveryNoteMessage: null,
           }}
         />
       </div>

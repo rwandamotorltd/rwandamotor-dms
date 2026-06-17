@@ -18,7 +18,9 @@ public record CompanySettingsDto(
     bool JobCardShowFooter,
     bool DeliveryNoteShowHeader,
     bool DeliveryNoteShowFooter,
-    string? FooterDisclaimer
+    string? FooterDisclaimer,
+    string? EmailJobCardMessage,
+    string? EmailDeliveryNoteMessage
 );
 
 public class GetCompanySettingsQueryHandler : IRequestHandler<GetCompanySettingsQuery, CompanySettingsDto>
@@ -44,7 +46,9 @@ public class GetCompanySettingsQueryHandler : IRequestHandler<GetCompanySettings
             settings.JobCardShowFooter,
             settings.DeliveryNoteShowHeader,
             settings.DeliveryNoteShowFooter,
-            settings.FooterDisclaimer
+            settings.FooterDisclaimer,
+            settings.EmailJobCardMessage,
+            settings.EmailDeliveryNoteMessage
         );
     }
 }

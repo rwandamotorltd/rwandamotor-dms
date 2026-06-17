@@ -409,6 +409,8 @@ export interface CompanySettings {
   deliveryNoteShowHeader: boolean;
   deliveryNoteShowFooter: boolean;
   footerDisclaimer: string | null;
+  emailJobCardMessage: string | null;
+  emailDeliveryNoteMessage: string | null;
 }
 
 // ============================================================

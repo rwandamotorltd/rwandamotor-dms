@@ -32,5 +32,12 @@ public class CompanySettings
     public string? FooterDisclaimer { get; set; } =
         "RwandaMotor declines all responsibility for materials not listed above.";
 
+    // ── Email Templates ───────────────────────────────────────
+    // Supports {CustomerName} and {ReferenceNumber} placeholders
+    public string? EmailJobCardMessage { get; set; } =
+        "Dear {CustomerName}, your vehicle has been received and a repair order has been opened. Our team will keep you informed of progress.";
+    public string? EmailDeliveryNoteMessage { get; set; } =
+        "Dear {CustomerName}, your vehicle service is complete and ready for collection. Please bring this reference number {ReferenceNumber} when collecting.";
+
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 }

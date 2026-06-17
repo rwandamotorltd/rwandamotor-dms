@@ -828,6 +828,9 @@ function SequenceTab() {
 
 // ─── Company Tab ───────────────────────────────────────────────
 
+const DEFAULT_JC_MSG  = "Dear {CustomerName}, your vehicle has been received and a repair order has been opened. Our team will keep you informed of progress.";
+const DEFAULT_DN_MSG  = "Dear {CustomerName}, your vehicle service is complete and ready for collection. Please bring this reference number {ReferenceNumber} when collecting.";
+
 const EMPTY_COMPANY: CompanySettings = {
   companyName: "RwandaMotor",
   address: null,
@@ -840,6 +843,8 @@ const EMPTY_COMPANY: CompanySettings = {
   deliveryNoteShowHeader: true,
   deliveryNoteShowFooter: true,
   footerDisclaimer: "RwandaMotor declines all responsibility for materials not listed above.",
+  emailJobCardMessage: DEFAULT_JC_MSG,
+  emailDeliveryNoteMessage: DEFAULT_DN_MSG,
 };
 
 function CompanyTab() {
@@ -990,6 +995,51 @@ function CompanyTab() {
             />
             <p className="text-xs text-muted-foreground">
               Appears at the bottom of printed documents when footer is enabled.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Email Templates */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Customer Email Messages</CardTitle>
+          <CardDescription>
+            Personalise the messages sent to customers. Use{" "}
+            <code className="text-xs bg-muted px-1 py-0.5 rounded">{"{CustomerName}"}</code> and{" "}
+            <code className="text-xs bg-muted px-1 py-0.5 rounded">{"{ReferenceNumber}"}</code> as placeholders.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          <div className="space-y-1.5">
+            <Label className="flex items-center gap-1.5">
+              <span className="inline-block w-2 h-2 rounded-full bg-blue-500" />
+              Job Card opened — vehicle received
+            </Label>
+            <textarea
+              className="w-full min-h-[72px] rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-y"
+              value={form.emailJobCardMessage ?? ""}
+              onChange={e => patch({ emailJobCardMessage: e.target.value || null })}
+              placeholder={DEFAULT_JC_MSG}
+            />
+            <p className="text-xs text-muted-foreground">
+              Sent when a new repair order is created.
+            </p>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="flex items-center gap-1.5">
+              <span className="inline-block w-2 h-2 rounded-full bg-emerald-500" />
+              Delivery note issued — vehicle ready for collection
+            </Label>
+            <textarea
+              className="w-full min-h-[72px] rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-y"
+              value={form.emailDeliveryNoteMessage ?? ""}
+              onChange={e => patch({ emailDeliveryNoteMessage: e.target.value || null })}
+              placeholder={DEFAULT_DN_MSG}
+            />
+            <p className="text-xs text-muted-foreground">
+              Sent when a job card is converted to a delivery note.
             </p>
           </div>
         </CardContent>
