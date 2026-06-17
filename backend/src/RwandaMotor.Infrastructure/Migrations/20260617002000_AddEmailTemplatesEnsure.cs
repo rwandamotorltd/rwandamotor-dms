@@ -1,9 +1,14 @@
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
+using RwandaMotor.Infrastructure.Persistence;
 
 #nullable disable
 
 namespace RwandaMotor.Infrastructure.Migrations
 {
+    [DbContext(typeof(ApplicationDbContext))]
+    [Migration("20260617002000_AddEmailTemplatesEnsure")]
     public partial class AddEmailTemplatesEnsure : Migration
     {
         protected override void Up(MigrationBuilder migrationBuilder)
