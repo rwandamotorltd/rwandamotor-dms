@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using MediatR;
 using RwandaMotor.Application.Common.Interfaces;
+using RwandaMotor.Application.Features.Admin.Commands;
 using RwandaMotor.Application.Features.Import.Commands;
 using RwandaMotor.Domain.Entities;
 using RwandaMotor.Domain.Enums;
@@ -288,10 +289,10 @@ public class ProcessImportCommandHandler
         var errors = new List<ImportRowErrorDto>();
         int imported = 0;
 
-        // Load all brands + models
+        // Load all brands + models (include inactive so auto-create doesn't duplicate)
         var brands = await _db.Brands
             .Include(b => b.Models)
-            .Where(b => b.IsActive)
+            .Where(b => !b.IsDeleted)
             .ToListAsync(ct);
 
         // Load ALL existing customers into memory
@@ -346,6 +347,9 @@ public class ProcessImportCommandHandler
         if (newCustomers.Count > 0)
             await _db.SaveChangesAsync(ct);
 
+        // Auto-create any missing brands/models so the import doesn't fail on unknown catalogue entries
+        await EnsureBrandsAndModels(allData, brands, ct);
+
         // Build vehicle entities
         var vehiclesToAdd = new List<Vehicle>();
 
@@ -383,13 +387,13 @@ public class ProcessImportCommandHandler
                                 b.Name.Equals(brandName, StringComparison.OrdinalIgnoreCase))
                             ?? brands.FirstOrDefault(b =>
                                 b.Name.Contains(brandName, StringComparison.OrdinalIgnoreCase))
-                            ?? throw new Exception($"Brand '{brandName}' not found.");
+                            ?? throw new Exception($"Brand '{brandName}' could not be resolved (auto-create failed).");
 
                 var model = brand.Models.FirstOrDefault(m =>
                                 m.Name.Equals(modelName, StringComparison.OrdinalIgnoreCase))
                             ?? brand.Models.FirstOrDefault(m =>
                                 m.Name.Contains(modelName, StringComparison.OrdinalIgnoreCase))
-                            ?? throw new Exception($"Model '{modelName}' not found under '{brand.Name}'.");
+                            ?? throw new Exception($"Model '{modelName}' could not be resolved under '{brand.Name}' (auto-create failed).");
 
                 if (!customerMap.TryGetValue(customerName, out var customer))
                     throw new Exception($"Customer '{customerName}' could not be resolved.");
@@ -781,6 +785,249 @@ public class ProcessImportCommandHandler
         return policies.FirstOrDefault(p => p.IsDefault) ?? defaultPolicy;
     }
 
+    // -- Auto-create missing brands/models so vehicle imports never fail on catalogue gaps ----
+
+    private async Task EnsureBrandsAndModels(
+        List<Dictionary<string, string>> allData,
+        List<Brand> brands,
+        CancellationToken ct)
+    {
+        // Pass 1 — brands
+        bool anyNew = false;
+        var brandNames = allData
+            .Select(d => Get(d, "BrandName"))
+            .Where(n => !string.IsNullOrWhiteSpace(n))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        foreach (var brandName in brandNames)
+        {
+            var existing = brands.FirstOrDefault(b =>
+                b.Name.Equals(brandName, StringComparison.OrdinalIgnoreCase) ||
+                b.Name.Contains(brandName, StringComparison.OrdinalIgnoreCase));
+
+            if (existing == null)
+            {
+                var brand = new Brand
+                {
+                    Name     = brandName,
+                    Code     = AutoCode(brandName),
+                    IsActive = true,
+                };
+                _db.Brands.Add(brand);
+                brands.Add(brand);
+                anyNew = true;
+                _log.LogInformation("Auto-created brand '{Brand}' during vehicle import", brandName);
+            }
+        }
+        if (anyNew) { await _db.SaveChangesAsync(ct); anyNew = false; }
+
+        // Pass 2 — models
+        var modelCombos = allData
+            .Select(d => (brand: Get(d, "BrandName"), model: Get(d, "ModelName")))
+            .Where(x => !string.IsNullOrWhiteSpace(x.brand) && !string.IsNullOrWhiteSpace(x.model))
+            .Distinct()
+            .ToList();
+
+        foreach (var (brandName, modelName) in modelCombos)
+        {
+            var brand = brands.FirstOrDefault(b =>
+                b.Name.Equals(brandName, StringComparison.OrdinalIgnoreCase) ||
+                b.Name.Contains(brandName, StringComparison.OrdinalIgnoreCase));
+            if (brand == null) continue;
+
+            var existingModel = brand.Models.FirstOrDefault(m =>
+                m.Name.Equals(modelName, StringComparison.OrdinalIgnoreCase) ||
+                m.Name.Contains(modelName, StringComparison.OrdinalIgnoreCase));
+
+            if (existingModel == null)
+            {
+                var model = new VehicleModel
+                {
+                    BrandId  = brand.Id,
+                    Name     = modelName,
+                    Code     = AutoCode(modelName),
+                    IsActive = true,
+                };
+                _db.VehicleModels.Add(model);
+                brand.Models.Add(model);
+                anyNew = true;
+                _log.LogInformation("Auto-created model '{Model}' under '{Brand}' during vehicle import", modelName, brandName);
+            }
+        }
+        if (anyNew) await _db.SaveChangesAsync(ct);
+    }
+
+    private static string AutoCode(string name)
+    {
+        var letters = name.Where(char.IsLetter).Take(5).ToArray();
+        return letters.Length > 0
+            ? new string(letters).ToUpperInvariant()
+            : name[..Math.Min(3, name.Length)].ToUpperInvariant();
+    }
+
     private static string Get(Dictionary<string, string> d, string key) =>
         (d.TryGetValue(key, out var v) ? v : "").Trim();
+}
+
+// --- Bulk Catalogue Import Handler -------------------------------------------
+
+public class BulkImportCatalogueCommandHandler
+    : IRequestHandler<BulkImportCatalogueCommand, BulkImportCatalogueResultDto>
+{
+    private readonly IApplicationDbContext _db;
+    private readonly ILogger<BulkImportCatalogueCommandHandler> _log;
+
+    public BulkImportCatalogueCommandHandler(
+        IApplicationDbContext db,
+        ILogger<BulkImportCatalogueCommandHandler> log)
+    {
+        _db = db; _log = log;
+    }
+
+    public async Task<BulkImportCatalogueResultDto> Handle(BulkImportCatalogueCommand cmd, CancellationToken ct)
+    {
+        List<Dictionary<string, string>> rows;
+        try
+        {
+            rows = cmd.FileName.EndsWith(".csv", StringComparison.OrdinalIgnoreCase)
+                ? ParseCsv(cmd.FileBytes)
+                : ParseExcel(cmd.FileBytes);
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException($"Could not read file: {ex.Message}");
+        }
+
+        var brands = await _db.Brands
+            .Include(b => b.Models)
+            .Where(b => !b.IsDeleted)
+            .ToListAsync(ct);
+
+        int brandsCreated = 0, brandsSkipped = 0, modelsCreated = 0, modelsSkipped = 0;
+        var brandsSeen    = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        // Pass 1: brands
+        bool anyNew = false;
+        foreach (var brandName in rows.Select(r => Get(r, "BrandName"))
+                                      .Where(n => !string.IsNullOrWhiteSpace(n))
+                                      .Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            var existing = brands.FirstOrDefault(b => b.Name.Equals(brandName, StringComparison.OrdinalIgnoreCase));
+            if (existing == null)
+            {
+                var firstRow = rows.First(r => Get(r, "BrandName").Equals(brandName, StringComparison.OrdinalIgnoreCase));
+                var code     = GetOrGenerate(Get(firstRow, "BrandCode"), brandName);
+                var country  = Get(firstRow, "BrandCountry");
+                var brand    = new Brand
+                {
+                    Name     = brandName,
+                    Code     = code,
+                    Country  = string.IsNullOrWhiteSpace(country) ? null : country,
+                    IsActive = true,
+                };
+                _db.Brands.Add(brand);
+                brands.Add(brand);
+                anyNew = true;
+                brandsCreated++;
+                _log.LogInformation("Bulk import: created brand '{Brand}'", brandName);
+            }
+            else
+            {
+                brandsSkipped++;
+            }
+        }
+        if (anyNew) { await _db.SaveChangesAsync(ct); anyNew = false; }
+
+        // Pass 2: models
+        foreach (var row in rows)
+        {
+            var brandName = Get(row, "BrandName");
+            var modelName = Get(row, "ModelName");
+            if (string.IsNullOrWhiteSpace(brandName) || string.IsNullOrWhiteSpace(modelName)) continue;
+
+            var brand = brands.FirstOrDefault(b => b.Name.Equals(brandName, StringComparison.OrdinalIgnoreCase));
+            if (brand == null) continue;
+
+            var existing = brand.Models.FirstOrDefault(m => m.Name.Equals(modelName, StringComparison.OrdinalIgnoreCase));
+            if (existing == null)
+            {
+                var code    = GetOrGenerate(Get(row, "ModelCode"), modelName);
+                var segment = Get(row, "ModelSegment");
+                var model   = new VehicleModel
+                {
+                    BrandId  = brand.Id,
+                    Name     = modelName,
+                    Code     = code,
+                    Segment  = string.IsNullOrWhiteSpace(segment) ? null : segment,
+                    IsActive = true,
+                };
+                _db.VehicleModels.Add(model);
+                brand.Models.Add(model);
+                anyNew = true;
+                modelsCreated++;
+            }
+            else
+            {
+                modelsSkipped++;
+            }
+        }
+        if (anyNew) await _db.SaveChangesAsync(ct);
+
+        return new BulkImportCatalogueResultDto(brandsCreated, brandsSkipped, modelsCreated, modelsSkipped);
+    }
+
+    private static string GetOrGenerate(string code, string name)
+    {
+        if (!string.IsNullOrWhiteSpace(code)) return code.Trim().ToUpperInvariant();
+        var letters = name.Where(char.IsLetter).Take(5).ToArray();
+        return letters.Length > 0
+            ? new string(letters).ToUpperInvariant()
+            : name[..Math.Min(3, name.Length)].ToUpperInvariant();
+    }
+
+    private static string Get(Dictionary<string, string> d, string key) =>
+        (d.TryGetValue(key, out var v) ? v : "").Trim();
+
+    private static List<Dictionary<string, string>> ParseCsv(byte[] bytes)
+    {
+        using var ms     = new MemoryStream(bytes);
+        using var reader = new StreamReader(ms, Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
+        using var csv    = new CsvReader(reader, new CsvConfiguration(CultureInfo.InvariantCulture)
+        {
+            HasHeaderRecord = true, MissingFieldFound = null, BadDataFound = null,
+            TrimOptions = TrimOptions.Trim,
+        });
+        csv.Read(); csv.ReadHeader();
+        var headers = csv.HeaderRecord ?? [];
+        var rows    = new List<Dictionary<string, string>>();
+        while (csv.Read())
+        {
+            var row = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var h in headers) row[h] = csv.GetField(h) ?? "";
+            rows.Add(row);
+        }
+        return rows;
+    }
+
+    private static List<Dictionary<string, string>> ParseExcel(byte[] bytes)
+    {
+        Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+        using var ms     = new MemoryStream(bytes);
+        using var reader = ExcelReaderFactory.CreateReader(ms);
+        var ds    = reader.AsDataSet(new ExcelDataSetConfiguration
+        {
+            ConfigureDataTable = _ => new ExcelDataTableConfiguration { UseHeaderRow = true }
+        });
+        var table = ds.Tables[0];
+        var rows  = new List<Dictionary<string, string>>();
+        foreach (System.Data.DataRow r in table.Rows)
+        {
+            var dict = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (System.Data.DataColumn c in table.Columns)
+                dict[c.ColumnName] = r[c]?.ToString()?.Trim() ?? "";
+            rows.Add(dict);
+        }
+        return rows;
+    }
 }

@@ -126,3 +126,8 @@ public class DeleteVehicleModelCommandHandler : IRequestHandler<DeleteVehicleMod
         return true;
     }
 }
+
+// ── Bulk catalogue import (handler lives in Infrastructure) ──────────────────
+
+public record BulkImportCatalogueResultDto(int BrandsCreated, int BrandsSkipped, int ModelsCreated, int ModelsSkipped);
+public record BulkImportCatalogueCommand(byte[] FileBytes, string FileName) : IRequest<BulkImportCatalogueResultDto>;

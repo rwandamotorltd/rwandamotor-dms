@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import {
   Settings, Hash, AlertTriangle, Users, ShieldCheck,
   Plus, Pencil, Trash2, X, Eye, EyeOff, KeyRound, Building2, Save,
-  ChevronDown, ChevronRight, Database, Car, Wrench
+  ChevronDown, ChevronRight, Database, Car, Wrench, Upload, Download
 } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
 import { useRouter } from "next/navigation";
@@ -14,7 +14,7 @@ import {
   adminApi, permissionGroupsApi, companySettingsApi, catalogueApi,
   type UserItem, type CreateUserPayload, type UpdateUserPayload,
   type PermissionGroupItem, type CreatePermissionGroupPayload,
-  type CatalogueBrandDto, type CatalogueModelDto,
+  type CatalogueBrandDto, type CatalogueModelDto, type BulkImportCatalogueResult,
 } from "@/lib/api";
 import { jobCardsApi } from "@/lib/api";
 import type { CompanySettings } from "@/types";
@@ -1032,6 +1032,8 @@ interface ModelForm  { name: string; code: string; segment: string; }
 
 function CatalogueTab() {
   const qc = useQueryClient();
+  const [importing, setImporting]      = useState(false);
+  const fileInputRef                   = useRef<HTMLInputElement>(null);
   const [expandedBrand, setExpanded]   = useState<string | null>(null);
   const [editingBrand,  setEditBrand]  = useState<CatalogueBrandDto | null>(null);
   const [addingBrand,   setAddBrand]   = useState(false);
@@ -1048,6 +1050,26 @@ function CatalogueTab() {
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ["catalogue-brands"] });
     qc.invalidateQueries({ queryKey: ["brands"] });
+  };
+
+  const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImporting(true);
+    try {
+      const r: BulkImportCatalogueResult = await catalogueApi.bulkImport(file);
+      const parts: string[] = [];
+      if (r.brandsCreated)  parts.push(`${r.brandsCreated} brand${r.brandsCreated !== 1 ? "s" : ""} created`);
+      if (r.modelsCreated)  parts.push(`${r.modelsCreated} model${r.modelsCreated !== 1 ? "s" : ""} created`);
+      if (!parts.length)    parts.push("nothing new to import");
+      toast.success(`Import complete — ${parts.join(", ")}`);
+      invalidate();
+    } catch {
+      toast.error("Import failed — check the file format and try again");
+    } finally {
+      setImporting(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
   };
 
   const createBrand = useMutation({
@@ -1106,10 +1128,34 @@ function CatalogueTab() {
               <Car className="w-4 h-4 text-muted-foreground" />
               <CardTitle className="text-base">Brands &amp; Models</CardTitle>
             </div>
-            <Button size="sm" className="gap-1.5 gradient-primary text-white"
-              onClick={() => { setAddBrand(true); setBrandForm({ name: "", code: "", country: "" }); }}>
-              <Plus className="w-4 h-4" /> Add Brand
-            </Button>
+            <div className="flex items-center gap-2">
+              <a
+                href="/catalogue-template.csv"
+                download
+                className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              >
+                <Download className="w-3.5 h-3.5" /> Template
+              </a>
+              <Button
+                size="sm" variant="outline" className="gap-1.5"
+                disabled={importing}
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <Upload className="w-3.5 h-3.5" />
+                {importing ? "Importing…" : "Import CSV"}
+              </Button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".csv,.xlsx,.xls"
+                className="hidden"
+                onChange={handleImportFile}
+              />
+              <Button size="sm" className="gap-1.5 gradient-primary text-white"
+                onClick={() => { setAddBrand(true); setBrandForm({ name: "", code: "", country: "" }); }}>
+                <Plus className="w-4 h-4" /> Add Brand
+              </Button>
+            </div>
           </div>
           <CardDescription>Manage vehicle brands and their model lines</CardDescription>
         </CardHeader>

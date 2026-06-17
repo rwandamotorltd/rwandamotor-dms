@@ -1,0 +1,11 @@
+BrandName,BrandCode,BrandCountry,ModelName,ModelCode,ModelSegment
+Toyota,TOYT,Japan,Corolla,COR,Sedan
+Toyota,TOYT,Japan,RAV4,RAV4,SUV
+Toyota,TOYT,Japan,Hilux,HIL,Pickup
+Toyota,TOYT,Japan,Land Cruiser,LC,SUV
+Honda,HND,Japan,Civic,CIV,Sedan
+Honda,HND,Japan,CR-V,CRV,SUV
+Nissan,NISS,Japan,X-Trail,XTR,SUV
+Nissan,NISS,Japan,Navara,NAV,Pickup
+Mitsubishi,MITS,Japan,Pajero,PAJ,SUV
+Mitsubishi,MITS,Japan,L200,L200,Pickup

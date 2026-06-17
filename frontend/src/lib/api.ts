@@ -375,7 +375,23 @@ export const catalogueApi = {
 
   deleteModel: (id: string) =>
     api.delete<ApiResponse<boolean>>(`/admin/catalogue/models/${id}`).then(r => r.data),
+
+  bulkImport: (file: File): Promise<BulkImportCatalogueResult> => {
+    const form = new FormData();
+    form.append('file', file);
+    return api.post<ApiResponse<BulkImportCatalogueResult>>(
+      '/admin/catalogue/import', form,
+      { headers: { 'Content-Type': 'multipart/form-data' } },
+    ).then(r => r.data.data!);
+  },
 };
+
+export interface BulkImportCatalogueResult {
+  brandsCreated: number;
+  brandsSkipped: number;
+  modelsCreated: number;
+  modelsSkipped: number;
+}
 
 export const adminApi = {
   getUsers: () =>

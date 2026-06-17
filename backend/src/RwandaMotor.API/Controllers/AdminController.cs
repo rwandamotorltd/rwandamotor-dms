@@ -112,6 +112,20 @@ public class AdminController : ControllerBase
         var ok = await _mediator.Send(new DeleteVehicleModelCommand(id));
         return ok ? Ok(ApiResponse<bool>.Ok(true)) : NotFound(ApiResponse<bool>.Fail("Model not found"));
     }
+
+    [HttpPost("catalogue/import")]
+    [Consumes("multipart/form-data")]
+    public async Task<IActionResult> ImportCatalogue([FromForm] IFormFile file)
+    {
+        if (file == null || file.Length == 0)
+            return BadRequest(ApiResponse<BulkImportCatalogueResultDto>.Fail("No file uploaded"));
+
+        using var ms = new MemoryStream();
+        await file.CopyToAsync(ms);
+
+        var result = await _mediator.Send(new BulkImportCatalogueCommand(ms.ToArray(), file.FileName));
+        return Ok(ApiResponse<BulkImportCatalogueResultDto>.Ok(result));
+    }
 }
 
 public record ResetPasswordRequest(string NewPassword);
