@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  jobCardsApi, vehiclesApi, techniciansApi, brandsApi,
+  jobCardsApi, vehiclesApi, techniciansApi, brandsApi, customersApi,
   type CreateJobCardPayload,
 } from "@/lib/api";
 import type { JobCardListItem, JobCardStatus, ServiceType, FuelLevel, VehicleListItem } from "@/types";
@@ -64,6 +64,7 @@ function AddVehicleDialog({ open, onClose, onCreated }: {
   onClose: () => void;
   onCreated: (vehicle: VehicleListItem) => void;
 }) {
+  // Vehicle fields
   const [vin, setVin] = useState("");
   const [plateNumber, setPlateNumber] = useState("");
   const [brandId, setBrandId] = useState("");
@@ -75,15 +76,37 @@ function AddVehicleDialog({ open, onClose, onCreated }: {
   const [currentMileage, setCurrentMileage] = useState("");
   const [isSoldByDealership, setIsSoldByDealership] = useState(false);
 
-  const { data: brands } = useQuery({
-    queryKey: ["brands"],
-    queryFn: () => brandsApi.list(),
-  });
+  // Customer selection
+  const [customerSearch, setCustomerSearch] = useState("");
+  const [debouncedCSearch, setDebouncedCSearch] = useState("");
+  const [showCDropdown, setShowCDropdown] = useState(false);
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
+  const [selectedCustomerName, setSelectedCustomerName] = useState<string | null>(null);
+  const [selectedCustomerPhone, setSelectedCustomerPhone] = useState<string | null>(null);
 
+  // Inline new-customer form
+  const [showNewCustomer, setShowNewCustomer] = useState(false);
+  const [newCustName, setNewCustName] = useState("");
+  const [newCustPhone, setNewCustPhone] = useState("");
+  const [newCustEmail, setNewCustEmail] = useState("");
+
+  // Debounce customer search
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedCSearch(customerSearch), 300);
+    return () => clearTimeout(t);
+  }, [customerSearch]);
+
+  const { data: brands } = useQuery({ queryKey: ["brands"], queryFn: () => brandsApi.list() });
   const selectedBrand = brands?.find(b => b.id === brandId);
   const models = selectedBrand?.models ?? [];
 
-  const mutation = useMutation({
+  const { data: customerResults } = useQuery({
+    queryKey: ["customers-quick", debouncedCSearch],
+    queryFn: () => customersApi.list({ search: debouncedCSearch, pageSize: 8 }),
+    enabled: debouncedCSearch.length >= 2 && !selectedCustomerId,
+  });
+
+  const vehicleMutation = useMutation({
     mutationFn: (payload: Record<string, unknown>) => vehiclesApi.create(payload),
     onSuccess: (res) => {
       if (res.success && res.data) {
@@ -96,9 +119,9 @@ function AddVehicleDialog({ open, onClose, onCreated }: {
           brandCode: "",
           modelName: models.find(m => m.id === modelId)?.name ?? "",
           year: parseInt(year),
-          customerId: null,
-          customerName: null,
-          customerPhone: null,
+          customerId: selectedCustomerId,
+          customerName: selectedCustomerName,
+          customerPhone: selectedCustomerPhone,
           saleDate: null,
           lastServiceDate: null,
           nextServiceDate: null,
@@ -114,6 +137,21 @@ function AddVehicleDialog({ open, onClose, onCreated }: {
     onError: () => toast.error("Failed to add vehicle"),
   });
 
+  const customerMutation = useMutation({
+    mutationFn: (payload: Record<string, unknown>) => customersApi.create(payload),
+    onSuccess: (res) => {
+      if (res.success && res.data) {
+        setSelectedCustomerId(res.data);
+        setSelectedCustomerName(newCustName.trim());
+        setSelectedCustomerPhone(newCustPhone.trim() || null);
+        setShowNewCustomer(false);
+        setNewCustName(""); setNewCustPhone(""); setNewCustEmail("");
+        toast.success("Customer created and assigned");
+      }
+    },
+    onError: () => toast.error("Failed to create customer"),
+  });
+
   // Reset form on close
   useEffect(() => {
     if (!open) {
@@ -122,8 +160,22 @@ function AddVehicleDialog({ open, onClose, onCreated }: {
       setYear(String(new Date().getFullYear()));
       setColor(""); setFuelType(""); setTransmission(""); setCurrentMileage("");
       setIsSoldByDealership(false);
+      setCustomerSearch(""); setDebouncedCSearch(""); setShowCDropdown(false);
+      setSelectedCustomerId(null); setSelectedCustomerName(null); setSelectedCustomerPhone(null);
+      setShowNewCustomer(false); setNewCustName(""); setNewCustPhone(""); setNewCustEmail("");
     }
   }, [open]);
+
+  const selectCustomer = (id: string, name: string, phone: string | null) => {
+    setSelectedCustomerId(id);
+    setSelectedCustomerName(name);
+    setSelectedCustomerPhone(phone);
+    setCustomerSearch(""); setShowCDropdown(false);
+  };
+
+  const clearCustomer = () => {
+    setSelectedCustomerId(null); setSelectedCustomerName(null); setSelectedCustomerPhone(null);
+  };
 
   const handleSubmit = () => {
     if (!vin.trim())  return toast.error("VIN is required");
@@ -133,23 +185,22 @@ function AddVehicleDialog({ open, onClose, onCreated }: {
     if (isNaN(yearNum) || yearNum < 1990 || yearNum > new Date().getFullYear() + 1)
       return toast.error("Invalid year (1990 – " + (new Date().getFullYear() + 1) + ")");
 
-    mutation.mutate({
+    vehicleMutation.mutate({
       vin: vin.trim().toUpperCase(),
       plateNumber: plateNumber.trim() || null,
-      brandId,
-      modelId,
-      year: yearNum,
+      brandId, modelId, year: yearNum,
       color: color || null,
       fuelType: fuelType || null,
       transmission: transmission || null,
       currentMileage: currentMileage ? parseInt(currentMileage) : null,
       isSoldByDealership,
+      customerId: selectedCustomerId ?? undefined,
     });
   };
 
   return (
     <Dialog open={open} onOpenChange={o => !o && onClose()}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Plus className="w-4 h-4" /> Add New Vehicle
@@ -161,20 +212,11 @@ function AddVehicleDialog({ open, onClose, onCreated }: {
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
               <Label>VIN <span className="text-red-500">*</span></Label>
-              <Input
-                value={vin}
-                onChange={e => setVin(e.target.value)}
-                placeholder="e.g. JTMZF33V4MD…"
-                className="uppercase"
-              />
+              <Input value={vin} onChange={e => setVin(e.target.value)} placeholder="JTMZF33V4MD…" className="uppercase" />
             </div>
             <div className="space-y-1">
               <Label>Plate Number</Label>
-              <Input
-                value={plateNumber}
-                onChange={e => setPlateNumber(e.target.value)}
-                placeholder="RAA 123A"
-              />
+              <Input value={plateNumber} onChange={e => setPlateNumber(e.target.value)} placeholder="RAA 123A" />
             </div>
           </div>
 
@@ -187,9 +229,7 @@ function AddVehicleDialog({ open, onClose, onCreated }: {
                   <span className={`flex flex-1 text-left${!brandId ? " text-muted-foreground" : ""}`}>{brandId ? (brands?.find(b => b.id === brandId)?.name ?? "…") : "Select brand"}</span>
                 </SelectTrigger>
                 <SelectContent>
-                  {brands?.map(b => (
-                    <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
-                  ))}
+                  {brands?.map(b => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -200,9 +240,7 @@ function AddVehicleDialog({ open, onClose, onCreated }: {
                   <span className={`flex flex-1 text-left${!modelId ? " text-muted-foreground" : ""}`}>{modelId ? (models.find(m => m.id === modelId)?.name ?? "…") : (!brandId ? "Select brand first" : "Select model")}</span>
                 </SelectTrigger>
                 <SelectContent>
-                  {models.map(m => (
-                    <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
-                  ))}
+                  {models.map(m => <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -212,13 +250,7 @@ function AddVehicleDialog({ open, onClose, onCreated }: {
           <div className="grid grid-cols-3 gap-3">
             <div className="space-y-1">
               <Label>Year <span className="text-red-500">*</span></Label>
-              <Input
-                type="number"
-                min={1990}
-                max={new Date().getFullYear() + 1}
-                value={year}
-                onChange={e => setYear(e.target.value)}
-              />
+              <Input type="number" min={1990} max={new Date().getFullYear() + 1} value={year} onChange={e => setYear(e.target.value)} />
             </div>
             <div className="space-y-1">
               <Label>Color</Label>
@@ -226,13 +258,7 @@ function AddVehicleDialog({ open, onClose, onCreated }: {
             </div>
             <div className="space-y-1">
               <Label>Mileage (km)</Label>
-              <Input
-                type="number"
-                min={0}
-                value={currentMileage}
-                onChange={e => setCurrentMileage(e.target.value)}
-                placeholder="0"
-              />
+              <Input type="number" min={0} value={currentMileage} onChange={e => setCurrentMileage(e.target.value)} placeholder="0" />
             </div>
           </div>
 
@@ -242,29 +268,139 @@ function AddVehicleDialog({ open, onClose, onCreated }: {
               <Label>Fuel Type</Label>
               <Select value={fuelType} onValueChange={v => setFuelType(v ?? "")}>
                 <SelectTrigger className="w-full"><span className={`flex flex-1 text-left${!fuelType ? " text-muted-foreground" : ""}`}>{fuelType || "Select…"}</span></SelectTrigger>
-                <SelectContent>
-                  {FUEL_TYPES.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}
-                </SelectContent>
+                <SelectContent>{FUEL_TYPES.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}</SelectContent>
               </Select>
             </div>
             <div className="space-y-1">
               <Label>Transmission</Label>
               <Select value={transmission} onValueChange={v => setTransmission(v ?? "")}>
                 <SelectTrigger className="w-full"><span className={`flex flex-1 text-left${!transmission ? " text-muted-foreground" : ""}`}>{transmission || "Select…"}</span></SelectTrigger>
-                <SelectContent>
-                  {TRANSMISSIONS.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-                </SelectContent>
+                <SelectContent>{TRANSMISSIONS.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
               </Select>
             </div>
           </div>
 
+          {/* ── Customer ───────────────────────────────────── */}
+          <div className="space-y-1.5">
+            <Label>Customer <span className="text-xs text-muted-foreground font-normal">(optional)</span></Label>
+
+            {selectedCustomerId ? (
+              /* Selected customer chip */
+              <div className="flex items-center gap-2 rounded-md border border-emerald-500/30 bg-emerald-500/5 px-3 py-2 text-sm">
+                <div className="flex-1 min-w-0">
+                  <span className="font-medium">{selectedCustomerName}</span>
+                  {selectedCustomerPhone && (
+                    <span className="text-muted-foreground ml-2 text-xs">{selectedCustomerPhone}</span>
+                  )}
+                </div>
+                <button type="button" onClick={clearCustomer} className="text-muted-foreground hover:text-foreground">
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ) : (
+              /* Search + create button */
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <Input
+                    placeholder="Search by name or phone…"
+                    value={customerSearch}
+                    onChange={e => { setCustomerSearch(e.target.value); setShowCDropdown(true); }}
+                    onFocus={() => setShowCDropdown(true)}
+                    onBlur={() => setTimeout(() => setShowCDropdown(false), 150)}
+                  />
+                  {showCDropdown && debouncedCSearch.length >= 2 && (
+                    <div className="absolute z-50 top-full left-0 right-0 mt-1 border rounded-md bg-popover shadow-lg max-h-44 overflow-y-auto">
+                      {!customerResults && (
+                        <div className="px-3 py-2 text-sm text-muted-foreground">Searching…</div>
+                      )}
+                      {customerResults?.items.length === 0 && (
+                        <div className="px-3 py-2 text-sm text-muted-foreground">
+                          No customer found.{" "}
+                          <button
+                            type="button"
+                            className="text-primary underline"
+                            onMouseDown={() => {
+                              setShowCDropdown(false);
+                              setShowNewCustomer(true);
+                              setNewCustName(customerSearch.trim());
+                            }}
+                          >
+                            Create &quot;{customerSearch.trim()}&quot;
+                          </button>
+                        </div>
+                      )}
+                      {customerResults?.items.map(c => (
+                        <button
+                          key={c.id}
+                          type="button"
+                          className="w-full text-left px-3 py-2 hover:bg-muted text-sm border-b last:border-b-0"
+                          onMouseDown={() => selectCustomer(c.id, c.fullName, c.phone)}
+                        >
+                          <span className="font-medium">{c.fullName}</span>
+                          {c.phone && <span className="text-muted-foreground ml-2 text-xs">{c.phone}</span>}
+                          {c.companyName && <span className="text-muted-foreground ml-1 text-xs">· {c.companyName}</span>}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <Button
+                  type="button" variant="outline" size="icon"
+                  title="Create new customer"
+                  onClick={() => setShowNewCustomer(v => !v)}
+                >
+                  <Plus className="w-4 h-4" />
+                </Button>
+              </div>
+            )}
+
+            {/* Inline new-customer form */}
+            {showNewCustomer && !selectedCustomerId && (
+              <div className="rounded-md border border-dashed p-3 space-y-3 bg-muted/30">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">New Customer</p>
+                <div className="space-y-1">
+                  <Label className="text-xs">Full Name <span className="text-red-500">*</span></Label>
+                  <Input
+                    value={newCustName}
+                    onChange={e => setNewCustName(e.target.value)}
+                    placeholder="Jean Paul Sem"
+                    autoFocus
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Phone</Label>
+                    <Input value={newCustPhone} onChange={e => setNewCustPhone(e.target.value)} placeholder="+250 788 000 000" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Email</Label>
+                    <Input type="email" value={newCustEmail} onChange={e => setNewCustEmail(e.target.value)} placeholder="email@example.com" />
+                  </div>
+                </div>
+                <div className="flex justify-end gap-2">
+                  <Button type="button" variant="ghost" size="sm" onClick={() => setShowNewCustomer(false)}>
+                    Cancel
+                  </Button>
+                  <Button
+                    type="button" size="sm"
+                    disabled={!newCustName.trim() || customerMutation.isPending}
+                    onClick={() => customerMutation.mutate({
+                      fullName: newCustName.trim(),
+                      phone: newCustPhone.trim() || null,
+                      email: newCustEmail.trim() || null,
+                      category: "Retail",
+                    })}
+                  >
+                    {customerMutation.isPending ? "Creating…" : "Create & Assign"}
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Dealership flag */}
           <div className="flex items-center gap-2">
-            <Checkbox
-              id="sold-by-dealer"
-              checked={isSoldByDealership}
-              onCheckedChange={c => setIsSoldByDealership(!!c)}
-            />
+            <Checkbox id="sold-by-dealer" checked={isSoldByDealership} onCheckedChange={c => setIsSoldByDealership(!!c)} />
             <label htmlFor="sold-by-dealer" className="text-sm cursor-pointer">
               Sold by RwandaMotor (Dealership Fleet)
             </label>
@@ -272,8 +408,8 @@ function AddVehicleDialog({ open, onClose, onCreated }: {
 
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="outline" onClick={onClose}>Cancel</Button>
-            <Button onClick={handleSubmit} disabled={mutation.isPending}>
-              {mutation.isPending ? "Adding…" : "Add Vehicle"}
+            <Button onClick={handleSubmit} disabled={vehicleMutation.isPending}>
+              {vehicleMutation.isPending ? "Adding…" : "Add Vehicle"}
             </Button>
           </div>
         </div>
