@@ -22,17 +22,15 @@ function useIdleLogout() {
   const warnTimer   = useRef<ReturnType<typeof setTimeout> | null>(null);
   const countdownInterval = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const clearAll = () => {
-    if (logoutTimer.current)      clearTimeout(logoutTimer.current);
-    if (warnTimer.current)        clearTimeout(warnTimer.current);
+  const clearAll = useCallback(() => {
+    if (logoutTimer.current)       clearTimeout(logoutTimer.current);
+    if (warnTimer.current)         clearTimeout(warnTimer.current);
     if (countdownInterval.current) clearInterval(countdownInterval.current);
-  };
+  }, []);
 
-  const reset = useCallback(() => {
+  // Starts timers without touching state — safe to call directly in an effect.
+  const startTimers = useCallback(() => {
     clearAll();
-    setShowWarning(false);
-    setSecondsLeft(60);
-
     warnTimer.current = setTimeout(() => {
       setShowWarning(true);
       setSecondsLeft(60);
@@ -43,18 +41,24 @@ function useIdleLogout() {
         });
       }, 1000);
     }, IDLE_MS - WARN_MS);
-
     logoutTimer.current = setTimeout(() => logout(), IDLE_MS);
-  }, [logout]);
+  }, [clearAll, logout]);
+
+  // Called by activity events: dismiss warning and restart the idle clock.
+  const reset = useCallback(() => {
+    setShowWarning(false);
+    setSecondsLeft(60);
+    startTimers();
+  }, [startTimers]);
 
   useEffect(() => {
     ACTIVITY_EVENTS.forEach(e => window.addEventListener(e, reset, { passive: true }));
-    reset();
+    startTimers(); // no setState — just starts the timers on mount
     return () => {
       clearAll();
       ACTIVITY_EVENTS.forEach(e => window.removeEventListener(e, reset));
     };
-  }, [reset]);
+  }, [clearAll, reset, startTimers]);
 
   return { showWarning, secondsLeft, stayLoggedIn: reset, logout };
 }
