@@ -32,11 +32,13 @@ public class CreateJobCardCommandHandler : IRequestHandler<CreateJobCardCommand,
 {
     private readonly IApplicationDbContext _db;
     private readonly ICurrentUserService _currentUser;
+    private readonly IEmailService _email;
 
-    public CreateJobCardCommandHandler(IApplicationDbContext db, ICurrentUserService currentUser)
+    public CreateJobCardCommandHandler(IApplicationDbContext db, ICurrentUserService currentUser, IEmailService email)
     {
         _db = db;
         _currentUser = currentUser;
+        _email = email;
     }
 
     public async Task<(Guid Id, string JobCardNumber)> Handle(CreateJobCardCommand cmd, CancellationToken ct)
@@ -56,12 +58,14 @@ public class CreateJobCardCommandHandler : IRequestHandler<CreateJobCardCommand,
         var customerId = cmd.CustomerId ?? vehicle.CustomerId;
         var customerName = vehicle.Customer?.FullName;
         var customerPhone = vehicle.Customer?.Phone;
+        var customerEmail = vehicle.Customer?.Email;
 
         if (cmd.CustomerId.HasValue && cmd.CustomerId != vehicle.CustomerId)
         {
             var cust = await _db.Customers.FindAsync(new object[] { cmd.CustomerId.Value }, ct);
             customerName = cust?.FullName;
             customerPhone = cust?.Phone;
+            customerEmail = cust?.Email;
         }
 
         var jobCard = new JobCard
@@ -93,6 +97,16 @@ public class CreateJobCardCommandHandler : IRequestHandler<CreateJobCardCommand,
         _db.JobCards.Add(jobCard);
         await _db.SaveChangesAsync(ct);
 
+        // Fire-and-forget: notify customer their vehicle is in for service
+        if (!string.IsNullOrWhiteSpace(customerEmail))
+        {
+            var brandName  = vehicle.Brand.Name;
+            var modelName  = vehicle.Model.Name;
+            var html       = JobCardCreatedEmailBuilder.Build(jobCard, brandName, modelName, _currentUser.UserName ?? "Service Advisor");
+            var subject    = $"Repair Order {jobCardNumber} — Your Vehicle Is In Service";
+            var _ = _email.SendAsync(customerEmail, subject, html, CancellationToken.None);
+        }
+
         return (jobCard.Id, jobCardNumber);
     }
 
@@ -123,4 +137,31 @@ public class CreateJobCardCommandHandler : IRequestHandler<CreateJobCardCommand,
 
         return $"OR{twoDigitYear:D2}{seq.CurrentSequence:D5}";
     }
+}
+
+file static class JobCardCreatedEmailBuilder
+{
+    private static string TDL => "padding:8px 0;border-bottom:1px solid #eee;color:#666;width:40%;font-size:14px";
+    private static string TD  => "padding:8px 0;border-bottom:1px solid #eee;font-weight:500;font-size:14px";
+    private static string E(string? s) => System.Net.WebUtility.HtmlEncode(s ?? "—");
+
+    internal static string Build(JobCard jc, string brand, string model, string advisor)
+        => "<html><head><meta charset='utf-8'></head>"
+         + "<body style='font-family:Arial,sans-serif;color:#1a1a1a;margin:0;padding:20px;background:#f5f5f5'>"
+         + "<div style='background:#fff;border-radius:8px;padding:32px;max-width:600px;margin:0 auto'>"
+         + $"<h1 style='font-size:20px;margin:0 0 4px;color:#111'>Repair Order {E(jc.JobCardNumber)}</h1>"
+         + "<p style='color:#666;font-size:14px;margin:0 0 24px'>Rwanda Motor Ltd &mdash; Service Department</p>"
+         + "<div style='background:#f0f4ff;border-left:3px solid #3b5bdb;padding:12px 16px;border-radius:4px;margin:0 0 20px;font-size:14px'>"
+         + $"Dear {E(jc.CustomerName)}, your vehicle has been received and a repair order has been opened. Our team will keep you informed of progress.</div>"
+         + "<table style='width:100%;border-collapse:collapse'>"
+         + $"<tr><td style='{TDL}'>Repair Order</td><td style='{TD}'>{E(jc.JobCardNumber)}</td></tr>"
+         + $"<tr><td style='{TDL}'>Vehicle</td><td style='{TD}'>{E($"{brand} {model}")} ({jc.Year})</td></tr>"
+         + $"<tr><td style='{TDL}'>VIN</td><td style='{TD}'>{E(jc.VIN)}</td></tr>"
+         + $"<tr><td style='{TDL}'>Plate Number</td><td style='{TD}'>{E(jc.PlateNumber)}</td></tr>"
+         + $"<tr><td style='{TDL}'>Service</td><td style='{TD}'>{E(jc.ServiceType.ToString())}</td></tr>"
+         + $"<tr><td style='{TDL}'>Mileage In</td><td style='{TD}'>{jc.Mileage:N0} km</td></tr>"
+         + $"<tr><td style='{TDL}'>Received By</td><td style='{TD}'>{E(advisor)}</td></tr>"
+         + "</table>"
+         + "<p style='margin-top:24px;font-size:12px;color:#999;text-align:center'>Rwanda Motor Ltd &middot; Sent automatically by the DMS</p>"
+         + "</div></body></html>";
 }

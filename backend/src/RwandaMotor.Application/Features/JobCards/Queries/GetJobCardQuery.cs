@@ -19,6 +19,7 @@ public class GetJobCardQueryHandler : IRequestHandler<GetJobCardQuery, JobCardDe
             .Include(x => x.Vehicle).ThenInclude(v => v.Brand)
             .Include(x => x.Vehicle).ThenInclude(v => v.Model)
             .Include(x => x.Technician)
+            .Include(x => x.Customer)
             .FirstOrDefaultAsync(x => x.Id == q.Id && !x.IsDeleted, ct);
 
         if (j == null) return null;
@@ -40,6 +41,8 @@ public class GetJobCardQueryHandler : IRequestHandler<GetJobCardQuery, JobCardDe
             j.CustomerId,
             j.CustomerName,
             j.CustomerPhone,
+            j.Customer?.Email,
+            j.Customer?.Address,
             j.TechnicianId,
             j.Technician?.FullName,
             j.ServiceType,
@@ -74,6 +77,8 @@ public record JobCardDetailDto(
     Guid? CustomerId,
     string? CustomerName,
     string? CustomerPhone,
+    string? CustomerEmail,
+    string? CustomerAddress,
     Guid? TechnicianId,
     string? TechnicianName,
     ServiceType ServiceType,

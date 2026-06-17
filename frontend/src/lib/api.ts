@@ -497,6 +497,20 @@ export interface ActivityLogEntry {
   occurredAt: string;
 }
 
+// ============================================================
+// Sales History
+// ============================================================
+export const salesApi = {
+  list: (params: {
+    search?: string;
+    saleType?: string;
+    dateFrom?: string;
+    dateTo?: string;
+    pageNumber?: number;
+    pageSize?: number;
+  }) => api.get<ApiResponse<PaginatedResult<import('@/types').SalesHistoryItem>>>('/sales', { params }).then(r => r.data.data!),
+};
+
 export const activityApi = {
   list: (params: {
     userId?: string;

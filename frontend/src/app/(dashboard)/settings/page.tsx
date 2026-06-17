@@ -118,6 +118,13 @@ const MODULES: ModuleDef[] = [
     },
   },
   {
+    key: "salesRecords", label: "Sales Records",
+    levels: ["none", "view"],
+    keys: {
+      view: ["nav.sales"],
+    },
+  },
+  {
     key: "activity", label: "Activity Log",
     levels: ["none", "view"],
     keys: {

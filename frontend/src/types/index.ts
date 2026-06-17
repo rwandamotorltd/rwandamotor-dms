@@ -449,6 +449,8 @@ export interface JobCardDetail {
   customerId: string | null;
   customerName: string | null;
   customerPhone: string | null;
+  customerEmail: string | null;
+  customerAddress: string | null;
   technicianId: string | null;
   technicianName: string | null;
   serviceType: ServiceType;
@@ -465,4 +467,24 @@ export interface JobCardDetail {
   closedByUserId: string | null;
   deliveryNoteNumber: string | null;
   deliveryNoteGeneratedAt: string | null;
+}
+
+export interface SalesHistoryItem {
+  id: string;
+  saleDate: string;
+  saleType: string;
+  vin: string;
+  plateNumber: string | null;
+  brandName: string;
+  modelName: string;
+  year: number;
+  customerName: string | null;
+  customerPhone: string | null;
+  jobCardNumber: string | null;
+  deliveryNoteNumber: string | null;
+  jobCardId: string | null;
+  customerId: string | null;
+  vehicleId: string;
+  notes: string | null;
+  createdAt: string;
 }

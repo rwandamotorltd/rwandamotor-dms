@@ -13,6 +13,7 @@ public static class DefaultPermissions
     public const string NavImport         = "nav.import";
     public const string NavSettings        = "nav.settings";
     public const string NavActivity        = "nav.activity";
+    public const string NavSales           = "nav.sales";
 
     // ── Job Cards ─────────────────────────────────────────────────────────────
     public const string JobCardsCreate  = "jobCards.create";
@@ -54,7 +55,7 @@ public static class DefaultPermissions
     public static readonly List<string> All = new()
     {
         NavDashboard, NavVehicles, NavCustomers, NavServiceRecords,
-        NavJobCards, NavRetention, NavImport, NavSettings, NavActivity,
+        NavJobCards, NavRetention, NavImport, NavSettings, NavActivity, NavSales,
         JobCardsCreate, JobCardsEdit, JobCardsDelete, JobCardsConvert, JobCardsPrint, JobCardsShare,
         VehiclesCreate, VehiclesEdit, VehiclesDelete,
         CustomersCreate, CustomersEdit, CustomersDelete,
@@ -72,7 +73,7 @@ public static class DefaultPermissions
         "CRMOfficer" => new()
         {
             NavDashboard, NavVehicles, NavCustomers, NavServiceRecords,
-            NavJobCards, NavRetention, NavImport,
+            NavJobCards, NavRetention, NavImport, NavSales,
             JobCardsCreate, JobCardsEdit, JobCardsConvert, JobCardsPrint, JobCardsShare,
             VehiclesCreate, VehiclesEdit,
             CustomersCreate, CustomersEdit,

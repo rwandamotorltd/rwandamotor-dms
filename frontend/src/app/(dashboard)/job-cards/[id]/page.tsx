@@ -163,10 +163,16 @@ function PrintView({ data, settings }: PrintViewProps) {
         </thead>
         <tbody>
           <tr>
-            <td style={cell({ fontWeight: "bold", width: "16%", fontSize: 10 })}>Name / Contact</td>
-            <td style={cell({ width: "34%" })}>{data.customerName ?? "—"} {data.customerPhone ? `/ ${data.customerPhone}` : ""}</td>
-            <td style={cell({ fontWeight: "bold", width: "16%", fontSize: 10 })}>Address / Email</td>
-            <td style={cell({ width: "34%" })}>—</td>
+            <td style={cell({ fontWeight: "bold", width: "16%", fontSize: 10 })}>Client Name</td>
+            <td style={cell({ width: "34%", fontSize: 10 })}>{data.customerName ?? "—"}</td>
+            <td style={cell({ fontWeight: "bold", width: "16%", fontSize: 10 })}>Phone</td>
+            <td style={cell({ width: "34%", fontSize: 10 })}>{data.customerPhone ?? "—"}</td>
+          </tr>
+          <tr>
+            <td style={cell({ fontWeight: "bold", width: "16%", fontSize: 10 })}>Address</td>
+            <td style={cell({ width: "34%", fontSize: 10 })}>{data.customerAddress ?? "—"}</td>
+            <td style={cell({ fontWeight: "bold", width: "16%", fontSize: 10 })}>Email</td>
+            <td style={cell({ width: "34%", fontSize: 10 })}>{data.customerEmail ?? "—"}</td>
           </tr>
         </tbody>
       </table>
