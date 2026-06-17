@@ -137,8 +137,6 @@ public class ConvertToDeliveryNoteCommandHandler : IRequestHandler<ConvertToDeli
 
 file static class DeliveryNoteEmailBuilder
 {
-    private static string TDL => "padding:8px 0;border-bottom:1px solid #eee;color:#666;width:40%;font-size:13px";
-    private static string TD  => "padding:8px 0;border-bottom:1px solid #eee;font-weight:500;font-size:13px";
     private static string E(string? s) => System.Net.WebUtility.HtmlEncode(s ?? "—");
 
     private const string DefaultMessage =
@@ -147,28 +145,76 @@ file static class DeliveryNoteEmailBuilder
     internal static string Build(JobCard jc, string brand, string model, string? messageTemplate)
     {
         var vehicleLabel = $"{brand} {model}".Trim();
+        var plate        = string.IsNullOrWhiteSpace(jc.PlateNumber) ? "—" : jc.PlateNumber;
+        var yearSuffix   = jc.Year > 0 ? $" ({jc.Year})" : "";
 
         var msg = (messageTemplate ?? DefaultMessage)
-            .Replace("{CustomerName}",  E(jc.CustomerName))
-            .Replace("{VehicleModel}",  E(vehicleLabel));
+            .Replace("{CustomerName}", E(jc.CustomerName))
+            .Replace("{VehicleModel}", E(vehicleLabel));
 
-        return "<html><head><meta charset='utf-8'></head>"
-             + "<body style='font-family:Arial,sans-serif;color:#1a1a1a;margin:0;padding:20px;background:#f5f5f5'>"
-             + "<div style='background:#fff;border-radius:8px;padding:28px 32px;max-width:560px;margin:0 auto'>"
-             + "<p style='color:#888;font-size:12px;margin:0 0 20px;letter-spacing:.4px;text-transform:uppercase'>RWANDAMOTOR LTD &mdash; Service Department</p>"
-             + "<hr style='border:none;border-top:1px solid #f0f0f0;margin:0 0 20px'>"
-             + $"<p style='font-size:14px;color:#333;margin:0 0 22px;line-height:1.75'>{msg}</p>"
-             + "<table style='width:100%;border-collapse:collapse;margin-bottom:22px'>"
-             + $"<tr><td style='{TDL}'>Vehicle</td><td style='{TD}'>{E(vehicleLabel)}{(jc.Year > 0 ? $" ({jc.Year})" : "")}</td></tr>"
-             + $"<tr><td style='{TDL}'>Plate Number</td><td style='{TD}'>{E(jc.PlateNumber)}</td></tr>"
-             + "</table>"
-             + "<div style='background:#f6faf8;border-left:3px solid #2d7d52;border-radius:0 4px 4px 0;padding:12px 16px;margin-bottom:26px'>"
-             + "<p style='font-size:13px;color:#333;margin:0;line-height:1.65'>"
-             + $"<strong>Our recommendation:</strong> To keep your {E(vehicleLabel)} performing at its best, "
-             + "we always recommend using <strong>genuine manufacturer-approved parts</strong>. "
-             + "Our team remains at your service for any future needs."
-             + "</p></div>"
-             + "<p style='margin:0;font-size:11px;color:#ccc;text-align:center'>RWANDAMOTOR LTD &mdash; We care about your vehicle</p>"
-             + "</div></body></html>";
+        return $@"<!DOCTYPE html>
+<html lang=""en"">
+<head>
+  <meta charset=""utf-8"">
+  <meta name=""viewport"" content=""width=device-width,initial-scale=1"">
+  <!--[if mso]><xml><o:OfficeDocumentSettings><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings></xml><![endif]-->
+</head>
+<body style=""margin:0;padding:0;background-color:#f5f5f5;"">
+<!--[if mso]><table width=""600"" align=""center"" cellpadding=""0"" cellspacing=""0"" border=""0""><tr><td><![endif]-->
+<table role=""presentation"" width=""100%"" cellpadding=""0"" cellspacing=""0"" border=""0"">
+<tr><td align=""center"" style=""padding:24px 16px;"">
+
+  <table role=""presentation"" width=""100%"" cellpadding=""0"" cellspacing=""0"" border=""0""
+         style=""max-width:580px;"">
+
+    <!-- Card -->
+    <tr><td bgcolor=""#ffffff"" style=""background-color:#ffffff;padding:32px 36px 28px;"">
+
+      <!-- Brand line -->
+      <p style=""margin:0 0 18px;font-family:Arial,sans-serif;font-size:11px;color:#999999;letter-spacing:1.2px;text-transform:uppercase;"">RWANDAMOTOR LTD &mdash; Service Department</p>
+
+      <!-- Divider -->
+      <table role=""presentation"" width=""100%"" cellpadding=""0"" cellspacing=""0"" border=""0"" style=""margin-bottom:20px;"">
+        <tr><td style=""border-top:1px solid #eeeeee;font-size:0;line-height:0;"">&nbsp;</td></tr>
+      </table>
+
+      <!-- Message -->
+      <p style=""margin:0 0 24px;font-family:Arial,sans-serif;font-size:14px;color:#333333;line-height:1.8;"">{msg}</p>
+
+      <!-- Vehicle details -->
+      <table role=""presentation"" width=""100%"" cellpadding=""0"" cellspacing=""0"" border=""0"" style=""margin-bottom:24px;"">
+        <tr>
+          <td style=""padding:9px 0;border-bottom:1px solid #eeeeee;font-family:Arial,sans-serif;font-size:13px;color:#888888;width:40%;"">Vehicle</td>
+          <td style=""padding:9px 0;border-bottom:1px solid #eeeeee;font-family:Arial,sans-serif;font-size:13px;color:#111111;font-weight:bold;"">{E(vehicleLabel)}{yearSuffix}</td>
+        </tr>
+        <tr>
+          <td style=""padding:9px 0;font-family:Arial,sans-serif;font-size:13px;color:#888888;"">Plate Number</td>
+          <td style=""padding:9px 0;font-family:Arial,sans-serif;font-size:13px;color:#111111;font-weight:bold;"">{E(plate)}</td>
+        </tr>
+      </table>
+
+      <!-- Recommendation — green left bar via narrow td (Outlook-safe) -->
+      <table role=""presentation"" width=""100%"" cellpadding=""0"" cellspacing=""0"" border=""0"" style=""margin-bottom:28px;"">
+        <tr>
+          <td width=""4"" bgcolor=""#2d7d52"" style=""background-color:#2d7d52;font-size:0;line-height:0;"">&nbsp;</td>
+          <td bgcolor=""#f4faf7"" style=""background-color:#f4faf7;padding:12px 16px;"">
+            <p style=""margin:0;font-family:Arial,sans-serif;font-size:13px;color:#333333;line-height:1.65;"">
+              <strong>Our recommendation:</strong> To keep your {E(vehicleLabel)} performing at its best, we always recommend using <strong>genuine manufacturer-approved parts</strong>. Our team remains at your service for any future needs.
+            </p>
+          </td>
+        </tr>
+      </table>
+
+      <!-- Footer -->
+      <p style=""margin:0;font-family:Arial,sans-serif;font-size:11px;color:#cccccc;text-align:center;"">RWANDAMOTOR LTD &mdash; We care about your vehicle</p>
+
+    </td></tr>
+
+  </table>
+</td></tr>
+</table>
+<!--[if mso]></td></tr></table><![endif]-->
+</body>
+</html>";
     }
 }
