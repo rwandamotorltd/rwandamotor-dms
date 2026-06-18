@@ -6,7 +6,7 @@ import { motion } from "framer-motion";
 import Link from "next/link";
 import {
   ArrowLeft, Car, User, Wrench, Shield, Clock,
-  CheckCircle2, Calendar, Gauge, DollarSign,
+  CheckCircle2, Calendar, Gauge, Bell,
   Phone, Mail, Star, Pencil, X, FileText
 } from "lucide-react";
 import { vehiclesApi, servicePoliciesApi, type UpdateVehiclePayload } from "@/lib/api";
@@ -393,20 +393,19 @@ export default function Vehicle360Page({ params }: { params: Promise<{ id: strin
       </motion.div>
 
       {/* KPI Summary */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <KpiCard title="Total Services" value={vehicle.kpis.totalServices} icon={Wrench} variant="info" index={0} />
-        <KpiCard title="Total Revenue" value={formatCurrency(vehicle.kpis.totalRevenue)} icon={DollarSign} variant="success" index={1} />
         <KpiCard
           title="Avg Interval"
           value={vehicle.kpis.averageServiceIntervalDays ? `${Math.round(vehicle.kpis.averageServiceIntervalDays)}d` : "—"}
-          icon={Clock} variant="default" index={2}
+          icon={Clock} variant="default" index={1}
         />
-        <KpiCard title="Warranty Jobs" value={vehicle.kpis.warrantyJobCount} icon={Shield} variant="purple" index={3} />
+        <KpiCard title="Warranty Jobs" value={vehicle.kpis.warrantyJobCount} icon={Shield} variant="purple" index={2} />
         <KpiCard
           title="Last Serviced"
           value={vehicle.kpis.lastServiceDaysAgo != null ? `${vehicle.kpis.lastServiceDaysAgo}d ago` : "—"}
           icon={Calendar} variant={vehicle.kpis.lastServiceDaysAgo != null && vehicle.kpis.lastServiceDaysAgo > 180 ? "danger" : "default"}
-          index={4}
+          index={3}
         />
       </div>
 
@@ -656,31 +655,99 @@ export default function Vehicle360Page({ params }: { params: Promise<{ id: strin
               {vehicle.followUpHistory.length === 0 ? (
                 <EmptyState icon={CheckCircle2} message="No follow-ups recorded" />
               ) : (
-                vehicle.followUpHistory.map((f, idx) => (
-                  <motion.div key={f.id} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: idx * 0.04 }}>
-                    <Card>
-                      <CardContent className="pt-4 pb-3">
-                        <div className="flex items-start justify-between">
-                          <div>
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <Badge variant={f.status === "Recovered" ? "default" : "secondary"} className="text-xs">
-                                {f.status}
-                              </Badge>
-                              <Badge variant="outline" className="text-xs">{f.priority}</Badge>
-                              <Badge variant="outline" className="text-xs">{f.contactMethod}</Badge>
+                vehicle.followUpHistory.map((f, idx) => {
+                  const isWelcome = f.reason === "WelcomeCall";
+                  const isServiceReminder = f.reason === "ServiceDueReminder";
+                  const isAuto = isWelcome || isServiceReminder;
+                  return (
+                    <motion.div key={f.id} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: idx * 0.04 }}>
+                      <Card className={isWelcome ? "border-l-4 border-l-blue-400" : isServiceReminder ? "border-l-4 border-l-amber-400" : ""}>
+                        <CardContent className="pt-4 pb-3">
+                          <div className="flex items-start gap-3">
+                            <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${
+                              isWelcome ? "bg-blue-100 dark:bg-blue-900/30" :
+                              isServiceReminder ? "bg-amber-100 dark:bg-amber-900/30" : "bg-muted"
+                            }`}>
+                              {isWelcome
+                                ? <Phone className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                                : isServiceReminder
+                                  ? <Bell className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                                  : <CheckCircle2 className="w-4 h-4 text-muted-foreground" />}
                             </div>
-                            <p className="text-sm mt-1.5">{f.reason}</p>
-                            {f.notes && <p className="text-xs text-muted-foreground mt-1 italic">{f.notes}</p>}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                {isWelcome && (
+                                  <Badge variant="outline" className="text-[10px] py-0 px-1.5 h-4 text-blue-600 border-blue-300 dark:text-blue-400">
+                                    Welcome Call
+                                  </Badge>
+                                )}
+                                {isServiceReminder && (
+                                  <Badge variant="outline" className="text-[10px] py-0 px-1.5 h-4 text-amber-600 border-amber-300 dark:text-amber-400">
+                                    Service Reminder
+                                  </Badge>
+                                )}
+                                {!isAuto && (
+                                  <Badge variant="secondary" className="text-[10px] py-0 px-1.5 h-4">
+                                    {f.reason || "Follow-up"}
+                                  </Badge>
+                                )}
+                                <Badge
+                                  variant="outline"
+                                  className={`text-[10px] py-0 px-1.5 h-4 ${
+                                    f.status === "Pending" ? "text-orange-600 border-orange-300" :
+                                    f.status === "Contacted" ? "text-blue-600 border-blue-300" :
+                                    f.status === "Recovered" ? "text-emerald-600 border-emerald-300" :
+                                    "text-muted-foreground"
+                                  }`}
+                                >
+                                  {f.status}
+                                </Badge>
+                                <Badge variant="outline" className="text-[10px] py-0 px-1.5 h-4">{f.priority}</Badge>
+                              </div>
+
+                              {/* Context card for auto follow-ups */}
+                              {isWelcome && f.status === "Pending" && (
+                                <div className="mt-2 rounded-md bg-blue-50 dark:bg-blue-950/20 border border-blue-200 px-3 py-2 text-xs text-blue-700 dark:text-blue-300 space-y-0.5">
+                                  <p className="font-medium">Welcome call checklist:</p>
+                                  <p>· Welcome customer to the Rwandamotor family</p>
+                                  <p>· Remind: 1st free service at 5,000 km or 1 year</p>
+                                  <p>· Remind: always use genuine manufacturer parts</p>
+                                  <p>· Confirm satisfaction with PDI delivery</p>
+                                </div>
+                              )}
+                              {isServiceReminder && f.status === "Pending" && (
+                                <div className="mt-2 rounded-md bg-amber-50 dark:bg-amber-950/20 border border-amber-200 px-3 py-2 text-xs text-amber-700 dark:text-amber-300 space-y-0.5">
+                                  <p className="font-medium">Service reminder — action required:</p>
+                                  <p>· Contact customer to schedule a service appointment</p>
+                                  <p>· Vehicle service is due soon (see Next Service date)</p>
+                                  <p>· Recommend genuine parts for best performance</p>
+                                </div>
+                              )}
+
+                              {f.notes && (
+                                <p className="text-xs text-muted-foreground mt-1.5 italic">{f.notes}</p>
+                              )}
+
+                              <div className="flex items-center gap-3 mt-1.5 text-xs text-muted-foreground flex-wrap">
+                                <span className="flex items-center gap-1">
+                                  <Calendar className="w-3 h-3" /> Due: {formatDate(f.dueDate)}
+                                </span>
+                                <span className="flex items-center gap-1">
+                                  <Phone className="w-3 h-3" /> {f.contactMethod}
+                                </span>
+                                {f.contactedAt && (
+                                  <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
+                                    <CheckCircle2 className="w-3 h-3" /> Contacted {formatDateDistance(f.contactedAt)}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
                           </div>
-                          <div className="text-right text-xs text-muted-foreground shrink-0">
-                            <p>Due: {formatDate(f.dueDate)}</p>
-                            {f.contactedAt && <p>Contacted: {formatDateDistance(f.contactedAt)}</p>}
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </motion.div>
-                ))
+                        </CardContent>
+                      </Card>
+                    </motion.div>
+                  );
+                })
               )}
             </TabsContent>
 
@@ -768,8 +835,8 @@ function Vehicle360Skeleton() {
           <Skeleton className="h-4 w-48" />
         </div>
       </div>
-      <div className="grid grid-cols-5 gap-3">
-        {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-20 rounded-xl" />)}
+      <div className="grid grid-cols-4 gap-3">
+        {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-20 rounded-xl" />)}
       </div>
       <div className="grid grid-cols-3 gap-6">
         <div className="space-y-4">

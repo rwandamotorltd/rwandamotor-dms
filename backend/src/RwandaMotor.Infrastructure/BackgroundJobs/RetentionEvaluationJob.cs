@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Quartz;
 using RwandaMotor.Application.Common.Interfaces;
+using RwandaMotor.Domain.Entities;
 using RwandaMotor.Domain.Enums;
 using RwandaMotor.Infrastructure.Services;
 
@@ -41,12 +42,71 @@ public class RetentionEvaluationJob : IJob
             await _engine.EvaluateAllVehiclesAsync(ct);
             _logger.LogInformation("RetentionEvaluationJob completed at {Time}", DateTime.UtcNow);
 
+            await CreateServiceDueRemindersAsync(ct);
             await SendServiceAlertAsync(ct);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "RetentionEvaluationJob failed");
             throw;
+        }
+    }
+
+    private async Task CreateServiceDueRemindersAsync(CancellationToken ct)
+    {
+        var today    = DateTime.UtcNow.Date;
+        var cutoff   = today.AddDays(15);
+
+        // Find dealership vehicles whose service is due within the next 15 days
+        var vehicles = await _db.Vehicles
+            .Where(v => !v.IsDeleted
+                && v.IsSoldByDealership
+                && v.CustomerId.HasValue
+                && v.NextServiceDate.HasValue
+                && v.NextServiceDate.Value.Date >= today
+                && v.NextServiceDate.Value.Date <= cutoff)
+            .ToListAsync(ct);
+
+        if (vehicles.Count == 0) return;
+
+        // Load existing pending ServiceDueReminder vehicle IDs in one query
+        var vehicleIds = vehicles.Select(v => v.Id).ToList();
+        var alreadyRemindered = await _db.FollowUps
+            .Where(f => !f.IsDeleted
+                && f.Reason == "ServiceDueReminder"
+                && f.Status == FollowUpStatus.Pending
+                && vehicleIds.Contains(f.VehicleId))
+            .Select(f => f.VehicleId)
+            .ToHashSetAsync(ct);
+
+        var created = 0;
+        foreach (var v in vehicles)
+        {
+            if (alreadyRemindered.Contains(v.Id)) continue;
+
+            // DueDate = 5 days before service, but never in the past
+            var dueDate = v.NextServiceDate!.Value.Date.AddDays(-5);
+            if (dueDate < today) dueDate = today;
+
+            _db.FollowUps.Add(new FollowUp
+            {
+                VehicleId      = v.Id,
+                CustomerId     = v.CustomerId!.Value,
+                Status         = FollowUpStatus.Pending,
+                Priority       = FollowUpPriority.High,
+                ContactMethod  = ContactMethod.Phone,
+                Reason         = "ServiceDueReminder",
+                Notes          = $"Service due on {v.NextServiceDate.Value:dd MMM yyyy}. Contact customer to schedule a service appointment and remind them to use genuine parts.",
+                DueDate        = dueDate,
+                CreatedBy      = "System"
+            });
+            created++;
+        }
+
+        if (created > 0)
+        {
+            await _db.SaveChangesAsync(ct);
+            _logger.LogInformation("Created {Count} ServiceDueReminder follow-ups", created);
         }
     }
 

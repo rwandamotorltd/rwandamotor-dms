@@ -17,7 +17,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Plus, Search, FileText, ArrowRight, Printer, Mail, ClipboardList, X } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
 import { format } from "date-fns";
@@ -813,6 +813,7 @@ function ShareDialog({ jobCard, open, onClose }: {
 
 export default function JobCardsPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const { hasPermission } = useAuth();
   const canCreate  = hasPermission("jobCards.create");
@@ -821,11 +822,15 @@ export default function JobCardsPage() {
   const canConvert = hasPermission("jobCards.convert");
 
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<JobCardStatus | "">("");
+  const [statusFilter, setStatusFilter] = useState<JobCardStatus | "">(() => {
+    const s = searchParams.get("status");
+    return s === "Open" || s === "Closed" ? (s as JobCardStatus) : "";
+  });
   const [serviceTypeFilter, setServiceTypeFilter] = useState<ServiceType | "">("");
   const [page, setPage] = useState(1);
   const [createOpen, setCreateOpen] = useState(false);
   const [shareTarget, setShareTarget] = useState<JobCardListItem | null>(null);
+  const [convertTarget, setConvertTarget] = useState<JobCardListItem | null>(null);
 
   const params = useMemo(() => ({
     search: search || undefined,
@@ -991,11 +996,7 @@ export default function JobCardsPage() {
                             variant="ghost" size="icon" className="h-8 w-8 text-orange-500"
                             title="Convert to Delivery Note"
                             disabled={convertMutation.isPending}
-                            onClick={() => {
-                              if (confirm(`Convert ${jc.jobCardNumber} to a Delivery Note? This will close it.`)) {
-                                convertMutation.mutate(jc.id);
-                              }
-                            }}
+                            onClick={() => setConvertTarget(jc)}
                           >
                             <ArrowRight className="w-4 h-4" />
                           </Button>
@@ -1056,6 +1057,54 @@ export default function JobCardsPage() {
           open={true}
           onClose={() => setShareTarget(null)}
         />
+      )}
+
+      {/* Convert to Delivery Note — confirmation dialog */}
+      {convertTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setConvertTarget(null)} />
+          <div className="relative bg-card border border-border rounded-xl shadow-2xl w-full max-w-md mx-4 animate-in fade-in-0 zoom-in-95 duration-150">
+            <div className="p-6 space-y-4">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-full bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center shrink-0">
+                  <ArrowRight className="w-6 h-6 text-orange-600 dark:text-orange-400" />
+                </div>
+                <div>
+                  <h2 className="text-base font-semibold">Convert to Delivery Note?</h2>
+                  <p className="text-sm text-muted-foreground font-mono">{convertTarget.jobCardNumber}</p>
+                </div>
+              </div>
+              <div className="rounded-lg bg-muted/60 border border-border p-4 space-y-1 text-xs text-muted-foreground">
+                <p className="font-medium text-foreground text-sm mb-2">This action will:</p>
+                <p>✓ Close this job card permanently</p>
+                <p>✓ Issue delivery note <span className="font-mono font-medium text-foreground">{"DN" + convertTarget.jobCardNumber.slice(2)}</span></p>
+                <p>✓ Auto-create a service record</p>
+                <p>✓ Update vehicle next service dates</p>
+                {convertTarget.serviceType === "PDI" && (
+                  <p className="text-blue-600 dark:text-blue-400">✓ Create sales history entry + schedule welcome call follow-up (PDI)</p>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">This cannot be undone. The job card will be permanently closed.</p>
+              <div className="flex items-center justify-end gap-3 pt-1">
+                <Button variant="outline" onClick={() => setConvertTarget(null)} disabled={convertMutation.isPending}>
+                  Cancel
+                </Button>
+                <Button
+                  className="bg-orange-500 hover:bg-orange-600 text-white"
+                  disabled={convertMutation.isPending}
+                  onClick={() => {
+                    const id = convertTarget.id;
+                    setConvertTarget(null);
+                    convertMutation.mutate(id);
+                  }}
+                >
+                  <ArrowRight className="w-4 h-4 mr-2" />
+                  {convertMutation.isPending ? "Converting…" : "Yes, Convert"}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

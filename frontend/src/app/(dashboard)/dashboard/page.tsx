@@ -27,6 +27,17 @@ const STATUS_COLORS = {
 
 const CHART_COLORS = ["#6366f1", "#0ea5e9", "#10b981", "#f59e0b", "#f43f5e", "#8b5cf6"];
 
+function SectionDivider({ title }: { title: string }) {
+  return (
+    <div className="flex items-center gap-3 pt-2">
+      <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground whitespace-nowrap">
+        {title}
+      </span>
+      <div className="flex-1 h-px bg-border" />
+    </div>
+  );
+}
+
 export default function DashboardPage() {
   const { hasPermission } = useAuth();
 
@@ -53,7 +64,7 @@ export default function DashboardPage() {
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* Header */}
       <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}>
         <div className="flex items-center justify-between">
@@ -72,69 +83,106 @@ export default function DashboardPage() {
         </div>
       </motion.div>
 
-      {/* Retention Rate Heroes — shown with retention permission */}
+      {/* ──────────────────────── RETENTION SECTION ──────────────────────── */}
       {showRetention && (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          {[
-            { label: "6-Month Retention",   value: kpis.sixMonthRetentionRate,   period: "Rolling 6 months" },
-            { label: "12-Month Retention",  value: kpis.yearlyRetentionRate,     period: "This year" },
-            { label: "Quarterly Retention", value: kpis.quarterlyRetentionRate,  period: "This quarter" },
-          ].map((r, i) => (
-            <motion.div
-              key={r.label}
-              initial={{ opacity: 0, scale: 0.97 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: i * 0.08 }}
-              className="relative overflow-hidden rounded-xl border border-border bg-card p-5 shadow-sm"
-            >
-              <div className="absolute inset-0 gradient-primary opacity-5" />
-              <p className="text-sm font-medium text-muted-foreground">{r.label}</p>
-              <div className="mt-2 flex items-end gap-2">
-                <span className="text-4xl font-bold tracking-tight text-foreground">
-                  {formatPercentage(r.value)}
-                </span>
-                <span className="text-sm text-muted-foreground mb-1">%</span>
-              </div>
-              <div className="mt-3 h-1.5 rounded-full bg-muted overflow-hidden">
-                <div className="h-full gradient-primary rounded-full" style={{ width: `${Math.min(r.value, 100)}%` }} />
-              </div>
-              <p className="mt-2 text-xs text-muted-foreground">{r.period}</p>
-            </motion.div>
-          ))}
-        </div>
+        <>
+          <SectionDivider title="Retention" />
+
+          {/* Retention Rate Heroes */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {[
+              { label: "6-Month Retention",   value: kpis.sixMonthRetentionRate,   period: "Rolling 6 months" },
+              { label: "12-Month Retention",  value: kpis.yearlyRetentionRate,     period: "This year" },
+              { label: "Quarterly Retention", value: kpis.quarterlyRetentionRate,  period: "This quarter" },
+            ].map((r, i) => (
+              <motion.div
+                key={r.label}
+                initial={{ opacity: 0, scale: 0.97 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: i * 0.08 }}
+                className="relative overflow-hidden rounded-xl border border-border bg-card p-5 shadow-sm"
+              >
+                <div className="absolute inset-0 gradient-primary opacity-5" />
+                <p className="text-sm font-medium text-muted-foreground">{r.label}</p>
+                <div className="mt-2 flex items-end gap-2">
+                  <span className="text-4xl font-bold tracking-tight text-foreground">
+                    {formatPercentage(r.value)}
+                  </span>
+                  <span className="text-sm text-muted-foreground mb-1">%</span>
+                </div>
+                <div className="mt-3 h-1.5 rounded-full bg-muted overflow-hidden">
+                  <div className="h-full gradient-primary rounded-full" style={{ width: `${Math.min(r.value, 100)}%` }} />
+                </div>
+                <p className="mt-2 text-xs text-muted-foreground">{r.period}</p>
+              </motion.div>
+            ))}
+          </div>
+
+          {/* Fleet status breakdown (companion to retention) */}
+          {showKpi && (
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+              <KpiCard title="Total Vehicles"    value={kpis.totalVehicles}                          subtitle="All registered"          icon={Car}           variant="info"    index={0}  href="/vehicles" />
+              <KpiCard title="Dealership Fleet"  value={kpis.dealershipVehicles}                     subtitle="Sold by us"              icon={Car}           variant="purple"  index={1}  href="/vehicles?isSoldByDealership=true" />
+              <KpiCard title="Customers"         value={kpis.totalCustomers}                          subtitle="Total registered"        icon={Users}         variant="default" index={2}  href="/customers" />
+              <KpiCard title="Due Soon"          value={kpis.dueSoonVehicles}                         subtitle="Upcoming service"        icon={Clock}         variant="warning" index={3}  href="/vehicles?status=DueSoon" />
+              <KpiCard title="Lost Vehicles"     value={kpis.lostVehicles}                            subtitle="> 12 months overdue"     icon={AlertTriangle} variant="danger"  index={4}  href="/vehicles?status=Lost" />
+              <KpiCard title="Overdue"           value={kpis.overdueVehicles}                         subtitle="Missed interval"         icon={AlertTriangle} variant="warning" index={5}  href="/vehicles?status=Overdue" />
+              <KpiCard title="Recovered"         value={kpis.recoveredVehicles}                       subtitle="Returned after lost"     icon={RefreshCw}     variant="success" index={6}  href="/vehicles?status=Recovered" />
+              <KpiCard title="Monthly Services"  value={kpis.monthlyServiceCount}                     subtitle="This month"              icon={Wrench}        variant="default" index={7}  href="/service-records" />
+              <KpiCard title="6-Month Rate"      value={formatPercentage(kpis.sixMonthRetentionRate)} subtitle="Rolling 6 months"        icon={TrendingUp}    variant="success" index={8}  href="/retention" />
+            </div>
+          )}
+        </>
       )}
 
-      {/* KPI Grid */}
+      {/* Fleet cards when kpi allowed but retention widget not permitted */}
+      {showKpi && !showRetention && (
+        <>
+          <SectionDivider title="Fleet Status" />
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+            <KpiCard title="Total Vehicles"    value={kpis.totalVehicles}       subtitle="All registered"          icon={Car}           variant="info"    index={0}  href="/vehicles" />
+            <KpiCard title="Dealership Fleet"  value={kpis.dealershipVehicles}  subtitle="Sold by us"              icon={Car}           variant="purple"  index={1}  href="/vehicles?isSoldByDealership=true" />
+            <KpiCard title="Customers"         value={kpis.totalCustomers}       subtitle="Total registered"        icon={Users}         variant="default" index={2}  href="/customers" />
+            <KpiCard title="Due Soon"          value={kpis.dueSoonVehicles}      subtitle="Upcoming service"        icon={Clock}         variant="warning" index={3}  href="/vehicles?status=DueSoon" />
+            <KpiCard title="Lost Vehicles"     value={kpis.lostVehicles}         subtitle="> 12 months overdue"     icon={AlertTriangle} variant="danger"  index={4}  href="/vehicles?status=Lost" />
+            <KpiCard title="Overdue"           value={kpis.overdueVehicles}      subtitle="Missed interval"         icon={AlertTriangle} variant="warning" index={5}  href="/vehicles?status=Overdue" />
+            <KpiCard title="Recovered"         value={kpis.recoveredVehicles}    subtitle="Returned after lost"     icon={RefreshCw}     variant="success" index={6}  href="/vehicles?status=Recovered" />
+            <KpiCard title="Monthly Services"  value={kpis.monthlyServiceCount}  subtitle="This month"              icon={Wrench}        variant="default" index={7}  href="/service-records" />
+          </div>
+        </>
+      )}
+
+      {/* ──────────────────────── FOLLOW-UPS SECTION ──────────────────────── */}
       {showKpi && (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-          <KpiCard title="Total Vehicles"    value={kpis.totalVehicles}                          subtitle="All registered"          icon={Car}           variant="info"    index={0}  href="/vehicles" />
-          <KpiCard title="Dealership Fleet"  value={kpis.dealershipVehicles}                     subtitle="Sold by us"              icon={Car}           variant="purple"  index={1}  href="/vehicles?isSoldByDealership=true" />
-          <KpiCard title="Customers"         value={kpis.totalCustomers}                          subtitle="Total registered"        icon={Users}         variant="default" index={2}  href="/customers" />
-          <KpiCard title="Due Soon"          value={kpis.dueSoonVehicles}                         subtitle="Upcoming service"        icon={Clock}         variant="warning" index={3}  href="/vehicles?status=DueSoon" />
-          <KpiCard title="Lost Vehicles"     value={kpis.lostVehicles}                            subtitle="> 12 months overdue"     icon={AlertTriangle} variant="danger"  index={4}  href="/vehicles?status=Lost" />
-          <KpiCard title="Overdue"           value={kpis.overdueVehicles}                         subtitle="Missed interval"         icon={AlertTriangle} variant="warning" index={5}  href="/vehicles?status=Overdue" />
-          <KpiCard title="Recovered"         value={kpis.recoveredVehicles}                       subtitle="Returned after lost"     icon={RefreshCw}     variant="success" index={6}  href="/vehicles?status=Recovered" />
-          <KpiCard title="Follow-ups"        value={kpis.activeFollowUps}                         subtitle="Pending contact"         icon={Activity}      variant="info"    index={7}  href="/retention" />
-          <KpiCard title="Monthly Services"  value={kpis.monthlyServiceCount}                     subtitle="This month"              icon={Wrench}        variant="default" index={8}  href="/service-records" />
-          <KpiCard title="6-Month Retention" value={formatPercentage(kpis.sixMonthRetentionRate)} subtitle="Rolling 6 months"        icon={TrendingUp}    variant="success" index={9}  href="/retention" />
-          {showJobCards && <>
-            <KpiCard title="Open Job Cards"      value={kpis.openJobCards ?? 0}    subtitle="Awaiting delivery"       icon={ClipboardList} variant="warning" index={10} href="/job-cards?status=Open" />
-            <KpiCard title="Today's Receptions"  value={kpis.todayJobCards ?? 0}   subtitle="Vehicles received today" icon={FileCheck}     variant="info"    index={11} href="/job-cards" />
-            <KpiCard title="Monthly Job Cards"   value={kpis.monthlyJobCards ?? 0} subtitle="This month"              icon={ClipboardList} variant="default" index={12} href="/job-cards" />
-          </>}
-        </div>
+        <>
+          <SectionDivider title="Follow-ups" />
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <KpiCard
+              title="Active Follow-ups"
+              value={kpis.activeFollowUps}
+              subtitle="Pending contact"
+              icon={Activity}
+              variant="info"
+              index={0}
+              href="/retention"
+            />
+          </div>
+        </>
       )}
 
-      {/* Job Cards widget only (when kpi is hidden but jobCards widget is allowed) */}
-      {!showKpi && showJobCards && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-          <KpiCard title="Open Job Cards"      value={kpis.openJobCards ?? 0}    subtitle="Awaiting delivery"       icon={ClipboardList} variant="warning" index={0} href="/job-cards?status=Open" />
-          <KpiCard title="Today's Receptions"  value={kpis.todayJobCards ?? 0}   subtitle="Vehicles received today" icon={FileCheck}     variant="info"    index={1} href="/job-cards" />
-          <KpiCard title="Monthly Job Cards"   value={kpis.monthlyJobCards ?? 0} subtitle="This month"              icon={ClipboardList} variant="default" index={2} href="/job-cards" />
-        </div>
+      {/* ──────────────────────── WORKSHOP SECTION ──────────────────────── */}
+      {showJobCards && (
+        <>
+          <SectionDivider title="Workshop" />
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+            <KpiCard title="Open Job Cards"      value={kpis.openJobCards ?? 0}    subtitle="Awaiting delivery"       icon={ClipboardList} variant="warning" index={0} href="/job-cards?status=Open" />
+            <KpiCard title="Today's Receptions"  value={kpis.todayJobCards ?? 0}   subtitle="Vehicles received today" icon={FileCheck}     variant="info"    index={1} href="/job-cards" />
+            <KpiCard title="Monthly Job Cards"   value={kpis.monthlyJobCards ?? 0} subtitle="This month"              icon={ClipboardList} variant="default" index={2} href="/job-cards" />
+          </div>
+        </>
       )}
 
-      {/* Charts — retention section */}
+      {/* ──────────────────────── CHARTS ──────────────────────── */}
       {showRetention && (
         <>
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -248,10 +296,33 @@ function DashboardSkeleton({ showKpi, showRetention, showJobCards }: {
   showKpi: boolean; showRetention: boolean; showJobCards: boolean;
 }) {
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <Skeleton className="h-10 w-64" />
-      {showRetention && <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-28 rounded-xl" />)}</div>}
-      {(showKpi || showJobCards) && <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">{[...Array(showKpi ? 10 : 3)].map((_, i) => <Skeleton key={i} className="h-24 rounded-xl" />)}</div>}
+      {showRetention && (
+        <>
+          <Skeleton className="h-4 w-32" />
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-28 rounded-xl" />)}</div>
+          {showKpi && <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">{[...Array(9)].map((_, i) => <Skeleton key={i} className="h-24 rounded-xl" />)}</div>}
+        </>
+      )}
+      {showKpi && !showRetention && (
+        <>
+          <Skeleton className="h-4 w-32" />
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">{[...Array(8)].map((_, i) => <Skeleton key={i} className="h-24 rounded-xl" />)}</div>
+        </>
+      )}
+      {showKpi && (
+        <>
+          <Skeleton className="h-4 w-28" />
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4"><Skeleton className="h-24 rounded-xl" /></div>
+        </>
+      )}
+      {showJobCards && (
+        <>
+          <Skeleton className="h-4 w-24" />
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-24 rounded-xl" />)}</div>
+        </>
+      )}
       {showRetention && <div className="grid grid-cols-1 lg:grid-cols-3 gap-4"><Skeleton className="h-72 lg:col-span-2 rounded-xl" /><Skeleton className="h-72 rounded-xl" /></div>}
     </div>
   );

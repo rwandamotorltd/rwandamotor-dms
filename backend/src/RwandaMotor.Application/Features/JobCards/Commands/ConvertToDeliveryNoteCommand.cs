@@ -43,8 +43,6 @@ public class ConvertToDeliveryNoteCommandHandler : IRequestHandler<ConvertToDeli
             throw new InvalidOperationException("Job card is already closed");
 
         var now = DateTime.UtcNow;
-
-        // Generate Delivery Note number: DN + YY + same sequence as job card
         var dnNumber = "DN" + jobCard.JobCardNumber[2..]; // OR2600001 -> DN2600001
 
         jobCard.Status = JobCardStatus.Closed;
@@ -60,7 +58,7 @@ public class ConvertToDeliveryNoteCommandHandler : IRequestHandler<ConvertToDeli
         var nextService = await _intervalEngine.CalculateNextServiceAsync(
             jobCard.VehicleId, jobCard.Mileage, now, ct);
 
-        var serviceRecord = new ServiceRecord
+        _db.ServiceRecords.Add(new ServiceRecord
         {
             VehicleId = jobCard.VehicleId,
             TechnicianId = jobCard.TechnicianId,
@@ -73,8 +71,7 @@ public class ConvertToDeliveryNoteCommandHandler : IRequestHandler<ConvertToDeli
             NextServiceMileage = nextService.NextServiceMileage,
             NextServiceDate = nextService.NextServiceDate,
             CreatedBy = _currentUser.UserId
-        };
-        _db.ServiceRecords.Add(serviceRecord);
+        });
 
         // Update vehicle service tracking fields
         var vehicle = jobCard.Vehicle;
@@ -88,7 +85,7 @@ public class ConvertToDeliveryNoteCommandHandler : IRequestHandler<ConvertToDeli
             vehicle.UpdatedAt = now;
         }
 
-        // If PDI -> create a SalesHistory entry
+        // If PDI -> create SalesHistory + auto-schedule welcome call follow-up
         if (jobCard.ServiceType == ServiceType.PDI)
         {
             _db.SalesHistories.Add(new SalesHistory
@@ -106,6 +103,23 @@ public class ConvertToDeliveryNoteCommandHandler : IRequestHandler<ConvertToDeli
                 Notes = "Auto-created from PDI Job Card conversion",
                 CreatedBy = _currentUser.UserId
             });
+
+            // Auto-schedule a welcome call follow-up 7 days after PDI delivery
+            if (jobCard.CustomerId.HasValue)
+            {
+                _db.FollowUps.Add(new FollowUp
+                {
+                    VehicleId = jobCard.VehicleId,
+                    CustomerId = jobCard.CustomerId.Value,
+                    Status = FollowUpStatus.Pending,
+                    Priority = FollowUpPriority.High,
+                    ContactMethod = ContactMethod.Phone,
+                    Reason = "WelcomeCall",
+                    Notes = $"Welcome call after PDI delivery. Remind customer about: first free service at {nextService.NextServiceMileage:N0} km or {nextService.NextServiceDate:dd MMM yyyy}; always use genuine parts for best performance; Rwandamotor is always available for any needs. Job Card: {jobCard.JobCardNumber}",
+                    DueDate = now.AddDays(7),
+                    CreatedBy = "System"
+                });
+            }
         }
 
         await _db.SaveChangesAsync(ct);
@@ -113,27 +127,163 @@ public class ConvertToDeliveryNoteCommandHandler : IRequestHandler<ConvertToDeli
         // Re-evaluate retention status after new service
         await _retentionEngine.EvaluateVehicleStatusAsync(jobCard.VehicleId, ct);
 
-        // Fire-and-forget: notify customer their vehicle is ready
+        // Fire-and-forget: notify customer
         var customerEmail = jobCard.Customer?.Email
                          ?? (jobCard.CustomerId.HasValue
                              ? (await _db.Customers.FindAsync(new object[] { jobCard.CustomerId.Value }, ct))?.Email
                              : null);
         if (!string.IsNullOrWhiteSpace(customerEmail))
         {
-            Domain.Entities.CompanySettings? settings = null;
-            try { settings = await _db.CompanySettings.FindAsync(new object[] { Domain.Entities.CompanySettings.SingletonId }, ct); }
-            catch { /* columns not yet migrated — fall back to defaults */ }
-            settings ??= new Domain.Entities.CompanySettings();
-            var brand   = jobCard.Vehicle?.Brand?.Name ?? "";
-            var model   = jobCard.Vehicle?.Model?.Name ?? "";
-            var html    = DeliveryNoteEmailBuilder.Build(jobCard, brand, model, settings.EmailDeliveryNoteMessage);
-            var subject = "Thank You for Choosing RWANDAMOTOR LTD";
+            CompanySettings? settings = null;
+            try { settings = await _db.CompanySettings.FindAsync(new object[] { CompanySettings.SingletonId }, ct); }
+            catch { /* settings table not yet migrated — fall back to defaults */ }
+            settings ??= new CompanySettings();
+
+            var brandName = jobCard.Vehicle?.Brand?.Name ?? "";
+            var modelName = jobCard.Vehicle?.Model?.Name ?? "";
+
+            string html;
+            string subject;
+
+            if (jobCard.ServiceType == ServiceType.PDI)
+            {
+                html    = PdiWelcomeEmailBuilder.Build(jobCard, brandName, modelName, nextService, settings.EmailDeliveryNoteMessage);
+                subject = $"Welcome to the RWANDAMOTOR Family — {brandName} {modelName}".Trim();
+            }
+            else
+            {
+                html    = DeliveryNoteEmailBuilder.Build(jobCard, brandName, modelName, settings.EmailDeliveryNoteMessage);
+                subject = "Thank You for Choosing RWANDAMOTOR LTD";
+            }
+
             var _ = _email.SendAsync(customerEmail, subject, html, CancellationToken.None);
         }
 
         return dnNumber;
     }
 }
+
+// ─── PDI welcome email (new vehicle owners) ────────────────────────────────────
+
+file static class PdiWelcomeEmailBuilder
+{
+    private static string E(string? s) => System.Net.WebUtility.HtmlEncode(s ?? "—");
+
+    internal static string Build(
+        JobCard jc, string brand, string model,
+        NextServiceResult nextService,
+        string? customMessage)
+    {
+        var vehicleLabel = $"{brand} {model}".Trim();
+        var plate        = string.IsNullOrWhiteSpace(jc.PlateNumber) ? "—" : jc.PlateNumber;
+        var yearSuffix   = jc.Year > 0 ? $" ({jc.Year})" : "";
+        var nextSvcKm    = nextService.NextServiceMileage.ToString("N0") + " km";
+        var nextSvcDate  = nextService.NextServiceDate.ToString("dd MMMM yyyy");
+        var customerName = !string.IsNullOrWhiteSpace(jc.CustomerName) ? E(jc.CustomerName) : "Valued Customer";
+
+        var welcomeMsg = string.IsNullOrWhiteSpace(customMessage)
+            ? $"Dear {customerName}, on behalf of the entire team at RWANDAMOTOR LTD, we are delighted to welcome you to our family! Your new {E(vehicleLabel)} is now officially yours, and we are honoured to have been part of this milestone."
+            : customMessage
+                .Replace("{CustomerName}", customerName)
+                .Replace("{VehicleModel}", E(vehicleLabel));
+
+        return $@"<!DOCTYPE html>
+<html lang=""en"">
+<head>
+  <meta charset=""utf-8"">
+  <meta name=""viewport"" content=""width=device-width,initial-scale=1"">
+  <!--[if mso]><xml><o:OfficeDocumentSettings><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings></xml><![endif]-->
+</head>
+<body style=""margin:0;padding:0;background-color:#f5f5f5;"">
+<!--[if mso]><table width=""600"" align=""center"" cellpadding=""0"" cellspacing=""0"" border=""0""><tr><td><![endif]-->
+<table role=""presentation"" width=""100%"" cellpadding=""0"" cellspacing=""0"" border=""0"">
+<tr><td align=""center"" style=""padding:24px 16px;"">
+
+  <table role=""presentation"" width=""100%"" cellpadding=""0"" cellspacing=""0"" border=""0"" style=""max-width:580px;"">
+
+    <!-- Card -->
+    <tr><td bgcolor=""#ffffff"" style=""background-color:#ffffff;padding:32px 36px 28px;"">
+
+      <!-- Brand line -->
+      <p style=""margin:0 0 6px;font-family:Arial,sans-serif;font-size:11px;color:#999999;letter-spacing:1.2px;text-transform:uppercase;"">RWANDAMOTOR LTD &mdash; New Vehicle Delivery</p>
+
+      <!-- Welcome headline -->
+      <h1 style=""margin:0 0 18px;font-family:Arial,sans-serif;font-size:22px;color:#1a1a1a;font-weight:bold;"">Welcome to the Rwandamotor Family!</h1>
+
+      <!-- Divider -->
+      <table role=""presentation"" width=""100%"" cellpadding=""0"" cellspacing=""0"" border=""0"" style=""margin-bottom:20px;"">
+        <tr><td style=""border-top:1px solid #eeeeee;font-size:0;line-height:0;"">&nbsp;</td></tr>
+      </table>
+
+      <!-- Welcome message -->
+      <p style=""margin:0 0 20px;font-family:Arial,sans-serif;font-size:14px;color:#333333;line-height:1.8;"">{welcomeMsg}</p>
+
+      <!-- Vehicle details -->
+      <table role=""presentation"" width=""100%"" cellpadding=""0"" cellspacing=""0"" border=""0"" style=""margin-bottom:24px;"">
+        <tr>
+          <td style=""padding:9px 0;border-bottom:1px solid #eeeeee;font-family:Arial,sans-serif;font-size:13px;color:#888888;width:40%;"">Your New Vehicle</td>
+          <td style=""padding:9px 0;border-bottom:1px solid #eeeeee;font-family:Arial,sans-serif;font-size:13px;color:#111111;font-weight:bold;"">{E(vehicleLabel)}{yearSuffix}</td>
+        </tr>
+        <tr>
+          <td style=""padding:9px 0;border-bottom:1px solid #eeeeee;font-family:Arial,sans-serif;font-size:13px;color:#888888;"">Plate Number</td>
+          <td style=""padding:9px 0;border-bottom:1px solid #eeeeee;font-family:Arial,sans-serif;font-size:13px;color:#111111;font-weight:bold;"">{E(plate)}</td>
+        </tr>
+        <tr>
+          <td style=""padding:9px 0;font-family:Arial,sans-serif;font-size:13px;color:#888888;"">Delivery Note</td>
+          <td style=""padding:9px 0;font-family:Arial,sans-serif;font-size:13px;color:#111111;font-weight:bold;"">{"DN" + jc.JobCardNumber[2..]}</td>
+        </tr>
+      </table>
+
+      <!-- Service package (green bar) -->
+      <table role=""presentation"" width=""100%"" cellpadding=""0"" cellspacing=""0"" border=""0"" style=""margin-bottom:20px;"">
+        <tr>
+          <td width=""4"" bgcolor=""#2d7d52"" style=""background-color:#2d7d52;font-size:0;line-height:0;"">&nbsp;</td>
+          <td bgcolor=""#f4faf7"" style=""background-color:#f4faf7;padding:14px 16px;"">
+            <p style=""margin:0 0 8px;font-family:Arial,sans-serif;font-size:13px;color:#1a5c38;font-weight:bold;"">Your Service Package Includes</p>
+            <table role=""presentation"" cellpadding=""0"" cellspacing=""0"" border=""0"">
+              <tr><td style=""padding:3px 0;font-family:Arial,sans-serif;font-size:13px;color:#333333;line-height:1.5;"">&#10003;&nbsp; <strong>First service is complimentary</strong> &mdash; at {E(nextSvcKm)} or {E(nextSvcDate)}</td></tr>
+              <tr><td style=""padding:3px 0;font-family:Arial,sans-serif;font-size:13px;color:#333333;line-height:1.5;"">&#10003;&nbsp; Regular service interval: <strong>every 5,000 km or 1 year</strong> (whichever comes first)</td></tr>
+              <tr><td style=""padding:3px 0;font-family:Arial,sans-serif;font-size:13px;color:#333333;line-height:1.5;"">&#10003;&nbsp; We will contact you <strong>15 days before your service is due</strong></td></tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+
+      <!-- Genuine parts (amber bar) -->
+      <table role=""presentation"" width=""100%"" cellpadding=""0"" cellspacing=""0"" border=""0"" style=""margin-bottom:28px;"">
+        <tr>
+          <td width=""4"" bgcolor=""#c07a00"" style=""background-color:#c07a00;font-size:0;line-height:0;"">&nbsp;</td>
+          <td bgcolor=""#fffbf0"" style=""background-color:#fffbf0;padding:12px 16px;"">
+            <p style=""margin:0;font-family:Arial,sans-serif;font-size:13px;color:#7a4e00;line-height:1.65;"">
+              <strong>Our recommendation:</strong> Always use <strong>genuine manufacturer-approved parts</strong> for your {E(vehicleLabel)}. Genuine parts ensure optimal performance, safety, and protect your warranty. Our certified technicians are always ready to help.
+            </p>
+          </td>
+        </tr>
+      </table>
+
+      <!-- CTA / contact -->
+      <p style=""margin:0 0 20px;font-family:Arial,sans-serif;font-size:13px;color:#555555;line-height:1.7;"">
+        We will reach out in the coming days to ensure everything is perfect with your new vehicle. In the meantime, please do not hesitate to contact our service team for any questions or assistance.
+      </p>
+
+      <!-- Footer -->
+      <table role=""presentation"" width=""100%"" cellpadding=""0"" cellspacing=""0"" border=""0"" style=""margin-top:8px;"">
+        <tr><td style=""border-top:1px solid #eeeeee;font-size:0;line-height:0;padding-bottom:12px;"">&nbsp;</td></tr>
+      </table>
+      <p style=""margin:0;font-family:Arial,sans-serif;font-size:11px;color:#cccccc;text-align:center;"">RWANDAMOTOR LTD &mdash; Kigali, Rwanda &mdash; We care about your vehicle</p>
+
+    </td></tr>
+
+  </table>
+</td></tr>
+</table>
+<!--[if mso]></td></tr></table><![endif]-->
+</body>
+</html>";
+    }
+}
+
+// ─── Standard delivery note email ─────────────────────────────────────────────
 
 file static class DeliveryNoteEmailBuilder
 {
@@ -193,7 +343,7 @@ file static class DeliveryNoteEmailBuilder
         </tr>
       </table>
 
-      <!-- Recommendation — green left bar via narrow td (Outlook-safe) -->
+      <!-- Recommendation -->
       <table role=""presentation"" width=""100%"" cellpadding=""0"" cellspacing=""0"" border=""0"" style=""margin-bottom:28px;"">
         <tr>
           <td width=""4"" bgcolor=""#2d7d52"" style=""background-color:#2d7d52;font-size:0;line-height:0;"">&nbsp;</td>

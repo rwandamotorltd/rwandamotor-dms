@@ -538,6 +538,7 @@ export default function JobCardDetailPage() {
 
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState<EditForm | null>(null);
+  const [showConvertDialog, setShowConvertDialog] = useState(false);
 
   const { data, isLoading } = useJobCard(id);
 
@@ -698,11 +699,7 @@ export default function JobCardDetailPage() {
                         size="sm"
                         className="bg-orange-500 hover:bg-orange-600 text-white"
                         disabled={convertMutation.isPending}
-                        onClick={() => {
-                          if (confirm(`Convert ${data.jobCardNumber} to a Delivery Note? This will close it permanently.`)) {
-                            convertMutation.mutate();
-                          }
-                        }}
+                        onClick={() => setShowConvertDialog(true)}
                       >
                         <ArrowRight className="w-4 h-4 mr-2" />
                         {convertMutation.isPending ? "Converting…" : "Convert to Delivery Note"}
@@ -958,6 +955,64 @@ export default function JobCardDetailPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Convert to Delivery Note — confirmation dialog */}
+      {showConvertDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowConvertDialog(false)} />
+          <div className="relative bg-card border border-border rounded-xl shadow-2xl w-full max-w-md mx-4 animate-in fade-in-0 zoom-in-95 duration-150">
+            <div className="p-6 space-y-4">
+              {/* Icon + title */}
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-full bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center shrink-0">
+                  <ArrowRight className="w-6 h-6 text-orange-600 dark:text-orange-400" />
+                </div>
+                <div>
+                  <h2 className="text-base font-semibold">Convert to Delivery Note?</h2>
+                  <p className="text-sm text-muted-foreground font-mono">{data.jobCardNumber}</p>
+                </div>
+              </div>
+
+              {/* What will happen */}
+              <div className="rounded-lg bg-muted/60 border border-border p-4 space-y-1.5 text-sm">
+                <p className="font-medium text-foreground mb-2">This action will:</p>
+                <div className="space-y-1 text-muted-foreground text-xs">
+                  <p>✓ Close this job card permanently</p>
+                  <p>✓ Issue delivery note <span className="font-mono font-medium text-foreground">{"DN" + data.jobCardNumber.slice(2)}</span></p>
+                  <p>✓ Auto-create a service record</p>
+                  <p>✓ Update vehicle next service dates</p>
+                  {data.serviceType === "PDI" && (
+                    <p className="text-blue-600 dark:text-blue-400">✓ Create sales history entry (PDI delivery)</p>
+                  )}
+                  {data.serviceType === "PDI" && (
+                    <p className="text-blue-600 dark:text-blue-400">✓ Schedule a welcome call follow-up (7 days)</p>
+                  )}
+                </div>
+              </div>
+
+              <p className="text-xs text-muted-foreground">This cannot be undone. The job card will be permanently closed.</p>
+
+              {/* Actions */}
+              <div className="flex items-center justify-end gap-3 pt-1">
+                <Button variant="outline" onClick={() => setShowConvertDialog(false)} disabled={convertMutation.isPending}>
+                  Cancel
+                </Button>
+                <Button
+                  className="bg-orange-500 hover:bg-orange-600 text-white"
+                  disabled={convertMutation.isPending}
+                  onClick={() => {
+                    setShowConvertDialog(false);
+                    convertMutation.mutate();
+                  }}
+                >
+                  <ArrowRight className="w-4 h-4 mr-2" />
+                  {convertMutation.isPending ? "Converting…" : "Yes, Convert"}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
