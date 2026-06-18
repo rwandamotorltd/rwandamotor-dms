@@ -58,9 +58,9 @@ jobs:
         id: vercel
         working-directory: frontend
         run: |
-          PREVIEW_URL=$(npx vercel deploy --no-prod \
+          PREVIEW_URL=$(npx vercel deploy \
             --token=${{ secrets.VERCEL_TOKEN }} \
-            --yes)
+            --yes 2>&1 | tail -1)
           echo "url=$PREVIEW_URL" >> $GITHUB_OUTPUT
 
       - name: Print preview URL
