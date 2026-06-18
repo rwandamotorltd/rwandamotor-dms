@@ -16,7 +16,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import {
   PhoneCall, PhoneOff, CalendarClock, Mail, MessageSquare,
-  Clock, AlertTriangle, CheckCircle2, Search, ExternalLink,
+  Clock, AlertTriangle, CheckCircle2, Search, ExternalLink, RefreshCw,
 } from "lucide-react";
 import { format, isAfter, parseISO } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -206,6 +206,7 @@ function FollowUpRow({ item, onAction }: { item: FollowUpListItem; onAction: () 
 
 export default function FollowUpsPage() {
   const searchParams = useSearchParams();
+  const qc = useQueryClient();
   const [search, setSearch]   = useState("");
   const [reason, setReason]   = useState(searchParams.get("reason") ?? "");
   const [status, setStatus]   = useState("");
@@ -214,6 +215,28 @@ export default function FollowUpsPage() {
   const { data = [], isLoading } = useQuery({
     queryKey: ["follow-ups", reason, status],
     queryFn: () => followUpsApi.list({ reason: reason || undefined, pageSize: 100 }),
+  });
+
+  const generateMutation = useMutation({
+    mutationFn: followUpsApi.generate,
+    onSuccess: (result) => {
+      const total = result.total ?? 0;
+      if (total === 0) {
+        toast.info("All follow-ups are already up to date");
+      } else {
+        toast.success(`Created ${total} follow-up${total !== 1 ? "s" : ""}`, {
+          description: [
+            result.serviceDueReminders > 0 && `${result.serviceDueReminders} service due`,
+            result.serviceDue15Days > 0    && `${result.serviceDue15Days} due in 15 days`,
+            result.lostRecovery > 0        && `${result.lostRecovery} lost recovery`,
+          ].filter(Boolean).join(" · "),
+        });
+      }
+      qc.invalidateQueries({ queryKey: ["follow-ups"] });
+      qc.invalidateQueries({ queryKey: ["notifications"] });
+      qc.invalidateQueries({ queryKey: ["dashboard-kpis"] });
+    },
+    onError: () => toast.error("Failed to generate follow-ups"),
   });
 
   const filtered = data.filter(f =>
@@ -230,6 +253,16 @@ export default function FollowUpsPage() {
           <h1 className="text-xl font-bold">Follow-ups</h1>
           <p className="text-sm text-muted-foreground">{filtered.length} follow-up{filtered.length !== 1 ? "s" : ""}</p>
         </div>
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-9 gap-1.5"
+          onClick={() => generateMutation.mutate()}
+          disabled={generateMutation.isPending}
+        >
+          <RefreshCw className={cn("w-3.5 h-3.5", generateMutation.isPending && "animate-spin")} />
+          {generateMutation.isPending ? "Syncing…" : "Sync Follow-ups"}
+        </Button>
       </div>
 
       <div className="flex gap-2 flex-wrap">
@@ -256,9 +289,28 @@ export default function FollowUpsPage() {
       {isLoading ? (
         Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-xl mb-2" />)
       ) : filtered.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
+        <div className="flex flex-col items-center justify-center py-20 text-muted-foreground text-center">
           <PhoneCall className="w-10 h-10 mb-3 opacity-30" />
-          <p>No follow-ups found</p>
+          <p className="font-medium text-foreground">No follow-ups yet</p>
+          {!search && !reason && !status ? (
+            <>
+              <p className="text-sm mt-1 max-w-xs">
+                Follow-ups are generated automatically each night from overdue and due-soon vehicles.
+                Click <strong>Sync</strong> to create them now.
+              </p>
+              <Button
+                size="sm"
+                className="mt-4 gap-1.5"
+                onClick={() => generateMutation.mutate()}
+                disabled={generateMutation.isPending}
+              >
+                <RefreshCw className={cn("w-3.5 h-3.5", generateMutation.isPending && "animate-spin")} />
+                {generateMutation.isPending ? "Syncing…" : "Generate Follow-ups Now"}
+              </Button>
+            </>
+          ) : (
+            <p className="text-sm mt-1">Try clearing the filters.</p>
+          )}
         </div>
       ) : (
         filtered.map(item => (

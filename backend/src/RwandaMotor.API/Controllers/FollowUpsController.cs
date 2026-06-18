@@ -59,6 +59,13 @@ public class FollowUpsController : ControllerBase
         await _mediator.Send(new CloseFollowUpCommand(id, req.Notes), ct);
         return Ok();
     }
+
+    [HttpPost("generate")]
+    public async Task<IActionResult> Generate(CancellationToken ct)
+    {
+        var result = await _mediator.Send(new GenerateFollowUpsCommand(), ct);
+        return Ok(result);
+    }
 }
 
 public record LogInteractionRequest(InteractionOutcome Outcome, string? Notes, DateTime? NextContactDate);

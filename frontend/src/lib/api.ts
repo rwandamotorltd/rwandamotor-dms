@@ -702,6 +702,8 @@ export const followUpsApi = {
     api.post<ApiResponse<boolean>>('/follow-ups/' + id + '/send-email', { emailType }).then(r => r.data),
   close: (id: string, notes?: string) =>
     api.post<ApiResponse<boolean>>('/follow-ups/' + id + '/close', { notes }).then(r => r.data),
+  generate: () =>
+    api.post<ApiResponse<{ serviceDueReminders: number; serviceDue15Days: number; lostRecovery: number; total: number }>>('/follow-ups/generate').then(r => r.data.data!),
 };
 
 // ============================================================
