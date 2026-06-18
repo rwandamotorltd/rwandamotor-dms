@@ -91,6 +91,7 @@ export function Header({ onMenuClick }: HeaderProps) {
     if (n.link) router.push(n.link);
     else if (n.followUpId) router.push("/follow-ups/" + n.followUpId);
     else if (n.appointmentId) router.push("/appointments");
+    else router.push("/follow-ups");
   }
 
   return (

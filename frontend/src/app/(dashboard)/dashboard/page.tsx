@@ -150,10 +150,10 @@ export default function DashboardPage() {
           <SectionDivider title="Follow-ups" />
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
             <KpiCard title="Active Follow-ups" value={kpis.activeFollowUps}      subtitle="Pending contact"     icon={Activity}      variant="info"    index={0} href="/follow-ups" />
-            <KpiCard title="Due Soon"          value={kpis.dueSoonVehicles}      subtitle="Needs outreach"      icon={Clock}         variant="warning" index={1} href="/follow-ups?reason=ServiceDueReminder" />
-            <KpiCard title="Overdue"           value={kpis.overdueVehicles}      subtitle="Missed interval"     icon={AlertTriangle} variant="warning" index={2} href="/follow-ups?reason=ServiceDueReminder" />
-            <KpiCard title="Lost"              value={kpis.lostVehicles}         subtitle="12m no service"      icon={AlertTriangle} variant="danger"  index={3} href="/follow-ups?reason=LostRecovery" />
-            <KpiCard title="Recovered"         value={kpis.recoveredVehicles}    subtitle="Returned for service" icon={RefreshCw}    variant="success" index={4} href="/follow-ups?reason=LostRecovery" />
+            <KpiCard title="Due Soon"          value={kpis.dueSoonVehicles}      subtitle="Needs outreach"      icon={Clock}         variant="warning" index={1} href="/retention" />
+            <KpiCard title="Overdue"           value={kpis.overdueVehicles}      subtitle="Missed interval"     icon={AlertTriangle} variant="warning" index={2} href="/retention" />
+            <KpiCard title="Lost"              value={kpis.lostVehicles}         subtitle="12m no service"      icon={AlertTriangle} variant="danger"  index={3} href="/retention" />
+            <KpiCard title="Recovered"         value={kpis.recoveredVehicles}    subtitle="Returned for service" icon={RefreshCw}    variant="success" index={4} href="/follow-ups" />
           </div>
         </>
       )}
