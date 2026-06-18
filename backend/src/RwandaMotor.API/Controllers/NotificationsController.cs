@@ -1,6 +1,7 @@
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using RwandaMotor.Application.Common.Models;
 using RwandaMotor.Application.Features.Notifications.Commands;
 using RwandaMotor.Application.Features.Notifications.Queries;
 
@@ -20,7 +21,7 @@ public class NotificationsController : ControllerBase
         [FromQuery] int page = 1, [FromQuery] int pageSize = 30, CancellationToken ct = default)
     {
         var result = await _mediator.Send(new GetNotificationsQuery(page, pageSize), ct);
-        return Ok(result);
+        return Ok(ApiResponse<NotificationsResultDto>.Ok(result));
     }
 
     [HttpPost("mark-read")]

@@ -1,6 +1,7 @@
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using RwandaMotor.Application.Common.Models;
 using RwandaMotor.Application.Features.FollowUps.Commands;
 using RwandaMotor.Application.Features.FollowUps.Queries;
 using RwandaMotor.Domain.Enums;
@@ -25,14 +26,14 @@ public class FollowUpsController : ControllerBase
         CancellationToken ct = default)
     {
         var result = await _mediator.Send(new GetFollowUpsQuery(reason, status, pageNumber, pageSize), ct);
-        return Ok(result);
+        return Ok(ApiResponse<List<FollowUpListItemDto>>.Ok(result));
     }
 
     [HttpGet("{id:guid}")]
     public async Task<IActionResult> GetDetail(Guid id, CancellationToken ct)
     {
         var result = await _mediator.Send(new GetFollowUpDetailQuery(id), ct);
-        return result is null ? NotFound() : Ok(result);
+        return result is null ? NotFound() : Ok(ApiResponse<FollowUpDetailDto>.Ok(result));
     }
 
     [HttpPost("{id:guid}/interactions")]
@@ -64,7 +65,7 @@ public class FollowUpsController : ControllerBase
     public async Task<IActionResult> Generate(CancellationToken ct)
     {
         var result = await _mediator.Send(new GenerateFollowUpsCommand(), ct);
-        return Ok(result);
+        return Ok(ApiResponse<GenerateFollowUpsResult>.Ok(result));
     }
 }
 

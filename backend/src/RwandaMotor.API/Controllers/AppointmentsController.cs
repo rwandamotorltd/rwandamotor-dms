@@ -1,6 +1,7 @@
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using RwandaMotor.Application.Common.Models;
 using RwandaMotor.Application.Features.Appointments.Commands;
 using RwandaMotor.Application.Features.Appointments.Queries;
 using RwandaMotor.Domain.Enums;
@@ -21,7 +22,7 @@ public class AppointmentsController : ControllerBase
         [FromQuery] DateTime from, [FromQuery] DateTime to, CancellationToken ct)
     {
         var result = await _mediator.Send(new GetAppointmentsQuery(from, to), ct);
-        return Ok(result);
+        return Ok(ApiResponse<List<AppointmentDto>>.Ok(result));
     }
 
     [HttpPost]
