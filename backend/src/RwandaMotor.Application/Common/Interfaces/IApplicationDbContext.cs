@@ -23,6 +23,9 @@ public interface IApplicationDbContext
     DbSet<PermissionGroup> PermissionGroups { get; }
     DbSet<CompanySettings> CompanySettings { get; }
     DbSet<AuditLog> AuditLogs { get; }
+    DbSet<FollowUpInteraction> FollowUpInteractions { get; }
+    DbSet<Appointment> Appointments { get; }
+    DbSet<Notification> Notifications { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

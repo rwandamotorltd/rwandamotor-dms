@@ -121,15 +121,11 @@ export default function DashboardPage() {
           {/* Fleet status breakdown (companion to retention) */}
           {showKpi && (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-              <KpiCard title="Total Vehicles"    value={kpis.totalVehicles}                          subtitle="All registered"          icon={Car}           variant="info"    index={0}  href="/vehicles" />
-              <KpiCard title="Dealership Fleet"  value={kpis.dealershipVehicles}                     subtitle="Sold by us"              icon={Car}           variant="purple"  index={1}  href="/vehicles?isSoldByDealership=true" />
-              <KpiCard title="Customers"         value={kpis.totalCustomers}                          subtitle="Total registered"        icon={Users}         variant="default" index={2}  href="/customers" />
-              <KpiCard title="Due Soon"          value={kpis.dueSoonVehicles}                         subtitle="Upcoming service"        icon={Clock}         variant="warning" index={3}  href="/vehicles?status=DueSoon" />
-              <KpiCard title="Lost Vehicles"     value={kpis.lostVehicles}                            subtitle="> 12 months overdue"     icon={AlertTriangle} variant="danger"  index={4}  href="/vehicles?status=Lost" />
-              <KpiCard title="Overdue"           value={kpis.overdueVehicles}                         subtitle="Missed interval"         icon={AlertTriangle} variant="warning" index={5}  href="/vehicles?status=Overdue" />
-              <KpiCard title="Recovered"         value={kpis.recoveredVehicles}                       subtitle="Returned after lost"     icon={RefreshCw}     variant="success" index={6}  href="/vehicles?status=Recovered" />
-              <KpiCard title="Monthly Services"  value={kpis.monthlyServiceCount}                     subtitle="This month"              icon={Wrench}        variant="default" index={7}  href="/service-records" />
-              <KpiCard title="6-Month Rate"      value={formatPercentage(kpis.sixMonthRetentionRate)} subtitle="Rolling 6 months"        icon={TrendingUp}    variant="success" index={8}  href="/retention" />
+              <KpiCard title="Total Vehicles"    value={kpis.totalVehicles}                          subtitle="All registered"   icon={Car}       variant="info"    index={0}  href="/vehicles" />
+              <KpiCard title="Dealership Fleet"  value={kpis.dealershipVehicles}                     subtitle="Sold by us"       icon={Car}       variant="purple"  index={1}  href="/vehicles?isSoldByDealership=true" />
+              <KpiCard title="Customers"         value={kpis.totalCustomers}                          subtitle="Total registered" icon={Users}     variant="default" index={2}  href="/customers" />
+              <KpiCard title="Monthly Services"  value={kpis.monthlyServiceCount}                     subtitle="This month"       icon={Wrench}    variant="default" index={3}  href="/service-records" />
+              <KpiCard title="6-Month Rate"      value={formatPercentage(kpis.sixMonthRetentionRate)} subtitle="Rolling 6 months" icon={TrendingUp} variant="success" index={4}  href="/retention" />
             </div>
           )}
         </>
@@ -139,15 +135,11 @@ export default function DashboardPage() {
       {showKpi && !showRetention && (
         <>
           <SectionDivider title="Fleet Status" />
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-            <KpiCard title="Total Vehicles"    value={kpis.totalVehicles}       subtitle="All registered"          icon={Car}           variant="info"    index={0}  href="/vehicles" />
-            <KpiCard title="Dealership Fleet"  value={kpis.dealershipVehicles}  subtitle="Sold by us"              icon={Car}           variant="purple"  index={1}  href="/vehicles?isSoldByDealership=true" />
-            <KpiCard title="Customers"         value={kpis.totalCustomers}       subtitle="Total registered"        icon={Users}         variant="default" index={2}  href="/customers" />
-            <KpiCard title="Due Soon"          value={kpis.dueSoonVehicles}      subtitle="Upcoming service"        icon={Clock}         variant="warning" index={3}  href="/vehicles?status=DueSoon" />
-            <KpiCard title="Lost Vehicles"     value={kpis.lostVehicles}         subtitle="> 12 months overdue"     icon={AlertTriangle} variant="danger"  index={4}  href="/vehicles?status=Lost" />
-            <KpiCard title="Overdue"           value={kpis.overdueVehicles}      subtitle="Missed interval"         icon={AlertTriangle} variant="warning" index={5}  href="/vehicles?status=Overdue" />
-            <KpiCard title="Recovered"         value={kpis.recoveredVehicles}    subtitle="Returned after lost"     icon={RefreshCw}     variant="success" index={6}  href="/vehicles?status=Recovered" />
-            <KpiCard title="Monthly Services"  value={kpis.monthlyServiceCount}  subtitle="This month"              icon={Wrench}        variant="default" index={7}  href="/service-records" />
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            <KpiCard title="Total Vehicles"    value={kpis.totalVehicles}       subtitle="All registered"   icon={Car}    variant="info"    index={0}  href="/vehicles" />
+            <KpiCard title="Dealership Fleet"  value={kpis.dealershipVehicles}  subtitle="Sold by us"       icon={Car}    variant="purple"  index={1}  href="/vehicles?isSoldByDealership=true" />
+            <KpiCard title="Customers"         value={kpis.totalCustomers}       subtitle="Total registered" icon={Users}  variant="default" index={2}  href="/customers" />
+            <KpiCard title="Monthly Services"  value={kpis.monthlyServiceCount}  subtitle="This month"       icon={Wrench} variant="default" index={3}  href="/service-records" />
           </div>
         </>
       )}
@@ -156,16 +148,12 @@ export default function DashboardPage() {
       {showKpi && (
         <>
           <SectionDivider title="Follow-ups" />
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <KpiCard
-              title="Active Follow-ups"
-              value={kpis.activeFollowUps}
-              subtitle="Pending contact"
-              icon={Activity}
-              variant="info"
-              index={0}
-              href="/retention"
-            />
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+            <KpiCard title="Active Follow-ups" value={kpis.activeFollowUps}      subtitle="Pending contact"     icon={Activity}      variant="info"    index={0} href="/follow-ups" />
+            <KpiCard title="Due Soon"          value={kpis.dueSoonVehicles}      subtitle="Needs outreach"      icon={Clock}         variant="warning" index={1} href="/follow-ups?reason=ServiceDueReminder" />
+            <KpiCard title="Overdue"           value={kpis.overdueVehicles}      subtitle="Missed interval"     icon={AlertTriangle} variant="warning" index={2} href="/follow-ups?reason=ServiceDueReminder" />
+            <KpiCard title="Lost"              value={kpis.lostVehicles}         subtitle="12m no service"      icon={AlertTriangle} variant="danger"  index={3} href="/follow-ups?reason=LostRecovery" />
+            <KpiCard title="Recovered"         value={kpis.recoveredVehicles}    subtitle="Returned for service" icon={RefreshCw}    variant="success" index={4} href="/follow-ups?reason=LostRecovery" />
           </div>
         </>
       )}

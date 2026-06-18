@@ -49,12 +49,25 @@ public class ServiceIntervalEngine : IServiceIntervalEngine
         if (!vehicle.LastServiceDate.HasValue && !vehicle.NextServiceDate.HasValue)
             return ServiceDueStatus.Active;
 
-        var nextDate = vehicle.NextServiceDate ?? vehicle.LastServiceDate!.Value.AddMonths(policy.IntervalMonths);
-        var daysUntilDue = (nextDate - now).TotalDays;
-        var monthsOverdue = (now - nextDate).TotalDays / 30.0;
+        // ── Month-based rules (from last service date) ──────────────────────
+        // Lost = 12 months since last service (whichever reference date is available)
+        // DueSoon = 6 months since last service
+        // These take priority and override NextServiceDate-based thresholds.
+        var lastService = vehicle.LastServiceDate ?? vehicle.SaleDate;
+        if (lastService.HasValue)
+        {
+            var monthsSinceService = (now - lastService.Value).TotalDays / 30.44;
 
-        if (monthsOverdue >= policy.LostThresholdMonths)
-            return ServiceDueStatus.Lost;
+            if (monthsSinceService >= 12)
+                return ServiceDueStatus.Lost;
+
+            if (monthsSinceService >= 6)
+                return ServiceDueStatus.Overdue; // 6-9m = overdue (past scheduled service)
+        }
+
+        // ── NextServiceDate-based rules (whichever triggers first) ──────────
+        var nextDate = vehicle.NextServiceDate ?? lastService!.Value.AddMonths(policy.IntervalMonths);
+        var daysUntilDue = (nextDate - now).TotalDays;
 
         if (daysUntilDue < 0)
             return ServiceDueStatus.Overdue;
@@ -62,7 +75,7 @@ public class ServiceIntervalEngine : IServiceIntervalEngine
         if (daysUntilDue <= policy.DueSoonLeadDays)
             return ServiceDueStatus.DueSoon;
 
-        // Also check mileage proximity if current mileage is known
+        // ── Mileage proximity ───────────────────────────────────────────────
         if (vehicle.CurrentMileage.HasValue && vehicle.NextServiceMileage.HasValue)
         {
             var kmUntilDue = vehicle.NextServiceMileage.Value - vehicle.CurrentMileage.Value;

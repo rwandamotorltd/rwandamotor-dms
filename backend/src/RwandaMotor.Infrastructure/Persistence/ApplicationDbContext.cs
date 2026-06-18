@@ -34,6 +34,9 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>, IApplica
     public DbSet<PermissionGroup> PermissionGroups => Set<PermissionGroup>();
     public DbSet<CompanySettings> CompanySettings => Set<CompanySettings>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+    public DbSet<FollowUpInteraction> FollowUpInteractions => Set<FollowUpInteraction>();
+    public DbSet<Appointment> Appointments => Set<Appointment>();
+    public DbSet<Notification> Notifications => Set<Notification>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -55,6 +58,9 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>, IApplica
         builder.Entity<ImportLogRow>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<JobCard>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<SalesHistory>().HasQueryFilter(e => !e.IsDeleted);
+        builder.Entity<FollowUpInteraction>().HasQueryFilter(e => !e.IsDeleted);
+        builder.Entity<Appointment>().HasQueryFilter(e => !e.IsDeleted);
+        builder.Entity<Notification>().HasQueryFilter(e => !e.IsDeleted);
 
         // Store accessories list as a JSON column
         builder.Entity<JobCard>()

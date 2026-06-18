@@ -1,12 +1,12 @@
 # ── .NET ──────────────────────────────────────────────────────────────────────
-bin/
-obj/
+**/bin/
+**/obj/
 *.user
 *.suo
 .vs/
 *.swp
 *.log
-logs/
+**/logs/
 publish/
 
 # Never commit local/dev secrets

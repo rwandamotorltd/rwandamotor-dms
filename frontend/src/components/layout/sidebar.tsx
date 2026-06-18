@@ -7,7 +7,8 @@ import { motion } from "framer-motion";
 import {
   LayoutDashboard, Car, Users, Wrench, TrendingUp,
   Upload, Settings, LogOut, Shield, ChevronLeft, ChevronRight,
-  Activity, X, ClipboardList, History, ShoppingCart
+  Activity, X, ClipboardList, History, ShoppingCart,
+  PhoneCall, CalendarDays, BarChart2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/auth-context";
@@ -29,6 +30,9 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/service-records",   label: "Service Records", icon: Wrench,          permission: "nav.serviceRecords" },
   { href: "/job-cards",         label: "Job Cards",       icon: ClipboardList,   permission: "nav.jobCards" },
   { href: "/retention",         label: "Retention",       icon: TrendingUp,      permission: "nav.retention" },
+  { href: "/follow-ups",        label: "Follow-ups",      icon: PhoneCall,       permission: "nav.retention" },
+  { href: "/appointments",      label: "Appointments",    icon: CalendarDays,    permission: "nav.retention" },
+  { href: "/reports",           label: "Reports",         icon: BarChart2,       permission: "nav.retention" },
   { href: "/import",            label: "Import Center",   icon: Upload,          permission: "nav.import" },
   { href: "/sales",             label: "Sales Records",   icon: ShoppingCart,    permission: "nav.sales" },
   { href: "/activity",          label: "Activity Log",    icon: History,         permission: "nav.activity" },

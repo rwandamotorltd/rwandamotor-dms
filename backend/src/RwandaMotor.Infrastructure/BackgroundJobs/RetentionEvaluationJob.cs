@@ -9,7 +9,15 @@ using RwandaMotor.Infrastructure.Services;
 
 namespace RwandaMotor.Infrastructure.BackgroundJobs;
 
-/// <summary>Runs nightly: recalculates retention status then emails a summary of newly-due vehicles.</summary>
+/// <summary>
+/// Runs nightly:
+///  1. Recalculates retention status for all dealership vehicles
+///  2. Creates 6-month proactive follow-ups (ServiceDueReminder)
+///  3. Creates 15-day specific follow-ups (ServiceDueReminder — near date)
+///  4. Creates Lost recovery follow-ups for newly-lost vehicles
+///  5. Creates in-app notifications for all new follow-ups
+///  6. Emails the admin a service-due summary
+/// </summary>
 [DisallowConcurrentExecution]
 public class RetentionEvaluationJob : IJob
 {
@@ -40,9 +48,11 @@ public class RetentionEvaluationJob : IJob
         try
         {
             await _engine.EvaluateAllVehiclesAsync(ct);
-            _logger.LogInformation("RetentionEvaluationJob completed at {Time}", DateTime.UtcNow);
+            _logger.LogInformation("RetentionEvaluationJob: retention evaluated");
 
+            await CreateSixMonthFollowUpsAsync(ct);
             await CreateServiceDueRemindersAsync(ct);
+            await CreateLostRecoveryFollowUpsAsync(ct);
             await SendServiceAlertAsync(ct);
         }
         catch (Exception ex)
@@ -52,13 +62,83 @@ public class RetentionEvaluationJob : IJob
         }
     }
 
+    // ── 6-month proactive outreach ──────────────────────────────────────────
+    private async Task CreateSixMonthFollowUpsAsync(CancellationToken ct)
+    {
+        var today = DateTime.UtcNow.Date;
+        // Vehicles whose last service was between 6m and 6m+2d ago (2-day window avoids re-triggering)
+        var from6m = today.AddMonths(-6).AddDays(-2);
+        var to6m   = today.AddMonths(-6);
+
+        var vehicles = await _db.Vehicles
+            .Include(v => v.Customer)
+            .Where(v => !v.IsDeleted
+                && v.IsSoldByDealership
+                && v.CustomerId.HasValue
+                && v.LastServiceDate.HasValue
+                && v.LastServiceDate.Value.Date >= from6m
+                && v.LastServiceDate.Value.Date <= to6m)
+            .ToListAsync(ct);
+
+        if (vehicles.Count == 0) return;
+
+        var vehicleIds = vehicles.Select(v => v.Id).ToList();
+        var existing = await _db.FollowUps
+            .Where(f => !f.IsDeleted
+                && vehicleIds.Contains(f.VehicleId)
+                && f.Reason == "ServiceDueReminder"
+                && f.Status == FollowUpStatus.Pending)
+            .Select(f => f.VehicleId)
+            .ToHashSetAsync(ct);
+
+        var created = 0;
+        foreach (var v in vehicles)
+        {
+            if (existing.Contains(v.Id)) continue;
+
+            var followUp = new FollowUp
+            {
+                VehicleId     = v.Id,
+                CustomerId    = v.CustomerId!.Value,
+                Status        = FollowUpStatus.Pending,
+                Priority      = FollowUpPriority.High,
+                ContactMethod = ContactMethod.Phone,
+                Reason        = "ServiceDueReminder",
+                Notes         = $"6-month service outreach. Last service: {v.LastServiceDate!.Value:dd MMM yyyy}. Contact customer to schedule their next service and remind them to use genuine parts.",
+                DueDate       = today,
+                CreatedBy     = "System"
+            };
+            _db.FollowUps.Add(followUp);
+
+            _db.Notifications.Add(new Notification
+            {
+                Title         = "6-Month Service Follow-up Due",
+                Message       = $"{v.Customer?.FullName ?? "Customer"} — {v.PlateNumber ?? v.VIN} hasn't been in for service in 6 months.",
+                Type          = NotificationType.ServiceDueSoon,
+                VehicleId     = v.Id,
+                CustomerId    = v.CustomerId,
+                Link          = $"/follow-ups",
+                CreatedBy     = "System"
+            });
+
+            created++;
+        }
+
+        if (created > 0)
+        {
+            await _db.SaveChangesAsync(ct);
+            _logger.LogInformation("Created {Count} 6-month service follow-ups", created);
+        }
+    }
+
+    // ── 15-day specific service-date reminders ──────────────────────────────
     private async Task CreateServiceDueRemindersAsync(CancellationToken ct)
     {
-        var today    = DateTime.UtcNow.Date;
-        var cutoff   = today.AddDays(15);
+        var today  = DateTime.UtcNow.Date;
+        var cutoff = today.AddDays(15);
 
-        // Find dealership vehicles whose service is due within the next 15 days
         var vehicles = await _db.Vehicles
+            .Include(v => v.Customer)
             .Where(v => !v.IsDeleted
                 && v.IsSoldByDealership
                 && v.CustomerId.HasValue
@@ -69,11 +149,10 @@ public class RetentionEvaluationJob : IJob
 
         if (vehicles.Count == 0) return;
 
-        // Load existing pending ServiceDueReminder vehicle IDs in one query
         var vehicleIds = vehicles.Select(v => v.Id).ToList();
-        var alreadyRemindered = await _db.FollowUps
+        var existing = await _db.FollowUps
             .Where(f => !f.IsDeleted
-                && f.Reason == "ServiceDueReminder"
+                && f.Reason == "ServiceDue15Days"
                 && f.Status == FollowUpStatus.Pending
                 && vehicleIds.Contains(f.VehicleId))
             .Select(f => f.VehicleId)
@@ -82,34 +161,114 @@ public class RetentionEvaluationJob : IJob
         var created = 0;
         foreach (var v in vehicles)
         {
-            if (alreadyRemindered.Contains(v.Id)) continue;
+            if (existing.Contains(v.Id)) continue;
 
-            // DueDate = 5 days before service, but never in the past
             var dueDate = v.NextServiceDate!.Value.Date.AddDays(-5);
             if (dueDate < today) dueDate = today;
 
-            _db.FollowUps.Add(new FollowUp
+            var followUp = new FollowUp
             {
-                VehicleId      = v.Id,
-                CustomerId     = v.CustomerId!.Value,
-                Status         = FollowUpStatus.Pending,
-                Priority       = FollowUpPriority.High,
-                ContactMethod  = ContactMethod.Phone,
-                Reason         = "ServiceDueReminder",
-                Notes          = $"Service due on {v.NextServiceDate.Value:dd MMM yyyy}. Contact customer to schedule a service appointment and remind them to use genuine parts.",
-                DueDate        = dueDate,
-                CreatedBy      = "System"
+                VehicleId     = v.Id,
+                CustomerId    = v.CustomerId!.Value,
+                Status        = FollowUpStatus.Pending,
+                Priority      = FollowUpPriority.High,
+                ContactMethod = ContactMethod.Phone,
+                Reason        = "ServiceDue15Days",
+                Notes         = $"Service due on {v.NextServiceDate.Value:dd MMM yyyy}. Call customer to confirm appointment and remind them to use genuine parts.",
+                DueDate       = dueDate,
+                CreatedBy     = "System"
+            };
+            _db.FollowUps.Add(followUp);
+
+            _db.Notifications.Add(new Notification
+            {
+                Title     = "Service Due in 15 Days",
+                Message   = $"{v.Customer?.FullName ?? "Customer"} — {v.PlateNumber ?? v.VIN} service due {v.NextServiceDate.Value:dd MMM yyyy}.",
+                Type      = NotificationType.ServiceDue15Days,
+                VehicleId = v.Id,
+                CustomerId= v.CustomerId,
+                Link      = "/follow-ups",
+                CreatedBy = "System"
             });
+
             created++;
         }
 
         if (created > 0)
         {
             await _db.SaveChangesAsync(ct);
-            _logger.LogInformation("Created {Count} ServiceDueReminder follow-ups", created);
+            _logger.LogInformation("Created {Count} 15-day service-due follow-ups", created);
         }
     }
 
+    // ── Lost customer recovery follow-ups ───────────────────────────────────
+    private async Task CreateLostRecoveryFollowUpsAsync(CancellationToken ct)
+    {
+        var today = DateTime.UtcNow.Date;
+
+        var lostVehicles = await _db.Vehicles
+            .Include(v => v.Customer)
+            .Where(v => !v.IsDeleted
+                && v.IsSoldByDealership
+                && v.CustomerId.HasValue
+                && v.RetentionStatus == RetentionStatus.Lost
+                // Only newly-lost today to avoid duplicate follow-ups
+                && v.RetentionStatusUpdatedAt.HasValue
+                && v.RetentionStatusUpdatedAt.Value.Date == today)
+            .ToListAsync(ct);
+
+        if (lostVehicles.Count == 0) return;
+
+        var vehicleIds = lostVehicles.Select(v => v.Id).ToList();
+        var existing = await _db.FollowUps
+            .Where(f => !f.IsDeleted
+                && f.Reason == "LostRecovery"
+                && f.Status == FollowUpStatus.Pending
+                && vehicleIds.Contains(f.VehicleId))
+            .Select(f => f.VehicleId)
+            .ToHashSetAsync(ct);
+
+        var created = 0;
+        foreach (var v in lostVehicles)
+        {
+            if (existing.Contains(v.Id)) continue;
+
+            var followUp = new FollowUp
+            {
+                VehicleId     = v.Id,
+                CustomerId    = v.CustomerId!.Value,
+                Status        = FollowUpStatus.Pending,
+                Priority      = FollowUpPriority.Critical,
+                ContactMethod = ContactMethod.Phone,
+                Reason        = "LostRecovery",
+                Notes         = $"Customer has not returned for 12 months (last service: {v.LastServiceDate?.ToString("dd MMM yyyy") ?? "unknown"}). Priority recovery outreach — contact to understand why and offer incentive to return.",
+                DueDate       = today,
+                CreatedBy     = "System"
+            };
+            _db.FollowUps.Add(followUp);
+
+            _db.Notifications.Add(new Notification
+            {
+                Title     = "Customer Marked Lost",
+                Message   = $"{v.Customer?.FullName ?? "Customer"} — {v.PlateNumber ?? v.VIN} has not returned in 12 months. Recovery follow-up created.",
+                Type      = NotificationType.CustomerLost,
+                VehicleId = v.Id,
+                CustomerId= v.CustomerId,
+                Link      = "/follow-ups",
+                CreatedBy = "System"
+            });
+
+            created++;
+        }
+
+        if (created > 0)
+        {
+            await _db.SaveChangesAsync(ct);
+            _logger.LogInformation("Created {Count} lost-customer recovery follow-ups", created);
+        }
+    }
+
+    // ── Admin email alert ───────────────────────────────────────────────────
     private async Task SendServiceAlertAsync(CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(_smtp.AlertRecipient))
@@ -137,13 +296,13 @@ public class RetentionEvaluationJob : IJob
             return;
         }
 
-        var dueSoon  = vehicles.Where(v => v.RetentionStatus == RetentionStatus.DueSoon).ToList();
-        var overdue  = vehicles.Where(v => v.RetentionStatus == RetentionStatus.Overdue).ToList();
+        var dueSoon = vehicles.Where(v => v.RetentionStatus == RetentionStatus.DueSoon).ToList();
+        var overdue = vehicles.Where(v => v.RetentionStatus == RetentionStatus.Overdue).ToList();
 
         var rows = new System.Text.StringBuilder();
         foreach (var v in vehicles)
         {
-            var badge = v.RetentionStatus == RetentionStatus.Overdue
+            var badge   = v.RetentionStatus == RetentionStatus.Overdue
                 ? "<span style='color:#c92a2a;font-weight:600'>Overdue</span>"
                 : "<span style='color:#e67700;font-weight:600'>Due Soon</span>";
             var lastSvc = v.LastServiceDate.HasValue ? v.LastServiceDate.Value.ToString("dd MMM yyyy") : "Never";
