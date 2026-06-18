@@ -65,11 +65,12 @@ function NewAppointmentDialog({ open, onClose }: { open: boolean; onClose: () =>
   const [technicianId,setTechnicianId]= useState("");
   const [notes,       setNotes]       = useState("");
 
-  const { data: vehicles = [] } = useQuery({
+  const { data: vehicleResult } = useQuery({
     queryKey: ["vehicle-search", plate],
     queryFn: () => vehiclesApi.list({ search: plate, pageSize: 8 }),
     enabled: plate.length >= 2,
   });
+  const vehicles = vehicleResult?.items ?? [];
 
   const { data: techs = [] } = useQuery({
     queryKey: ["technicians"],
