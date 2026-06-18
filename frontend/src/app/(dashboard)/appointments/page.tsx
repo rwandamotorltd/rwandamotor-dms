@@ -4,8 +4,9 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   appointmentsApi, vehiclesApi, techniciansApi,
-  type AppointmentDto, type BookAppointmentPayload,
+  type AppointmentDto, type BookAppointmentPayload, type TechnicianItem,
 } from "@/lib/api";
+import type { VehicleListItem } from "@/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,7 +22,7 @@ import {
 } from "lucide-react";
 import {
   format, startOfWeek, endOfWeek, addWeeks, subWeeks,
-  isSameDay, isToday, parseISO, addDays,
+  isToday, parseISO, addDays,
 } from "date-fns";
 import { cn } from "@/lib/utils";
 
@@ -95,11 +96,11 @@ function NewAppointmentDialog({ open, onClose }: { open: boolean; onClose: () =>
     setTechnicianId(""); setNotes("");
   }
 
-  function selectVehicle(v: { id: string; licensePlate: string; customerName?: string; customerId?: string }) {
-    setPlate(v.licensePlate);
+  function selectVehicle(v: VehicleListItem) {
+    setPlate(v.plateNumber ?? v.vin);
     setVehicleId(v.id);
-    setCustomerId((v as any).customerId ?? "");
-    setCustomerName((v as any).customerName ?? "");
+    setCustomerId(v.customerId ?? "");
+    setCustomerName(v.customerName ?? "");
   }
 
   function submit() {
@@ -135,14 +136,14 @@ function NewAppointmentDialog({ open, onClose }: { open: boolean; onClose: () =>
               />
               {showDropdown && (
                 <div className="absolute z-50 top-full mt-1 w-full rounded-lg border bg-popover shadow-md overflow-hidden">
-                  {vehicles.map((v: any) => (
+                  {vehicles.map((v) => (
                     <button
                       key={v.id}
                       className="w-full text-left px-3 py-2 text-sm hover:bg-muted flex items-center gap-2"
                       onClick={() => selectVehicle(v)}
                     >
-                      <span className="font-medium">{v.licensePlate}</span>
-                      <span className="text-muted-foreground">{v.brand} {v.model} {v.year}</span>
+                      <span className="font-medium">{v.plateNumber ?? v.vin}</span>
+                      <span className="text-muted-foreground">{v.brandName} {v.modelName} {v.year}</span>
                       {v.customerName && <span className="ml-auto text-xs text-muted-foreground">{v.customerName}</span>}
                     </button>
                   ))}
@@ -204,7 +205,7 @@ function NewAppointmentDialog({ open, onClose }: { open: boolean; onClose: () =>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="">Any available</SelectItem>
-                  {techs.map((t: any) => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
+                  {techs.map((t: TechnicianItem) => <SelectItem key={t.id} value={t.id}>{t.fullName}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -262,7 +263,7 @@ function ApptRow({ appt }: { appt: AppointmentDto }) {
           <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{appt.durationMinutes}m</span>
           {appt.technicianName && <span>{appt.technicianName}</span>}
         </div>
-        {appt.notes && <p className="text-xs text-muted-foreground italic mt-0.5">"{appt.notes}"</p>}
+        {appt.notes && <p className="text-xs text-muted-foreground italic mt-0.5">&quot;{appt.notes}&quot;</p>}
       </div>
       {pending && (
         <div className="flex gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">

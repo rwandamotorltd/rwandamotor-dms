@@ -348,7 +348,7 @@ export default function FollowUpDetailPage() {
             <Clock className="w-4 h-4 text-muted-foreground" />
             <span>Due: <strong>{format(parseISO(data.dueDate), "dd MMM yyyy")}</strong></span>
           </div>
-          {data.notes && <p className="text-sm text-muted-foreground italic">"{data.notes}"</p>}
+          {data.notes && <p className="text-sm text-muted-foreground italic">&quot;{data.notes}&quot;</p>}
         </CardContent>
       </Card>
 
