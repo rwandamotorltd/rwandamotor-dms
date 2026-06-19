@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, Suspense } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { jobCardsApi, companySettingsApi, techniciansApi } from "@/lib/api";
 import type { CompanySettings, ServiceType, FuelLevel } from "@/types";
@@ -526,6 +526,14 @@ interface EditForm {
 }
 
 export default function JobCardDetailPage() {
+  return (
+    <Suspense>
+      <JobCardDetailContent />
+    </Suspense>
+  );
+}
+
+function JobCardDetailContent() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const searchParams = useSearchParams();

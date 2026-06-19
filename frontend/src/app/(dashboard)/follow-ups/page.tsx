@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter, useSearchParams } from "next/navigation";
 import { followUpsApi, type FollowUpListItem } from "@/lib/api";
@@ -206,6 +206,14 @@ function FollowUpRow({ item, onAction }: { item: FollowUpListItem; onAction: () 
 // ─── Page ──────────────────────────────────────────────────────────────────────
 
 export default function FollowUpsPage() {
+  return (
+    <Suspense>
+      <FollowUpsContent />
+    </Suspense>
+  );
+}
+
+function FollowUpsContent() {
   const { hasPermission } = useAuth();
   const searchParams = useSearchParams();
 

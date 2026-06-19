@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, Suspense } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
@@ -142,6 +142,14 @@ function exportVehiclesToCsv(rows: VehicleListItem[]) {
 
 // ─── Main Page ──────────────────────────────────────────────────
 export default function VehiclesPage() {
+  return (
+    <Suspense>
+      <VehiclesContent />
+    </Suspense>
+  );
+}
+
+function VehiclesContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
