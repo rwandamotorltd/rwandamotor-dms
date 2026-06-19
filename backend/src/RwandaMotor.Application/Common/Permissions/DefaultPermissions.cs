@@ -10,6 +10,9 @@ public static class DefaultPermissions
     public const string NavServiceRecords = "nav.serviceRecords";
     public const string NavJobCards       = "nav.jobCards";
     public const string NavRetention      = "nav.retention";
+    public const string NavFollowUps      = "nav.followUps";
+    public const string NavAppointments   = "nav.appointments";
+    public const string NavReports        = "nav.reports";
     public const string NavImport         = "nav.import";
     public const string NavSettings        = "nav.settings";
     public const string NavActivity        = "nav.activity";
@@ -41,6 +44,14 @@ public static class DefaultPermissions
     // ── Retention ─────────────────────────────────────────────────────────────
     public const string RetentionManage = "retention.manage";
 
+    // ── Follow-ups ────────────────────────────────────────────────────────────
+    public const string FollowUpsView   = "followUps.view";
+    public const string FollowUpsManage = "followUps.manage";
+
+    // ── Appointments ──────────────────────────────────────────────────────────
+    public const string AppointmentsView   = "appointments.view";
+    public const string AppointmentsManage = "appointments.manage";
+
     // ── Settings ──────────────────────────────────────────────────────────────
     public const string SettingsUsers   = "settings.users";
     public const string SettingsCompany = "settings.company";
@@ -55,12 +66,15 @@ public static class DefaultPermissions
     public static readonly List<string> All = new()
     {
         NavDashboard, NavVehicles, NavCustomers, NavServiceRecords,
-        NavJobCards, NavRetention, NavImport, NavSettings, NavActivity, NavSales,
+        NavJobCards, NavRetention, NavFollowUps, NavAppointments, NavReports,
+        NavImport, NavSettings, NavActivity, NavSales,
         JobCardsCreate, JobCardsEdit, JobCardsDelete, JobCardsConvert, JobCardsPrint, JobCardsShare,
         VehiclesCreate, VehiclesEdit, VehiclesDelete,
         CustomersCreate, CustomersEdit, CustomersDelete,
         ServiceRecordsCreate, ServiceRecordsEdit, ServiceRecordsDelete,
         RetentionManage,
+        FollowUpsView, FollowUpsManage,
+        AppointmentsView, AppointmentsManage,
         SettingsUsers, SettingsCompany, SettingsGroups,
         DashboardKpi, DashboardRetention, DashboardJobCardsWidget,
     };
@@ -73,20 +87,33 @@ public static class DefaultPermissions
         "CRMOfficer" => new()
         {
             NavDashboard, NavVehicles, NavCustomers, NavServiceRecords,
-            NavJobCards, NavRetention, NavImport, NavSales,
+            NavJobCards, NavRetention, NavFollowUps, NavAppointments, NavReports, NavImport, NavSales,
             JobCardsCreate, JobCardsEdit, JobCardsConvert, JobCardsPrint, JobCardsShare,
             VehiclesCreate, VehiclesEdit,
             CustomersCreate, CustomersEdit,
             ServiceRecordsCreate, ServiceRecordsEdit,
             RetentionManage,
+            FollowUpsView, FollowUpsManage,
+            AppointmentsView, AppointmentsManage,
             DashboardKpi, DashboardRetention, DashboardJobCardsWidget,
         },
 
         "TechnicalDirector" => new()
         {
             NavDashboard, NavVehicles, NavCustomers,
-            NavServiceRecords, NavJobCards, NavRetention,
+            NavServiceRecords, NavJobCards, NavRetention, NavAppointments, NavReports,
+            AppointmentsView, AppointmentsManage,
             DashboardKpi, DashboardRetention, DashboardJobCardsWidget,
+        },
+
+        // CRE: Customer Relation Executive — focuses on customer outreach
+        "CRE" => new()
+        {
+            NavDashboard, NavCustomers, NavVehicles,
+            NavFollowUps, NavAppointments,
+            FollowUpsView, FollowUpsManage,
+            AppointmentsView, AppointmentsManage,
+            DashboardKpi,
         },
 
         _ => new() { NavDashboard },

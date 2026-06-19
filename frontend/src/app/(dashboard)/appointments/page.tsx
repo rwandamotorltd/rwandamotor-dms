@@ -25,6 +25,7 @@ import {
   isToday, parseISO, addDays,
 } from "date-fns";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/contexts/auth-context";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -317,6 +318,7 @@ function DayGroup({ day, appointments }: { day: Date; appointments: AppointmentD
 // ─── Page ──────────────────────────────────────────────────────────────────────
 
 export default function AppointmentsPage() {
+  const { hasPermission } = useAuth();
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date(), { weekStartsOn: 1 }));
   const [showNew, setShowNew]     = useState(false);
   const [statusFilter, setStatusFilter] = useState("");
@@ -344,6 +346,16 @@ export default function AppointmentsPage() {
   }
 
   const pendingCount = appointments.filter(a => PENDING.has(a.status)).length;
+
+  if (!hasPermission("appointments.view") && !hasPermission("appointments.manage")) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 gap-3 text-center">
+        <AlertTriangle className="w-10 h-10 text-muted-foreground" />
+        <p className="font-medium text-muted-foreground">Access restricted</p>
+        <p className="text-sm text-muted-foreground">You do not have permission to view appointments.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="p-4 md:p-6 space-y-4 max-w-3xl mx-auto">

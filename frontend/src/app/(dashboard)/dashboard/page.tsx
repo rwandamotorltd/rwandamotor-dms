@@ -38,30 +38,46 @@ function SectionDivider({ title }: { title: string }) {
   );
 }
 
-export default function DashboardPage() {
-  const { hasPermission } = useAuth();
+function getGreeting() {
+  const h = new Date().getHours();
+  if (h < 12) return "Good morning";
+  if (h < 17) return "Good afternoon";
+  return "Good evening";
+}
 
-  const showKpi       = hasPermission("dashboard.kpi");
-  const showRetention = hasPermission("dashboard.retention");
-  const showJobCards  = hasPermission("dashboard.jobCardsWidget");
+export default function DashboardPage() {
+  const { user, hasPermission } = useAuth();
+
+  const showKpi         = hasPermission("dashboard.kpi");
+  const showRetention   = hasPermission("dashboard.retention");
+  const showJobCards    = hasPermission("dashboard.jobCardsWidget");
+  const showFollowUps   = hasPermission("followUps.view") || hasPermission("followUps.manage");
+  const showAppts       = hasPermission("appointments.view") || hasPermission("appointments.manage");
+
+  const needsKpiData = showKpi || showRetention || showJobCards;
 
   const { data, isLoading } = useQuery({
     queryKey: ["dashboard-kpis"],
     queryFn: dashboardApi.getKpis,
+    enabled: needsKpiData,
     refetchInterval: 5 * 60_000,
   });
 
-  if (isLoading) return <DashboardSkeleton showKpi={showKpi} showRetention={showRetention} showJobCards={showJobCards} />;
   const kpis = data;
-  if (!kpis) return null;
+  const firstName = user?.fullName?.split(" ")[0] ?? "";
 
-  const statusDistribution = [
+  const statusDistribution = kpis ? [
     { name: "Active",    value: kpis.activeVehicles,    color: STATUS_COLORS.Active },
     { name: "Due Soon",  value: kpis.dueSoonVehicles,   color: STATUS_COLORS.DueSoon },
     { name: "Overdue",   value: kpis.overdueVehicles,   color: STATUS_COLORS.Overdue },
     { name: "Lost",      value: kpis.lostVehicles,      color: STATUS_COLORS.Lost },
     { name: "Recovered", value: kpis.recoveredVehicles, color: STATUS_COLORS.Recovered },
-  ];
+  ] : [];
+
+  if (isLoading && needsKpiData) return (
+    <DashboardSkeleton showKpi={showKpi} showRetention={showRetention} showJobCards={showJobCards} />
+  );
+  if (needsKpiData && !kpis) return null;
 
   return (
     <div className="space-y-5">
@@ -69,9 +85,11 @@ export default function DashboardPage() {
       <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}>
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-2xl font-bold tracking-tight">Good morning 👋</h2>
+            <h2 className="text-2xl font-bold tracking-tight">
+              {getGreeting()}{firstName ? `, ${firstName}` : ""} 👋
+            </h2>
             <p className="text-muted-foreground text-sm mt-0.5">
-              Here&apos;s what&apos;s happening with your fleet today.
+              Here&apos;s your overview for today.
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -268,8 +286,39 @@ export default function DashboardPage() {
         </>
       )}
 
+      {/* ──────────────────────── FOLLOW-UPS / APPOINTMENTS QUICK LINKS ──────────────────────── */}
+      {(showFollowUps || showAppts) && !showRetention && (
+        <>
+          <SectionDivider title="My Work" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {showFollowUps && kpis && (
+              <KpiCard
+                title="Active Follow-ups"
+                value={kpis.activeFollowUps}
+                subtitle="Pending customer contact"
+                icon={Activity}
+                variant="warning"
+                index={0}
+                href="/follow-ups"
+              />
+            )}
+            {showAppts && kpis && (
+              <KpiCard
+                title="Overdue Vehicles"
+                value={kpis.overdueVehicles}
+                subtitle="Need scheduling"
+                icon={AlertTriangle}
+                variant="danger"
+                index={1}
+                href="/appointments"
+              />
+            )}
+          </div>
+        </>
+      )}
+
       {/* Empty state for very restricted users */}
-      {!showKpi && !showRetention && !showJobCards && (
+      {!showKpi && !showRetention && !showJobCards && !showFollowUps && !showAppts && (
         <Card>
           <CardContent className="py-16 text-center text-muted-foreground text-sm">
             No dashboard widgets are enabled for your account. Contact your administrator.

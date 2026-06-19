@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { format, isAfter, parseISO } from "date-fns";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/contexts/auth-context";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -205,7 +206,9 @@ function FollowUpRow({ item, onAction }: { item: FollowUpListItem; onAction: () 
 // ─── Page ──────────────────────────────────────────────────────────────────────
 
 export default function FollowUpsPage() {
+  const { hasPermission } = useAuth();
   const searchParams = useSearchParams();
+
   const qc = useQueryClient();
   const [search, setSearch]   = useState("");
   const [reason, setReason]   = useState(searchParams.get("reason") ?? "");
@@ -245,6 +248,16 @@ export default function FollowUpsPage() {
     f.customerName.toLowerCase().includes(search.toLowerCase()) ||
     (f.customerPhone ?? "").includes(search)
   ).filter(f => !status || f.status === status);
+
+  if (!hasPermission("followUps.view") && !hasPermission("followUps.manage")) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 gap-3 text-center">
+        <AlertTriangle className="w-10 h-10 text-muted-foreground" />
+        <p className="font-medium text-muted-foreground">Access restricted</p>
+        <p className="text-sm text-muted-foreground">You do not have permission to view follow-ups.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="p-4 md:p-6 space-y-4 max-w-5xl mx-auto">
