@@ -2,7 +2,33 @@
   "permissions": {
     "allow": [
       "PowerShell(node --version 2>$null)",
-      "PowerShell(npm --version 2>$null)"
+      "PowerShell(npm --version 2>$null)",
+      "Bash(npm run *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Bash(dotnet build *)",
+      "Bash(git add *)",
+      "Bash(gh run *)",
+      "mcp__visualize__read_me",
+      "mcp__visualize__show_widget",
+      "Bash(npx tsc *)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\APC\\\\Claude\\\\Projects\\\\CSSR\" -Directory)",
+      "Bash(Select-Object Name)",
+      "Bash(dotnet ef *)",
+      "PowerShell(git add \"frontend/src/app/\\(dashboard\\)/job-cards/page.tsx\")",
+      "Bash(mkdir -p \"C:/Users/APC/Claude/Projects/CSSR/frontend/src/app/\\(dashboard\\)/follow-ups\" && mkdir -p \"C:/Users/APC/Claude/Projects/CSSR/frontend/src/app/\\(dashboard\\)/follow-ups/[id]\" && mkdir -p \"C:/Users/APC/Claude/Projects/CSSR/frontend/src/app/\\(dashboard\\)/appointments\" && mkdir -p \"C:/Users/APC/Claude/Projects/CSSR/frontend/src/app/\\(dashboard\\)/reports/follow-ups\")",
+      "Bash(grep -v \"//\\\\|Designer\\\\|Snapshot\")",
+      "PowerShell(cd \"C:\\\\Users\\\\APC\\\\Claude\\\\Projects\\\\CSSR\\\\backend\"; dotnet build src/RwandaMotor.Infrastructure 2>&1 | Where-Object { $_ -match \"error CS|error :|warning CS|Build succeeded|FAILED\" } | Select-Object -Last 20)",
+      "Bash(sshpass -p 'Mukwagatandatu@2026' ssh -o StrictHostKeyChecking=no rwandamotor@100.66.112.125 \"echo connected && sudo -n whoami 2>/dev/null || echo 'no-sudo-nopass'\")",
+      "PowerShell(Get-Command plink, plink.exe, putty, pscp 2>$null)",
+      "PowerShell(Install-Module -Name Posh-SSH -Scope CurrentUser -Force -AllowClobber 2>&1 | Select-Object -Last 5)",
+      "mcp__6dc4f7fd-3360-465b-8191-a6492b919d14__deploy_to_vercel",
+      "mcp__6dc4f7fd-3360-465b-8191-a6492b919d14__list_teams",
+      "mcp__6dc4f7fd-3360-465b-8191-a6492b919d14__list_projects",
+      "mcp__6dc4f7fd-3360-465b-8191-a6492b919d14__list_deployments",
+      "mcp__6dc4f7fd-3360-465b-8191-a6492b919d14__get_deployment",
+      "Bash(git commit -m 'fix: dashboard links, notification click, minimalistic appointments + create dialog *)",
+      "Bash(git commit *)"
     ]
   }
 }
