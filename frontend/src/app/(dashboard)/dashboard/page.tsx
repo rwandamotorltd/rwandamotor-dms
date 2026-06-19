@@ -77,7 +77,6 @@ export default function DashboardPage() {
   if (isLoading && needsKpiData) return (
     <DashboardSkeleton showKpi={showKpi} showRetention={showRetention} showJobCards={showJobCards} />
   );
-  if (needsKpiData && !kpis) return null;
 
   return (
     <div className="space-y-5">
@@ -102,7 +101,7 @@ export default function DashboardPage() {
       </motion.div>
 
       {/* ──────────────────────── RETENTION SECTION ──────────────────────── */}
-      {showRetention && (
+      {showRetention && kpis && (
         <>
           <SectionDivider title="Retention" />
 
@@ -150,7 +149,7 @@ export default function DashboardPage() {
       )}
 
       {/* Fleet cards when kpi allowed but retention widget not permitted */}
-      {showKpi && !showRetention && (
+      {showKpi && kpis && !showRetention && (
         <>
           <SectionDivider title="Fleet Status" />
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -163,7 +162,7 @@ export default function DashboardPage() {
       )}
 
       {/* ──────────────────────── FOLLOW-UPS SECTION ──────────────────────── */}
-      {showKpi && (
+      {showKpi && kpis && (
         <>
           <SectionDivider title="Follow-ups" />
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
@@ -177,7 +176,7 @@ export default function DashboardPage() {
       )}
 
       {/* ──────────────────────── WORKSHOP SECTION ──────────────────────── */}
-      {showJobCards && (
+      {showJobCards && kpis && (
         <>
           <SectionDivider title="Workshop" />
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
@@ -189,7 +188,7 @@ export default function DashboardPage() {
       )}
 
       {/* ──────────────────────── CHARTS ──────────────────────── */}
-      {showRetention && (
+      {showRetention && kpis && (
         <>
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             {/* Retention Trend */}
