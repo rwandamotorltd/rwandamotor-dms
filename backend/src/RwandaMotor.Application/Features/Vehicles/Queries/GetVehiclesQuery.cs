@@ -33,15 +33,13 @@ public class GetVehiclesQueryHandler : IRequestHandler<GetVehiclesQuery, Paginat
 
         if (!string.IsNullOrWhiteSpace(q.Search))
         {
-            // SQL Server default collation is case-insensitive — Contains() translates to
-            // LIKE '%term%' which works without LOWER() and preserves index hints.
-            var s = q.Search.Trim();
+            var s = q.Search.Trim().ToLower();
             query = query.Where(v =>
-                v.VIN.Contains(s) ||
-                (v.PlateNumber != null && v.PlateNumber.Contains(s)) ||
-                (v.Customer != null && v.Customer.FullName.Contains(s)) ||
-                v.Brand.Name.Contains(s) ||
-                v.Model.Name.Contains(s));
+                v.VIN.ToLower().Contains(s) ||
+                (v.PlateNumber != null && v.PlateNumber.ToLower().Contains(s)) ||
+                (v.Customer != null && v.Customer.FullName.ToLower().Contains(s)) ||
+                v.Brand.Name.ToLower().Contains(s) ||
+                v.Model.Name.ToLower().Contains(s));
         }
 
         if (q.BrandId.HasValue) query = query.Where(v => v.BrandId == q.BrandId);
@@ -59,10 +57,11 @@ public class GetVehiclesQueryHandler : IRequestHandler<GetVehiclesQuery, Paginat
                 v.Id,
                 v.VIN,
                 v.PlateNumber,
-                v.Brand.Name,
-                v.Brand.Code,
-                v.Model.Name,
+                v.Brand != null ? v.Brand.Name : "—",
+                v.Brand != null ? v.Brand.Code : "—",
+                v.Model != null ? v.Model.Name : "—",
                 v.Year,
+                v.CustomerId,
                 v.Customer != null ? v.Customer.FullName : null,
                 v.Customer != null ? v.Customer.Phone : null,
                 v.SaleDate,
@@ -88,6 +87,7 @@ public record VehicleListItemDto(
     string BrandCode,
     string ModelName,
     int Year,
+    Guid? CustomerId,
     string? CustomerName,
     string? CustomerPhone,
     DateTime? SaleDate,

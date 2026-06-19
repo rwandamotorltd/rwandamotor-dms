@@ -12,10 +12,10 @@ import {
 import {
   Search, Filter, Car, ChevronLeft, ChevronRight,
   Pencil, Check, X, Layers, CheckSquare, SquareDashed,
-  Save, RefreshCw, AlertTriangle, Trash2, Download
+  Save, AlertTriangle, Trash2, Download
 } from "lucide-react";
-import { vehiclesApi, servicePoliciesApi, type UpdateVehiclePayload, type BulkUpdatePayload } from "@/lib/api";
-import type { VehicleListItem, RetentionStatus, ServicePolicy } from "@/types";
+import { vehiclesApi, type UpdateVehiclePayload, type BulkUpdatePayload } from "@/lib/api";
+import type { VehicleListItem, RetentionStatus } from "@/types";
 import { RetentionBadge } from "@/components/shared/retention-badge";
 import { cn, formatDate, formatMileage } from "@/lib/utils";
 import { useAuth } from "@/contexts/auth-context";
@@ -145,8 +145,8 @@ export default function VehiclesPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
-  const { user } = useAuth();
-  const isAdmin = user?.role === "Admin";
+  const { hasPermission } = useAuth();
+  const canEditVehicles = hasPermission("vehicles.edit");
 
   // Filters
   const [search, setSearch]               = useState(searchParams.get("search") ?? "");
@@ -196,7 +196,7 @@ export default function VehiclesPage() {
     setStatusFilter(val as RetentionStatus | "all");
     setPagination(p => ({ ...p, pageIndex: 0 }));
     const params = new URLSearchParams(window.location.search);
-    val === "all" ? params.delete("status") : params.set("status", val);
+    if (val === "all") params.delete("status"); else params.set("status", val);
     router.replace(`/vehicles?${params.toString()}`, { scroll: false });
   };
 
@@ -210,12 +210,6 @@ export default function VehiclesPage() {
       pageNumber: pagination.pageIndex + 1,
       pageSize: pagination.pageSize,
     }),
-  });
-
-  const { data: policies } = useQuery({
-    queryKey: ["service-policies"],
-    queryFn: () => servicePoliciesApi.list(),
-    staleTime: 5 * 60_000,
   });
 
   // Mutations
@@ -325,7 +319,7 @@ export default function VehiclesPage() {
       header: "Plate",
       cell: ({ row }) => {
         const v = row.original;
-        const isEditing = editingCell?.vehicleId === v.id && editingCell.field === "plateNumber";
+        const isEditing = canEditVehicles && editingCell?.vehicleId === v.id && editingCell.field === "plateNumber";
         if (isEditing) return (
           <div className="flex items-center gap-1">
             <Input autoFocus className="h-7 w-28 text-xs font-mono px-2"
@@ -340,12 +334,14 @@ export default function VehiclesPage() {
         return (
           <div className="flex items-center gap-1.5 group">
             <span className="font-mono font-semibold text-foreground text-sm">{v.plateNumber ?? "—"}</span>
-            <button
-              onClick={() => setEditingCell({ vehicleId: v.id, field: "plateNumber", value: v.plateNumber ?? "" })}
-              className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground"
-            >
-              <Pencil className="w-3 h-3" />
-            </button>
+            {canEditVehicles && (
+              <button
+                onClick={() => setEditingCell({ vehicleId: v.id, field: "plateNumber", value: v.plateNumber ?? "" })}
+                className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground"
+              >
+                <Pencil className="w-3 h-3" />
+              </button>
+            )}
           </div>
         );
       },
@@ -381,7 +377,7 @@ export default function VehiclesPage() {
       header: "Mileage",
       cell: ({ row }) => {
         const v = row.original;
-        const isEditing = editingCell?.vehicleId === v.id && editingCell.field === "currentMileage";
+        const isEditing = canEditVehicles && editingCell?.vehicleId === v.id && editingCell.field === "currentMileage";
         if (isEditing) return (
           <div className="flex items-center gap-1">
             <Input autoFocus type="number" className="h-7 w-24 text-xs px-2"
@@ -399,12 +395,14 @@ export default function VehiclesPage() {
               <p className="text-sm">{formatDate(v.lastServiceDate)}</p>
               <p className="text-xs text-muted-foreground">{formatMileage(v.currentMileage)}</p>
             </div>
-            <button
-              onClick={() => setEditingCell({ vehicleId: v.id, field: "currentMileage", value: String(v.currentMileage ?? "") })}
-              className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground"
-            >
-              <Pencil className="w-3 h-3" />
-            </button>
+            {canEditVehicles && (
+              <button
+                onClick={() => setEditingCell({ vehicleId: v.id, field: "currentMileage", value: String(v.currentMileage ?? "") })}
+                className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground"
+              >
+                <Pencil className="w-3 h-3" />
+              </button>
+            )}
           </div>
         );
       },
@@ -509,15 +507,17 @@ export default function VehiclesPage() {
           {exporting ? "Exporting..." : "Export CSV"}
         </Button>
 
-        <Button
-          variant={bulkMode ? "default" : "outline"}
-          size="sm"
-          onClick={() => { setBulkMode(v => !v); setRowSelection({}); setDeleteAllRecords(false); }}
-          className="gap-2 shrink-0"
-        >
-          <Layers className="w-4 h-4" />
-          {bulkMode ? "Exit Bulk" : "Bulk Edit"}
-        </Button>
+        {canEditVehicles && (
+          <Button
+            variant={bulkMode ? "default" : "outline"}
+            size="sm"
+            onClick={() => { setBulkMode(v => !v); setRowSelection({}); setDeleteAllRecords(false); }}
+            className="gap-2 shrink-0"
+          >
+            <Layers className="w-4 h-4" />
+            {bulkMode ? "Exit Bulk" : "Bulk Edit"}
+          </Button>
+        )}
       </motion.div>
 
       {/* Bulk action bar */}
@@ -544,7 +544,7 @@ export default function VehiclesPage() {
                 <Save className="w-3.5 h-3.5" /> Apply Changes
               </Button>
             )}
-            {isAdmin && (
+            {hasPermission("vehicles.delete") && (
               <Button
                 size="sm"
                 variant="destructive"
@@ -583,7 +583,7 @@ export default function VehiclesPage() {
         </div>
 
         {/* "Select all records across pages" banner */}
-        {isAdmin && bulkMode && allPageSelected && hasMultiplePages && !deleteAllRecords && (
+        {hasPermission("vehicles.delete") && bulkMode && allPageSelected && hasMultiplePages && !deleteAllRecords && (
           <motion.div
             initial={{ opacity: 0, y: -4 }}
             animate={{ opacity: 1, y: 0 }}
@@ -602,7 +602,7 @@ export default function VehiclesPage() {
         )}
 
         {/* "All records selected" banner */}
-        {isAdmin && bulkMode && deleteAllRecords && (
+        {hasPermission("vehicles.delete") && bulkMode && deleteAllRecords && (
           <motion.div
             initial={{ opacity: 0, y: -4 }}
             animate={{ opacity: 1, y: 0 }}

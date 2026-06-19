@@ -25,4 +25,6 @@ public class FollowUp : BaseEntity
     // Navigation
     public Vehicle Vehicle { get; set; } = null!;
     public Customer Customer { get; set; } = null!;
+    public ICollection<FollowUpInteraction> Interactions { get; set; } = new List<FollowUpInteraction>();
+    public ICollection<Appointment> Appointments { get; set; } = new List<Appointment>();
 }

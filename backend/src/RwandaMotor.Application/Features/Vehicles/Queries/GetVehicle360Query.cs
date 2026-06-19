@@ -1,6 +1,7 @@
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using RwandaMotor.Application.Common.Interfaces;
+using RwandaMotor.Domain.Entities;
 using RwandaMotor.Domain.Enums;
 
 namespace RwandaMotor.Application.Features.Vehicles.Queries;
@@ -30,6 +31,27 @@ public class GetVehicle360QueryHandler : IRequestHandler<GetVehicle360Query, Veh
 
         if (vehicle == null) return null;
 
+        var jobCards = await _db.JobCards
+            .Include(j => j.Technician)
+            .Where(j => j.VehicleId == request.VehicleId && !j.IsDeleted)
+            .OrderByDescending(j => j.CreatedAt)
+            .Select(j => new JobCard360Dto(
+                j.Id,
+                j.JobCardNumber,
+                null,
+                null,
+                j.ServiceType,
+                j.Status,
+                j.Mileage,
+                j.TechnicianId,
+                j.Technician != null ? j.Technician.FullName : null,
+                j.CreatedAt,
+                j.ClosedAt,
+                j.DeliveryNoteNumber,
+                j.Notes
+            ))
+            .ToListAsync(ct);
+
         var serviceTimeline = vehicle.ServiceRecords
             .Where(sr => !sr.IsDeleted)
             .OrderByDescending(sr => sr.ServiceDate)
@@ -43,6 +65,7 @@ public class GetVehicle360QueryHandler : IRequestHandler<GetVehicle360Query, Veh
                 sr.TotalCost,
                 sr.IsWarrantyJob,
                 sr.Notes,
+                sr.ServiceDescription,
                 sr.Parts.Select(p => new ServicePartDto(p.PartNumber, p.PartName, p.Quantity, p.UnitPrice, p.TotalPrice)).ToList()
             )).ToList();
 
@@ -109,7 +132,8 @@ public class GetVehicle360QueryHandler : IRequestHandler<GetVehicle360Query, Veh
             ServiceTimeline: serviceTimeline,
             FollowUpHistory: followUpHistory,
             TechnicianHistory: technicianHistory,
-            Kpis: kpis
+            Kpis: kpis,
+            JobCards: jobCards
         );
     }
 
@@ -137,13 +161,14 @@ public record Vehicle360Dto(
     List<ServiceTimelineItemDto> ServiceTimeline,
     List<FollowUpHistoryDto> FollowUpHistory,
     List<TechnicianHistoryDto> TechnicianHistory,
-    Vehicle360KpisDto Kpis);
+    Vehicle360KpisDto Kpis,
+    List<JobCard360Dto> JobCards);
 
 public record ServiceTimelineItemDto(
     Guid Id, DateTime ServiceDate, ServiceType ServiceType,
     int Mileage, string? TechnicianName, string? InvoiceNumber,
     decimal? TotalCost, bool IsWarrantyJob, string? Notes,
-    List<ServicePartDto> Parts);
+    string? ServiceDescription, List<ServicePartDto> Parts);
 
 public record ServicePartDto(string PartNumber, string PartName, int Quantity, decimal UnitPrice, decimal TotalPrice);
 
@@ -157,3 +182,18 @@ public record TechnicianHistoryDto(Guid TechnicianId, string TechnicianName, int
 public record Vehicle360KpisDto(
     int TotalServices, decimal TotalRevenue,
     double? AverageServiceIntervalDays, int WarrantyJobCount, int? LastServiceDaysAgo);
+
+public record JobCard360Dto(
+    Guid Id,
+    string JobCardNumber,
+    string? VIN,
+    string? PlateNumber,
+    ServiceType ServiceType,
+    JobCardStatus Status,
+    int Mileage,
+    Guid? TechnicianId,
+    string? TechnicianName,
+    DateTime CreatedAt,
+    DateTime? ClosedAt,
+    string? DeliveryNoteNumber,
+    string? Notes);

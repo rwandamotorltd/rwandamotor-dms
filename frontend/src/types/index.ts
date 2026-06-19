@@ -3,6 +3,8 @@
 // ============================================================
 
 export type RetentionStatus = 'Active' | 'DueSoon' | 'Overdue' | 'Lost' | 'Recovered' | 'External';
+export type JobCardStatus = 'Open' | 'Closed';
+export type FuelLevel = 'Empty' | 'Quarter' | 'Half' | 'ThreeQuarter' | 'Full';
 export type ServiceType = 'RoutineMaintenance' | 'OilChange' | 'MajorService' | 'TyreRotation' |
   'BrakeService' | 'TransmissionService' | 'AirConditioningService' | 'ElectricalDiagnostics' |
   'BodyRepair' | 'WarrantyRepair' | 'RecallRepair' | 'PDI' | 'EmergencyRepair' | 'Inspection' | 'Other';
@@ -10,7 +12,7 @@ export type CustomerCategory = 'Retail' | 'Corporate' | 'Government' | 'NGO' | '
 export type ContactMethod = 'Phone' | 'SMS' | 'Email' | 'WhatsApp' | 'InPerson';
 export type FollowUpStatus = 'Pending' | 'Contacted' | 'AppointmentBooked' | 'Recovered' | 'Unreachable' | 'Declined' | 'Closed';
 export type FollowUpPriority = 'Low' | 'Medium' | 'High' | 'Critical';
-export type ImportType = 'Vehicles' | 'Customers' | 'ServiceRecords';
+export type ImportType = 'Vehicles' | 'Customers' | 'ServiceRecords' | 'JobCards';
 export type ImportStatus = 'Pending' | 'Validating' | 'Valid' | 'Invalid' | 'Importing' | 'Completed' | 'CompletedWithErrors' | 'RolledBack' | 'Failed';
 
 // ============================================================
@@ -24,6 +26,7 @@ export interface AuthResponse {
   email: string;
   role: string;
   expiresAt: string;
+  permissions: string[];
 }
 
 export interface AuthUser {
@@ -31,6 +34,7 @@ export interface AuthUser {
   fullName: string;
   email: string;
   role: string;
+  permissions: string[];
 }
 
 // ============================================================
@@ -53,6 +57,10 @@ export interface DashboardKpis {
   yearlyRetentionRate: number;
   retentionTrend: RetentionTrendPoint[];
   brandRetention: BrandRetention[];
+  openJobCards: number;
+  todayJobCards: number;
+  monthlyJobCards: number;
+  monthlySalesHistory: number;
 }
 
 export interface RetentionTrendPoint {
@@ -152,6 +160,7 @@ export interface VehicleListItem {
   brandCode: string;
   modelName: string;
   year: number;
+  customerId: string | null;
   customerName: string | null;
   customerPhone: string | null;
   saleDate: string | null;
@@ -182,6 +191,7 @@ export interface ServiceTimelineItem {
   totalCost: number | null;
   isWarrantyJob: boolean;
   notes: string | null;
+  serviceDescription: string | null;
   parts: ServicePart[];
 }
 
@@ -209,6 +219,22 @@ export interface Vehicle360Kpis {
   averageServiceIntervalDays: number | null;
   warrantyJobCount: number;
   lastServiceDaysAgo: number | null;
+}
+
+export interface JobCard360Item {
+  id: string;
+  jobCardNumber: string;
+  vin: string | null;
+  plateNumber: string | null;
+  serviceType: ServiceType;
+  status: JobCardStatus;
+  mileage: number;
+  technicianId: string | null;
+  technicianName: string | null;
+  createdAt: string;
+  closedAt: string | null;
+  deliveryNoteNumber: string | null;
+  notes: string | null;
 }
 
 export interface Vehicle360 {
@@ -245,11 +271,56 @@ export interface Vehicle360 {
   followUpHistory: FollowUpHistory[];
   technicianHistory: TechnicianHistory[];
   kpis: Vehicle360Kpis;
+  jobCards: JobCard360Item[];
 }
 
 // ============================================================
 // Customers
 // ============================================================
+export interface CustomerVehicleSummary {
+  id: string;
+  vin: string;
+  plateNumber: string | null;
+  brandName: string;
+  modelName: string;
+  year: number;
+  retentionStatus: RetentionStatus;
+  currentMileage: number | null;
+  lastServiceDate: string | null;
+}
+
+export interface CustomerServiceHistoryItem {
+  id: string;
+  serviceDate: string;
+  mileageAtService: number;
+  serviceType: ServiceType;
+  vehicleLabel: string;
+  plateNumber: string | null;
+  technicianName: string | null;
+  invoiceNumber: string | null;
+  totalCost: number | null;
+  isWarrantyJob: boolean;
+}
+
+export interface Customer360 {
+  id: string;
+  fullName: string;
+  phone: string | null;
+  email: string | null;
+  city: string | null;
+  country: string | null;
+  address: string | null;
+  category: CustomerCategory;
+  companyName: string | null;
+  taxId: string | null;
+  preferredContactMethod: string;
+  isActive: boolean;
+  createdAt: string;
+  vehicles: CustomerVehicleSummary[];
+  serviceHistory: CustomerServiceHistoryItem[];
+  jobCards: JobCard360Item[];
+}
+
 export interface CustomerListItem {
   id: string;
   fullName: string;
@@ -324,53 +395,99 @@ export interface ServicePolicy {
 }
 
 // ============================================================
-// Customer 360
+// Company Settings
 // ============================================================
-export interface CustomerVehicleSummary {
+export interface CompanySettings {
+  companyName: string;
+  address: string | null;
+  phone: string | null;
+  email: string | null;
+  tinNumber: string | null;
+  website: string | null;
+  jobCardShowHeader: boolean;
+  jobCardShowFooter: boolean;
+  deliveryNoteShowHeader: boolean;
+  deliveryNoteShowFooter: boolean;
+  footerDisclaimer: string | null;
+  emailJobCardMessage: string | null;
+  emailDeliveryNoteMessage: string | null;
+}
+
+// ============================================================
+// Job Cards
+// ============================================================
+export interface JobCardListItem {
   id: string;
+  jobCardNumber: string;
+  vin: string;
+  plateNumber: string | null;
+  year: number;
+  customerName: string | null;
+  customerPhone: string | null;
+  serviceType: ServiceType;
+  status: JobCardStatus;
+  fuelLevel: FuelLevel;
+  mileage: number;
+  receivedByName: string;
+  technicianName: string | null;
+  createdAt: string;
+  closedAt: string | null;
+  deliveryNoteNumber: string | null;
+}
+
+export interface JobCardDetail {
+  id: string;
+  jobCardNumber: string;
+  vehicleId: string;
+  vin: string;
+  plateNumber: string | null;
+  year: number;
+  color: string | null;
+  transmission: string | null;
+  fuelType: string | null;
+  fuelLevel: FuelLevel;
+  mileage: number;
+  brandName: string;
+  modelName: string;
+  customerId: string | null;
+  customerName: string | null;
+  customerPhone: string | null;
+  customerEmail: string | null;
+  customerAddress: string | null;
+  technicianId: string | null;
+  technicianName: string | null;
+  serviceType: ServiceType;
+  status: JobCardStatus;
+  notes: string | null;
+  additionalInfo: string | null;
+  accessoriesPresent: string[];
+  receivedByName: string;
+  receivedByUserId: string;
+  createdAt: string;
+  updatedAt: string | null;
+  closedAt: string | null;
+  closedByName: string | null;
+  closedByUserId: string | null;
+  deliveryNoteNumber: string | null;
+  deliveryNoteGeneratedAt: string | null;
+}
+
+export interface SalesHistoryItem {
+  id: string;
+  saleDate: string;
+  saleType: string;
   vin: string;
   plateNumber: string | null;
   brandName: string;
   modelName: string;
   year: number;
-  color: string | null;
-  currentMileage: number | null;
-  retentionStatus: RetentionStatus;
-  lastServiceDate: string | null;
-  nextServiceDate: string | null;
-  nextServiceMileage: number | null;
-  warrantyEndDate: string | null;
-}
-
-export interface CustomerServiceHistory {
-  id: string;
-  vin: string;
-  plateNumber: string | null;
-  vehicleLabel: string;
-  serviceDate: string;
-  mileageAtService: number;
-  serviceType: ServiceType;
-  technicianName: string | null;
-  invoiceNumber: string | null;
-  totalCost: number | null;
-  isWarrantyJob: boolean;
-}
-
-export interface Customer360 {
-  id: string;
-  fullName: string;
-  phone: string | null;
-  email: string | null;
-  address: string | null;
-  city: string | null;
-  country: string | null;
-  category: CustomerCategory;
-  preferredContactMethod: ContactMethod;
-  companyName: string | null;
-  taxId: string | null;
+  customerName: string | null;
+  customerPhone: string | null;
+  jobCardNumber: string | null;
+  deliveryNoteNumber: string | null;
+  jobCardId: string | null;
+  customerId: string | null;
+  vehicleId: string;
   notes: string | null;
-  isActive: boolean;
   createdAt: string;
-  vehicles: CustomerVehicleSummary[];
-  serviceHistory: CustomerServiceHistory[];
 }

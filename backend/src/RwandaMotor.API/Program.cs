@@ -10,7 +10,7 @@ using RwandaMotor.Infrastructure;
 using RwandaMotor.Infrastructure.Persistence.Seed;
 using Serilog;
 
-// Fix Npgsql 6+ DateTime UTC requirement — must be before any EF/Npgsql code
+// Fix Npgsql 6+ DateTime UTC requirement -- must be before any EF/Npgsql code
 AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
 
 var builder = WebApplication.CreateBuilder(args);
@@ -94,7 +94,7 @@ builder.Services.AddCors(options =>
 builder.Services.AddControllers()
     .AddJsonOptions(opts =>
     {
-        // Allow string ↔ enum round-trip (frontend sends "Phone", "Retail", etc.)
+        // Allow string <-> enum round-trip (frontend sends "Phone", "Retail", etc.)
         opts.JsonSerializerOptions.Converters.Add(
             new System.Text.Json.Serialization.JsonStringEnumConverter());
     });
@@ -105,7 +105,7 @@ builder.Services.AddSwaggerGen(c =>
     {
         Title = "RwandaMotor DMS API",
         Version = "v1",
-        Description = "Retention & Service Intelligence Platform — Rwanda Multi-Brand Automotive DMS"
+        Description = "Retention & Service Intelligence Platform -- Rwanda Multi-Brand Automotive DMS"
     });
     c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
@@ -130,21 +130,64 @@ var app = builder.Build();
 // Run migrations and seed database on startup
 using (var scope = app.Services.CreateScope())
 {
+    var db = scope.ServiceProvider.GetRequiredService<RwandaMotor.Infrastructure.Persistence.ApplicationDbContext>();
+
+    // EF Core migrations
+    try { await db.Database.MigrateAsync(); }
+    catch (Exception ex) { Log.Error(ex, "EF Core migrations failed"); }
+
+    // Belt-and-suspenders: add email template columns directly if they were
+    // not yet created by migrations (idempotent, runs on every startup).
     try
     {
-        var db = scope.ServiceProvider.GetRequiredService<RwandaMotor.Infrastructure.Persistence.ApplicationDbContext>();
-        await db.Database.MigrateAsync();
+        await db.Database.ExecuteSqlRawAsync(@"
+            DO $$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_schema = 'public'
+                      AND table_name   = 'CompanySettings'
+                      AND column_name  = 'EmailJobCardMessage'
+                ) THEN
+                    ALTER TABLE ""CompanySettings"" ADD COLUMN ""EmailJobCardMessage"" text;
+                END IF;
+
+                IF NOT EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_schema = 'public'
+                      AND table_name   = 'CompanySettings'
+                      AND column_name  = 'EmailDeliveryNoteMessage'
+                ) THEN
+                    ALTER TABLE ""CompanySettings"" ADD COLUMN ""EmailDeliveryNoteMessage"" text;
+                END IF;
+            END $$;");
+    }
+    catch (Exception ex) { Log.Error(ex, "Schema column patch failed"); }
+
+    // Seed reference data
+    try
+    {
         var seeder = scope.ServiceProvider.GetRequiredService<ApplicationDbSeeder>();
         await seeder.SeedAsync();
     }
-    catch (Exception ex)
-    {
-        Log.Error(ex, "Database migration/seeding failed");
-    }
+    catch (Exception ex) { Log.Error(ex, "Database seeding failed"); }
 }
 
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI(c =>
-    
+    {
+        c.SwaggerEndpoint("/swagger/v1/swagger.json", "RwandaMotor DMS API v1");
+        c.RoutePrefix = "swagger";
+    });
+}
+
+app.UseSerilogRequestLogging();
+app.UseMiddleware<RwandaMotor.API.Middleware.ExceptionHandlingMiddleware>();
+app.UseCors("DmsPolicy");
+app.UseAuthentication();
+app.UseAuthorization();
+app.MapControllers();
+
+app.Run();

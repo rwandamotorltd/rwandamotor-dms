@@ -17,5 +17,6 @@ public enum ImportType
 {
     Vehicles = 1,
     Customers = 2,
-    ServiceRecords = 3
+    ServiceRecords = 3,
+    JobCards = 4
 }

@@ -3,12 +3,13 @@ namespace RwandaMotor.Domain.Enums;
 public enum FollowUpStatus
 {
     Pending = 1,
-    Contacted = 2,
-    AppointmentBooked = 3,
-    Recovered = 4,
+    InProgress = 2,
+    CallbackScheduled = 3,
+    AppointmentBooked = 4,
     Unreachable = 5,
     Declined = 6,
-    Closed = 7
+    Recovered = 7,
+    Closed = 8
 }
 
 public enum FollowUpPriority
@@ -26,4 +27,35 @@ public enum ContactMethod
     Email = 3,
     WhatsApp = 4,
     InPerson = 5
+}
+
+public enum InteractionOutcome
+{
+    Reached = 1,
+    NoAnswer = 2,
+    LeftMessage = 3,
+    CallbackScheduled = 4,
+    ServiceReminderEmailSent = 5,
+    SatisfactionEmailSent = 6,
+    AppointmentBooked = 7
+}
+
+public enum AppointmentStatus
+{
+    Scheduled = 1,
+    Confirmed = 2,
+    Completed = 3,
+    Cancelled = 4,
+    NoShow = 5
+}
+
+public enum NotificationType
+{
+    WelcomeCall = 1,
+    ServiceDueSoon = 2,
+    ServiceDue15Days = 3,
+    CustomerLost = 4,
+    FollowUpDue = 5,
+    AppointmentReminder = 6,
+    AppointmentConfirmed = 7
 }

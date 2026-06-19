@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Npgsql;
 using Quartz;
 using RwandaMotor.Application.Common.Interfaces;
 using RwandaMotor.Domain.Entities;
@@ -17,9 +18,15 @@ public static class DependencyInjection
     public static IServiceCollection AddInfrastructure(
         this IServiceCollection services, IConfiguration configuration)
     {
+        // Npgsql 8.0: EnableDynamicJson is required for List<T> jsonb columns
+        var dataSourceBuilder = new NpgsqlDataSourceBuilder(
+            configuration.GetConnectionString("DefaultConnection"));
+        dataSourceBuilder.EnableDynamicJson();
+        var dataSource = dataSourceBuilder.Build();
+
         services.AddDbContext<ApplicationDbContext>(options =>
             options.UseNpgsql(
-                configuration.GetConnectionString("DefaultConnection"),
+                dataSource,
                 b => b.MigrationsAssembly(typeof(ApplicationDbContext).Assembly.FullName)));
 
         services.AddScoped<IApplicationDbContext>(sp => sp.GetRequiredService<ApplicationDbContext>());
@@ -40,7 +47,20 @@ public static class DependencyInjection
         services.AddScoped<IRetentionEngine, RetentionEngine>();
         services.AddScoped<ApplicationDbSeeder>();
 
-        // Nightly retention evaluation — runs at 2:00 AM UTC
+        services.Configure<SmtpSettings>(configuration.GetSection("Email"));
+        // PostConfigure picks up EMAIL_* env vars that don't follow the Email__ double-underscore convention
+        services.PostConfigure<SmtpSettings>(s =>
+        {
+            if (Env("EMAIL_HOST")      is { Length: > 0 } h) s.Host     = h;
+            if (Env("EMAIL_USERNAME")  is { Length: > 0 } u) s.Username = u;
+            if (Env("EMAIL_PASSWORD")  is { Length: > 0 } p) s.Password = p;
+            if (Env("EMAIL_ALERT_RECIPIENT") is { Length: > 0 } a) s.AlertRecipient = a;
+            if (int.TryParse(Env("EMAIL_PORT"), out var port)) s.Port = port;
+            static string? Env(string k) => Environment.GetEnvironmentVariable(k);
+        });
+        services.AddScoped<IEmailService, SmtpEmailService>();
+
+        // Nightly retention evaluation -- runs at 2:00 AM UTC
         services.AddQuartz(q =>
         {
             var jobKey = new JobKey("RetentionEvaluationJob");
@@ -51,6 +71,9 @@ public static class DependencyInjection
                 .WithCronSchedule("0 0 2 * * ?"));
         });
         services.AddQuartzHostedService(q => q.WaitForJobsToComplete = true);
+
+        // Startup backfill: create service records for closed job cards that predate auto-create
+        services.AddHostedService<BackfillJobCardServiceRecordsService>();
 
         return services;
     }

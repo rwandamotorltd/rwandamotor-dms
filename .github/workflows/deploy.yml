@@ -2,13 +2,14 @@ name: Deploy RwandaMotor DMS
 
 on:
   push:
-    branches: [main]
+    branches: [main, preview]
   workflow_dispatch:
 
 jobs:
-  # ── Backend: build & deploy (runs directly on the server) ─────────────────
+  # ── Backend: build & deploy to production (main only) ─────────────────────
   deploy-api:
     name: Deploy .NET API
+    if: github.ref == 'refs/heads/main'
     runs-on: self-hosted
     steps:
       - uses: actions/checkout@v4
@@ -25,11 +26,46 @@ jobs:
       - name: Deploy to /opt/rwandamotor-api
         run: sudo /usr/local/bin/rwandamotor-deploy
 
-  # ── Frontend: trigger Vercel redeploy ──────────────────────────────────────
+  # ── Frontend: deploy to Vercel production (main only) ─────────────────────
   deploy-frontend:
-    name: Deploy Frontend (Vercel)
+    name: Deploy Frontend — Production (Vercel)
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - name: Trigger Vercel deploy hook
+        run: curl -X POST "${{ secrets.VERCEL_DEPLOY_HOOK }}"
+
+  # ── Frontend: deploy to Vercel preview (preview branch) ───────────────────
+  deploy-preview:
+    name: Deploy Frontend — Preview (Vercel)
+    if: github.ref == 'refs/heads/preview'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Deploy to Vercel Preview
+        id: vercel
+        working-directory: frontend
         run: |
-          curl -X POST "${{ secrets.VERCEL_DEPLOY_HOOK }}"
+          PREVIEW_URL=$(npx vercel deploy \
+            --token=${{ secrets.VERCEL_TOKEN }} \
+            --yes 2>&1 | tail -1)
+          echo "url=$PREVIEW_URL" >> $GITHUB_OUTPUT
+
+      - name: Print preview URL
+        run: echo "Preview deployed → ${{ steps.vercel.outputs.url }}"
+
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}

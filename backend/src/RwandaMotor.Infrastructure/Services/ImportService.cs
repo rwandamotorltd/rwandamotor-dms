@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using MediatR;
 using RwandaMotor.Application.Common.Interfaces;
+using RwandaMotor.Application.Features.Admin.Commands;
 using RwandaMotor.Application.Features.Import.Commands;
 using RwandaMotor.Domain.Entities;
 using RwandaMotor.Domain.Enums;
@@ -138,11 +139,23 @@ public class ValidateImportFileCommandHandler
                 return (false, false, "VIN is required");
             if (!row.TryGetValue("ServiceDate", out var dateStr) || !DateTime.TryParse(dateStr, out _))
                 return (false, false, "ServiceDate must be a valid date (YYYY-MM-DD)");
-            // Warn (but still accept) if mileage is present but invalid
             if (row.TryGetValue("MileageAtService", out var mileStr)
                 && !string.IsNullOrWhiteSpace(mileStr)
                 && (!int.TryParse(mileStr, out var m) || m < 0))
                 return (false, false, "MileageAtService must be a non-negative integer when provided");
+            return (true, false, null);
+        }
+
+        if (type == ImportType.JobCards)
+        {
+            if (!row.TryGetValue("VIN", out var vin) || string.IsNullOrWhiteSpace(vin))
+                return (false, false, "VIN is required");
+            if (!row.TryGetValue("JobCardDate", out var dateStr) || !DateTime.TryParse(dateStr, out _))
+                return (false, false, "JobCardDate must be a valid date (YYYY-MM-DD)");
+            if (row.TryGetValue("Mileage", out var mileStr)
+                && !string.IsNullOrWhiteSpace(mileStr)
+                && (!int.TryParse(mileStr, out var m) || m < 0))
+                return (false, false, "Mileage must be a non-negative integer when provided");
             return (true, false, null);
         }
 
@@ -246,6 +259,8 @@ public class ProcessImportCommandHandler
             (imported, errors) = await ImportVehiclesBatch(rowsToProcess, allData, ct);
         else if (importLog.ImportType == ImportType.ServiceRecords)
             (imported, errors) = await ImportServiceRecordsBatch(rowsToProcess, allData, ct);
+        else if (importLog.ImportType == ImportType.JobCards)
+            (imported, errors) = await ImportJobCardsBatch(rowsToProcess, allData, ct);
 
         foreach (var e in errors)
         {
@@ -274,10 +289,10 @@ public class ProcessImportCommandHandler
         var errors = new List<ImportRowErrorDto>();
         int imported = 0;
 
-        // Load all brands + models
+        // Load all brands + models (include inactive so auto-create doesn't duplicate)
         var brands = await _db.Brands
             .Include(b => b.Models)
-            .Where(b => b.IsActive)
+            .Where(b => !b.IsDeleted)
             .ToListAsync(ct);
 
         // Load ALL existing customers into memory
@@ -332,6 +347,9 @@ public class ProcessImportCommandHandler
         if (newCustomers.Count > 0)
             await _db.SaveChangesAsync(ct);
 
+        // Auto-create any missing brands/models so the import doesn't fail on unknown catalogue entries
+        await EnsureBrandsAndModels(allData, brands, ct);
+
         // Build vehicle entities
         var vehiclesToAdd = new List<Vehicle>();
 
@@ -369,13 +387,13 @@ public class ProcessImportCommandHandler
                                 b.Name.Equals(brandName, StringComparison.OrdinalIgnoreCase))
                             ?? brands.FirstOrDefault(b =>
                                 b.Name.Contains(brandName, StringComparison.OrdinalIgnoreCase))
-                            ?? throw new Exception($"Brand '{brandName}' not found.");
+                            ?? throw new Exception($"Brand '{brandName}' could not be resolved (auto-create failed).");
 
                 var model = brand.Models.FirstOrDefault(m =>
                                 m.Name.Equals(modelName, StringComparison.OrdinalIgnoreCase))
                             ?? brand.Models.FirstOrDefault(m =>
                                 m.Name.Contains(modelName, StringComparison.OrdinalIgnoreCase))
-                            ?? throw new Exception($"Model '{modelName}' not found under '{brand.Name}'.");
+                            ?? throw new Exception($"Model '{modelName}' could not be resolved under '{brand.Name}' (auto-create failed).");
 
                 if (!customerMap.TryGetValue(customerName, out var customer))
                     throw new Exception($"Customer '{customerName}' could not be resolved.");
@@ -424,12 +442,15 @@ public class ProcessImportCommandHandler
             }
         }
 
+        var savedVehicles = new List<Vehicle>();
+
         if (vehiclesToAdd.Count > 0)
         {
             try
             {
                 _db.Vehicles.AddRange(vehiclesToAdd);
                 await _db.SaveChangesAsync(ct);
+                savedVehicles.AddRange(vehiclesToAdd);
             }
             catch (Exception batchEx)
             {
@@ -456,6 +477,7 @@ public class ProcessImportCommandHandler
                         _db.Vehicles.Add(vehicle);
                         await _db.SaveChangesAsync(ct);
                         imported++;
+                        savedVehicles.Add(vehicle);
                     }
                     catch (Exception rowEx)
                     {
@@ -471,6 +493,26 @@ public class ProcessImportCommandHandler
                     }
                 }
             }
+        }
+
+        // Create a SalesHistory record for every successfully saved vehicle
+        if (savedVehicles.Count > 0)
+        {
+            var customerIdToName = customerMap.ToDictionary(kv => kv.Value.Id, kv => kv.Key);
+            _db.SalesHistories.AddRange(savedVehicles.Select(v => new SalesHistory
+            {
+                VehicleId    = v.Id,
+                CustomerId   = v.CustomerId,
+                SaleDate     = v.SaleDate ?? DateTime.UtcNow,
+                SaleType     = "Import",
+                VIN          = v.VIN,
+                PlateNumber  = v.PlateNumber,
+                CustomerName = v.CustomerId.HasValue &&
+                               customerIdToName.TryGetValue(v.CustomerId.Value, out var cName)
+                               ? cName : null,
+                Notes        = "Imported from Vehicle Sales Data",
+            }));
+            await _db.SaveChangesAsync(ct);
         }
 
         return (imported, errors);
@@ -489,6 +531,9 @@ public class ProcessImportCommandHandler
             .ToListAsync(ct);
         var vehicleMap = allVehicles
             .ToDictionary(v => v.VIN, StringComparer.OrdinalIgnoreCase);
+
+        // Pre-pass: auto-create external vehicles for unknown VINs
+        vehicleMap = await EnsureExternalVehicles(allData.Select(d => Get(d, "VIN")).ToList(), vehicleMap, ct);
 
         var policies = await _db.ServicePolicies
             .Where(p => !p.IsDeleted && p.IsActive)
@@ -522,15 +567,13 @@ public class ProcessImportCommandHandler
                 var invoiceNumber  = Get(data, "InvoiceNumber");
 
                 if (!vehicleMap.TryGetValue(vin, out var vehicle))
-                    throw new Exception($"Vehicle with VIN '{vin}' not found.");
+                    throw new Exception($"Vehicle with VIN '{vin}' could not be resolved.");
 
                 var serviceDate = DateTime.Parse(serviceDateStr, null, DateTimeStyles.AssumeUniversal);
 
-                // Mileage is optional — default to 0 so CRE can fill it in later
                 var mileage = (!string.IsNullOrWhiteSpace(mileageStr) && int.TryParse(mileageStr, out var parsedMileage) && parsedMileage >= 0)
                     ? parsedMileage : 0;
 
-                // ServiceType is optional — default to RoutineMaintenance
                 if (!Enum.TryParse<ServiceType>(serviceTypeStr, ignoreCase: true, out var serviceType))
                     serviceType = ServiceType.RoutineMaintenance;
 
@@ -584,6 +627,163 @@ public class ProcessImportCommandHandler
         return (imported, errors);
     }
 
+    // -- Job Cards — historical import --------------------------------------------
+
+    private async Task<(int imported, List<ImportRowErrorDto> errors)> ImportJobCardsBatch(
+        List<ImportLogRow> logRows, List<Dictionary<string, string>> allData, CancellationToken ct)
+    {
+        var errors = new List<ImportRowErrorDto>();
+        int imported = 0;
+
+        var allVehicles = await _db.Vehicles
+            .Where(v => !v.IsDeleted)
+            .ToListAsync(ct);
+        var vehicleMap = allVehicles
+            .ToDictionary(v => v.VIN, StringComparer.OrdinalIgnoreCase);
+
+        // Pre-pass: auto-create external vehicles for unknown VINs
+        vehicleMap = await EnsureExternalVehicles(allData.Select(d => Get(d, "VIN")).ToList(), vehicleMap, ct);
+
+        var technicians = await _db.Technicians
+            .Where(t => !t.IsDeleted)
+            .ToListAsync(ct);
+
+        var jobCardsToAdd = new List<JobCard>();
+
+        for (int i = 0; i < allData.Count; i++)
+        {
+            var data   = allData[i];
+            var logRow = logRows[i];
+
+            try
+            {
+                var vin            = Get(data, "VIN").ToUpperInvariant();
+                var jobCardDateStr = Get(data, "JobCardDate");
+                var mileageStr     = Get(data, "Mileage");
+                var serviceTypeStr = Get(data, "ServiceType");
+                var fuelLevelStr   = Get(data, "FuelLevel");
+                var technicianName = Get(data, "TechnicianName");
+                var statusStr      = Get(data, "Status");
+                var notes          = Get(data, "Notes");
+                var jobCardNumber  = Get(data, "JobCardNumber");
+                var customerName   = Get(data, "CustomerName");
+                var customerPhone  = Get(data, "CustomerPhone");
+
+                if (!vehicleMap.TryGetValue(vin, out var vehicle))
+                    throw new Exception($"Vehicle with VIN '{vin}' could not be resolved.");
+
+                var jobCardDate = DateTime.Parse(jobCardDateStr, null, DateTimeStyles.AssumeUniversal);
+
+                var mileage = (!string.IsNullOrWhiteSpace(mileageStr) && int.TryParse(mileageStr, out var parsedMileage) && parsedMileage >= 0)
+                    ? parsedMileage : 0;
+
+                if (!Enum.TryParse<ServiceType>(serviceTypeStr, ignoreCase: true, out var serviceType))
+                    serviceType = ServiceType.RoutineMaintenance;
+
+                if (!Enum.TryParse<FuelLevel>(fuelLevelStr, ignoreCase: true, out var fuelLevel))
+                    fuelLevel = FuelLevel.Half;
+
+                // Historical job cards default to Closed; override from CSV if present
+                if (!Enum.TryParse<JobCardStatus>(statusStr, ignoreCase: true, out var status))
+                    status = JobCardStatus.Closed;
+
+                Technician? technician = null;
+                if (!string.IsNullOrWhiteSpace(technicianName))
+                    technician = technicians.FirstOrDefault(t =>
+                        t.FullName.Contains(technicianName, StringComparison.OrdinalIgnoreCase));
+
+                // Use provided number or generate a placeholder from VIN + date
+                var number = !string.IsNullOrWhiteSpace(jobCardNumber)
+                    ? jobCardNumber
+                    : $"HIST-{vin[..Math.Min(8, vin.Length)]}-{jobCardDate:yyyyMMdd}";
+
+                jobCardsToAdd.Add(new JobCard
+                {
+                    JobCardNumber    = number,
+                    VehicleId        = vehicle.Id,
+                    CustomerId       = vehicle.CustomerId,
+                    TechnicianId     = technician?.Id,
+                    VIN              = vehicle.VIN,
+                    PlateNumber      = vehicle.PlateNumber,
+                    Year             = vehicle.Year,
+                    Color            = vehicle.Color,
+                    Transmission     = vehicle.Transmission,
+                    FuelType         = vehicle.FuelType,
+                    FuelLevel        = fuelLevel,
+                    Mileage          = mileage,
+                    CustomerName     = !string.IsNullOrWhiteSpace(customerName) ? customerName : null,
+                    CustomerPhone    = !string.IsNullOrWhiteSpace(customerPhone) ? customerPhone : null,
+                    ServiceType      = serviceType,
+                    Notes            = string.IsNullOrWhiteSpace(notes) ? null : notes,
+                    Status           = status,
+                    ReceivedByName   = "Import",
+                    CreatedAt        = jobCardDate,
+                    ClosedAt         = status == JobCardStatus.Closed ? jobCardDate : null,
+                });
+
+                vehicle.CurrentMileage = Math.Max(vehicle.CurrentMileage ?? 0, mileage);
+                vehicle.UpdatedAt      = DateTime.UtcNow;
+
+                logRow.IsImported = true;
+                imported++;
+            }
+            catch (Exception ex)
+            {
+                _log.LogWarning(ex, "Job card row {Row} failed", logRow.RowNumber);
+                errors.Add(new ImportRowErrorDto(logRow.RowNumber, "Row", ex.Message));
+            }
+        }
+
+        if (jobCardsToAdd.Count > 0)
+        {
+            // Capture historical dates before DbContext override sets CreatedAt = UtcNow
+            var historicalDates = jobCardsToAdd.ToDictionary(jc => jc.Id, jc => jc.CreatedAt);
+            _db.JobCards.AddRange(jobCardsToAdd);
+            await _db.SaveChangesAsync(ct);
+
+            // Restore original job card dates so historical records sort correctly
+            var dbCtx = _db as Microsoft.EntityFrameworkCore.DbContext;
+            if (dbCtx != null)
+                foreach (var (id, date) in historicalDates)
+                    await dbCtx.Database.ExecuteSqlRawAsync(
+                        @"UPDATE ""JobCards"" SET ""CreatedAt"" = {0} WHERE ""Id"" = {1}", date, id);
+        }
+
+        return (imported, errors);
+    }
+
+    // -- Shared: ensure external vehicles exist for all unknown VINs ---------------
+
+    private async Task<Dictionary<string, Vehicle>> EnsureExternalVehicles(
+        List<string> vins, Dictionary<string, Vehicle> vehicleMap, CancellationToken ct)
+    {
+        var unknownVins = vins
+            .Select(v => v.Trim().ToUpperInvariant())
+            .Where(v => !string.IsNullOrWhiteSpace(v) && !vehicleMap.ContainsKey(v))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (unknownVins.Count == 0) return vehicleMap;
+
+        var newVehicles = unknownVins.Select(vin => new Vehicle
+        {
+            VIN                = vin.Length > 17 ? vin[..17] : vin,
+            IsSoldByDealership = false,
+            RetentionStatus    = RetentionStatus.External,
+            Year               = 0,
+        }).ToList();
+
+        _db.Vehicles.AddRange(newVehicles);
+        await _db.SaveChangesAsync(ct);
+
+        foreach (var v in newVehicles)
+            vehicleMap[v.VIN] = v;
+
+        _log.LogInformation("Auto-created {Count} external vehicle(s) for import", newVehicles.Count);
+
+        return vehicleMap;
+    }
+
     // -- In-memory policy resolution ----------------------------------------------
 
     private static ServicePolicy ResolvePolicy(
@@ -609,6 +809,249 @@ public class ProcessImportCommandHandler
         return policies.FirstOrDefault(p => p.IsDefault) ?? defaultPolicy;
     }
 
+    // -- Auto-create missing brands/models so vehicle imports never fail on catalogue gaps ----
+
+    private async Task EnsureBrandsAndModels(
+        List<Dictionary<string, string>> allData,
+        List<Brand> brands,
+        CancellationToken ct)
+    {
+        // Pass 1 — brands
+        bool anyNew = false;
+        var brandNames = allData
+            .Select(d => Get(d, "BrandName"))
+            .Where(n => !string.IsNullOrWhiteSpace(n))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        foreach (var brandName in brandNames)
+        {
+            var existing = brands.FirstOrDefault(b =>
+                b.Name.Equals(brandName, StringComparison.OrdinalIgnoreCase) ||
+                b.Name.Contains(brandName, StringComparison.OrdinalIgnoreCase));
+
+            if (existing == null)
+            {
+                var brand = new Brand
+                {
+                    Name     = brandName,
+                    Code     = AutoCode(brandName),
+                    IsActive = true,
+                };
+                _db.Brands.Add(brand);
+                brands.Add(brand);
+                anyNew = true;
+                _log.LogInformation("Auto-created brand '{Brand}' during vehicle import", brandName);
+            }
+        }
+        if (anyNew) { await _db.SaveChangesAsync(ct); anyNew = false; }
+
+        // Pass 2 — models
+        var modelCombos = allData
+            .Select(d => (brand: Get(d, "BrandName"), model: Get(d, "ModelName")))
+            .Where(x => !string.IsNullOrWhiteSpace(x.brand) && !string.IsNullOrWhiteSpace(x.model))
+            .Distinct()
+            .ToList();
+
+        foreach (var (brandName, modelName) in modelCombos)
+        {
+            var brand = brands.FirstOrDefault(b =>
+                b.Name.Equals(brandName, StringComparison.OrdinalIgnoreCase) ||
+                b.Name.Contains(brandName, StringComparison.OrdinalIgnoreCase));
+            if (brand == null) continue;
+
+            var existingModel = brand.Models.FirstOrDefault(m =>
+                m.Name.Equals(modelName, StringComparison.OrdinalIgnoreCase) ||
+                m.Name.Contains(modelName, StringComparison.OrdinalIgnoreCase));
+
+            if (existingModel == null)
+            {
+                var model = new VehicleModel
+                {
+                    BrandId  = brand.Id,
+                    Name     = modelName,
+                    Code     = AutoCode(modelName),
+                    IsActive = true,
+                };
+                _db.VehicleModels.Add(model);
+                brand.Models.Add(model);
+                anyNew = true;
+                _log.LogInformation("Auto-created model '{Model}' under '{Brand}' during vehicle import", modelName, brandName);
+            }
+        }
+        if (anyNew) await _db.SaveChangesAsync(ct);
+    }
+
+    private static string AutoCode(string name)
+    {
+        var letters = name.Where(char.IsLetter).Take(5).ToArray();
+        return letters.Length > 0
+            ? new string(letters).ToUpperInvariant()
+            : name[..Math.Min(3, name.Length)].ToUpperInvariant();
+    }
+
     private static string Get(Dictionary<string, string> d, string key) =>
         (d.TryGetValue(key, out var v) ? v : "").Trim();
+}
+
+// --- Bulk Catalogue Import Handler -------------------------------------------
+
+public class BulkImportCatalogueCommandHandler
+    : IRequestHandler<BulkImportCatalogueCommand, BulkImportCatalogueResultDto>
+{
+    private readonly IApplicationDbContext _db;
+    private readonly ILogger<BulkImportCatalogueCommandHandler> _log;
+
+    public BulkImportCatalogueCommandHandler(
+        IApplicationDbContext db,
+        ILogger<BulkImportCatalogueCommandHandler> log)
+    {
+        _db = db; _log = log;
+    }
+
+    public async Task<BulkImportCatalogueResultDto> Handle(BulkImportCatalogueCommand cmd, CancellationToken ct)
+    {
+        List<Dictionary<string, string>> rows;
+        try
+        {
+            rows = cmd.FileName.EndsWith(".csv", StringComparison.OrdinalIgnoreCase)
+                ? ParseCsv(cmd.FileBytes)
+                : ParseExcel(cmd.FileBytes);
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException($"Could not read file: {ex.Message}");
+        }
+
+        var brands = await _db.Brands
+            .Include(b => b.Models)
+            .Where(b => !b.IsDeleted)
+            .ToListAsync(ct);
+
+        int brandsCreated = 0, brandsSkipped = 0, modelsCreated = 0, modelsSkipped = 0;
+        var brandsSeen    = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        // Pass 1: brands
+        bool anyNew = false;
+        foreach (var brandName in rows.Select(r => Get(r, "BrandName"))
+                                      .Where(n => !string.IsNullOrWhiteSpace(n))
+                                      .Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            var existing = brands.FirstOrDefault(b => b.Name.Equals(brandName, StringComparison.OrdinalIgnoreCase));
+            if (existing == null)
+            {
+                var firstRow = rows.First(r => Get(r, "BrandName").Equals(brandName, StringComparison.OrdinalIgnoreCase));
+                var code     = GetOrGenerate(Get(firstRow, "BrandCode"), brandName);
+                var country  = Get(firstRow, "BrandCountry");
+                var brand    = new Brand
+                {
+                    Name     = brandName,
+                    Code     = code,
+                    Country  = string.IsNullOrWhiteSpace(country) ? null : country,
+                    IsActive = true,
+                };
+                _db.Brands.Add(brand);
+                brands.Add(brand);
+                anyNew = true;
+                brandsCreated++;
+                _log.LogInformation("Bulk import: created brand '{Brand}'", brandName);
+            }
+            else
+            {
+                brandsSkipped++;
+            }
+        }
+        if (anyNew) { await _db.SaveChangesAsync(ct); anyNew = false; }
+
+        // Pass 2: models
+        foreach (var row in rows)
+        {
+            var brandName = Get(row, "BrandName");
+            var modelName = Get(row, "ModelName");
+            if (string.IsNullOrWhiteSpace(brandName) || string.IsNullOrWhiteSpace(modelName)) continue;
+
+            var brand = brands.FirstOrDefault(b => b.Name.Equals(brandName, StringComparison.OrdinalIgnoreCase));
+            if (brand == null) continue;
+
+            var existing = brand.Models.FirstOrDefault(m => m.Name.Equals(modelName, StringComparison.OrdinalIgnoreCase));
+            if (existing == null)
+            {
+                var code    = GetOrGenerate(Get(row, "ModelCode"), modelName);
+                var segment = Get(row, "ModelSegment");
+                var model   = new VehicleModel
+                {
+                    BrandId  = brand.Id,
+                    Name     = modelName,
+                    Code     = code,
+                    Segment  = string.IsNullOrWhiteSpace(segment) ? null : segment,
+                    IsActive = true,
+                };
+                _db.VehicleModels.Add(model);
+                brand.Models.Add(model);
+                anyNew = true;
+                modelsCreated++;
+            }
+            else
+            {
+                modelsSkipped++;
+            }
+        }
+        if (anyNew) await _db.SaveChangesAsync(ct);
+
+        return new BulkImportCatalogueResultDto(brandsCreated, brandsSkipped, modelsCreated, modelsSkipped);
+    }
+
+    private static string GetOrGenerate(string code, string name)
+    {
+        if (!string.IsNullOrWhiteSpace(code)) return code.Trim().ToUpperInvariant();
+        var letters = name.Where(char.IsLetter).Take(5).ToArray();
+        return letters.Length > 0
+            ? new string(letters).ToUpperInvariant()
+            : name[..Math.Min(3, name.Length)].ToUpperInvariant();
+    }
+
+    private static string Get(Dictionary<string, string> d, string key) =>
+        (d.TryGetValue(key, out var v) ? v : "").Trim();
+
+    private static List<Dictionary<string, string>> ParseCsv(byte[] bytes)
+    {
+        using var ms     = new MemoryStream(bytes);
+        using var reader = new StreamReader(ms, Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
+        using var csv    = new CsvReader(reader, new CsvConfiguration(CultureInfo.InvariantCulture)
+        {
+            HasHeaderRecord = true, MissingFieldFound = null, BadDataFound = null,
+            TrimOptions = TrimOptions.Trim,
+        });
+        csv.Read(); csv.ReadHeader();
+        var headers = csv.HeaderRecord ?? [];
+        var rows    = new List<Dictionary<string, string>>();
+        while (csv.Read())
+        {
+            var row = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var h in headers) row[h] = csv.GetField(h) ?? "";
+            rows.Add(row);
+        }
+        return rows;
+    }
+
+    private static List<Dictionary<string, string>> ParseExcel(byte[] bytes)
+    {
+        Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+        using var ms     = new MemoryStream(bytes);
+        using var reader = ExcelReaderFactory.CreateReader(ms);
+        var ds    = reader.AsDataSet(new ExcelDataSetConfiguration
+        {
+            ConfigureDataTable = _ => new ExcelDataTableConfiguration { UseHeaderRow = true }
+        });
+        var table = ds.Tables[0];
+        var rows  = new List<Dictionary<string, string>>();
+        foreach (System.Data.DataRow r in table.Rows)
+        {
+            var dict = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (System.Data.DataColumn c in table.Columns)
+                dict[c.ColumnName] = r[c]?.ToString()?.Trim() ?? "";
+            rows.Add(dict);
+        }
+        return rows;
+    }
 }

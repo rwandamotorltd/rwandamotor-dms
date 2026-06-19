@@ -7,8 +7,8 @@ public class Vehicle : BaseEntity
 {
     public string VIN { get; set; } = string.Empty;
     public string? PlateNumber { get; set; }
-    public Guid BrandId { get; set; }
-    public Guid ModelId { get; set; }
+    public Guid? BrandId { get; set; }
+    public Guid? ModelId { get; set; }
     public int Year { get; set; }
     public string? EngineNumber { get; set; }
     public string? Color { get; set; }

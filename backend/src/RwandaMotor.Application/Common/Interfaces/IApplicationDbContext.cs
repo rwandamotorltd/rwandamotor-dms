@@ -17,6 +17,15 @@ public interface IApplicationDbContext
     DbSet<FollowUp> FollowUps { get; }
     DbSet<ImportLog> ImportLogs { get; }
     DbSet<ImportLogRow> ImportLogRows { get; }
+    DbSet<JobCard> JobCards { get; }
+    DbSet<JobCardSequence> JobCardSequences { get; }
+    DbSet<SalesHistory> SalesHistories { get; }
+    DbSet<PermissionGroup> PermissionGroups { get; }
+    DbSet<CompanySettings> CompanySettings { get; }
+    DbSet<AuditLog> AuditLogs { get; }
+    DbSet<FollowUpInteraction> FollowUpInteractions { get; }
+    DbSet<Appointment> Appointments { get; }
+    DbSet<Notification> Notifications { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

@@ -31,7 +31,12 @@ const IMPORT_TYPES: { value: ImportType; label: string; description: string }[] 
   {
     value: "ServiceRecords",
     label: "Service History",
-    description: "Import past service records — VIN, service date, mileage, type, and technician.",
+    description: "Import past service records — VIN, service date, mileage, type, and technician. Vehicles not in the system are automatically created as External.",
+  },
+  {
+    value: "JobCards",
+    label: "Historical Job Cards",
+    description: "Import job cards from a previous system. Vehicles not in the system are automatically created as External.",
   },
 ];
 
@@ -44,6 +49,11 @@ const CSV_TEMPLATES: Record<ImportType, string[]> = {
   ServiceRecords: [
     "VIN", "ServiceDate", "MileageAtService",
     "ServiceType", "TechnicianName", "InvoiceNumber",
+  ],
+  JobCards: [
+    "VIN", "JobCardDate", "Mileage", "ServiceType",
+    "FuelLevel", "TechnicianName", "Status", "Notes",
+    "JobCardNumber", "CustomerName", "CustomerPhone",
   ],
 };
 

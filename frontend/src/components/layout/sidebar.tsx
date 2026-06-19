@@ -1,36 +1,46 @@
 "use client";
 
+import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
 import {
   LayoutDashboard, Car, Users, Wrench, TrendingUp,
   Upload, Settings, LogOut, Shield, ChevronLeft, ChevronRight,
-  UserCog, Activity, X
+  Activity, X, ClipboardList, History, ShoppingCart,
+  PhoneCall, CalendarDays, BarChart2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/auth-context";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { useState } from "react";
 
-// roles: null = all roles can see it; string[] = only those roles
-const NAV_ITEMS = [
-  { href: "/dashboard",          label: "Dashboard",         icon: LayoutDashboard, badge: null,  roles: null },
-  { href: "/vehicles",           label: "Vehicles",           icon: Car,             badge: null,  roles: null },
-  { href: "/customers",          label: "Customers",          icon: Users,           badge: null,  roles: null },
-  { href: "/service-records",    label: "Service Records",    icon: Wrench,          badge: null,  roles: null },
-  { href: "/retention",          label: "Retention",          icon: TrendingUp,      badge: "NEW", roles: null },
-  // TechnicalDirector cannot access Import Center
-  { href: "/import",             label: "Import Center",      icon: Upload,          badge: null,  roles: ["Admin", "CRMOfficer"] as string[] },
-  // Admin-only management pages
-  { href: "/admin/users",        label: "User Management",    icon: UserCog,         badge: null,  roles: ["Admin"] as string[] },
-  { href: "/admin/technicians",  label: "Technicians",        icon: Activity,        badge: null,  roles: ["Admin"] as string[] },
+interface NavItem {
+  href: string;
+  label: string;
+  icon: React.ElementType;
+  permission: string | null;
+  adminOnly?: boolean;
+}
+
+const NAV_ITEMS: NavItem[] = [
+  { href: "/dashboard",         label: "Dashboard",      icon: LayoutDashboard, permission: "nav.dashboard" },
+  { href: "/vehicles",          label: "Vehicles",        icon: Car,             permission: "nav.vehicles" },
+  { href: "/customers",         label: "Customers",       icon: Users,           permission: "nav.customers" },
+  { href: "/service-records",   label: "Service Records", icon: Wrench,          permission: "nav.serviceRecords" },
+  { href: "/job-cards",         label: "Job Cards",       icon: ClipboardList,   permission: "nav.jobCards" },
+  { href: "/retention",         label: "Retention",       icon: TrendingUp,      permission: "nav.retention" },
+  { href: "/follow-ups",        label: "Follow-ups",      icon: PhoneCall,       permission: "nav.retention" },
+  { href: "/appointments",      label: "Appointments",    icon: CalendarDays,    permission: "nav.retention" },
+  { href: "/reports",           label: "Reports",         icon: BarChart2,       permission: "nav.retention" },
+  { href: "/import",            label: "Import Center",   icon: Upload,          permission: "nav.import" },
+  { href: "/sales",             label: "Sales Records",   icon: ShoppingCart,    permission: "nav.sales" },
+  { href: "/activity",          label: "Activity Log",    icon: History,         permission: "nav.activity" },
+  { href: "/admin/technicians", label: "Technicians",     icon: Activity,        permission: null, adminOnly: true },
 ];
 
-const BOTTOM_ITEMS = [
-  { href: "/settings", label: "Settings", icon: Settings },
+const BOTTOM_NAV: NavItem[] = [
+  { href: "/settings", label: "Settings", icon: Settings, permission: "nav.settings" },
 ];
 
 interface SidebarProps {
@@ -42,15 +52,52 @@ interface SidebarProps {
 
 export function Sidebar({ collapsed, onToggle, mobileOpen = false, onMobileClose }: SidebarProps) {
   const pathname = usePathname();
-  const { user, logout } = useAuth();
+  const { user, logout, hasPermission } = useAuth();
 
   const initials = user?.fullName
     ? user.fullName.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2)
     : "?";
 
-  const visibleNavItems = NAV_ITEMS.filter(item =>
-    item.roles === null || (user?.role && item.roles.includes(user.role))
+  const isAdmin = user?.role === "Admin";
+
+  const visibleNavItems = NAV_ITEMS.filter(item => {
+    if (item.adminOnly) return isAdmin;
+    if (!item.permission) return true;
+    return hasPermission(item.permission);
+  });
+
+  const visibleBottomItems = BOTTOM_NAV.filter(item =>
+    !item.permission || hasPermission(item.permission)
   );
+
+  function NavLink({ href, label, icon: Icon }: { href: string; label: string; icon: React.ElementType }) {
+    const isActive = pathname === href || pathname.startsWith(href + "/");
+    const link = (
+      <Link
+        href={href}
+        onClick={mobileOpen ? onMobileClose : undefined}
+        className={cn(
+          "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-150",
+          collapsed ? "justify-center" : "",
+          isActive
+            ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm"
+            : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+        )}
+      >
+        <Icon className="w-5 h-5 shrink-0" />
+        {!collapsed && <span className="truncate">{label}</span>}
+      </Link>
+    );
+    if (collapsed) {
+      return (
+        <Tooltip>
+          <TooltipTrigger className="w-full">{link}</TooltipTrigger>
+          <TooltipContent side="right">{label}</TooltipContent>
+        </Tooltip>
+      );
+    }
+    return link;
+  }
 
   return (
     <TooltipProvider delay={0}>
@@ -59,7 +106,6 @@ export function Sidebar({ collapsed, onToggle, mobileOpen = false, onMobileClose
         transition={{ duration: 0.2, ease: "easeInOut" }}
         className={cn(
           "relative flex flex-col h-screen bg-sidebar border-r border-sidebar-border shrink-0 overflow-hidden",
-          // On mobile: hidden by default, shown as overlay when mobileOpen
           "hidden md:flex",
           mobileOpen && "!flex fixed inset-y-0 left-0 z-30"
         )}
@@ -78,7 +124,6 @@ export function Sidebar({ collapsed, onToggle, mobileOpen = false, onMobileClose
               <p className="text-xs text-sidebar-foreground/50 leading-none mt-0.5">CSSR Platform</p>
             </motion.div>
           )}
-          {/* Close button on mobile */}
           {mobileOpen && !collapsed && (
             <button
               onClick={onMobileClose}
@@ -89,73 +134,18 @@ export function Sidebar({ collapsed, onToggle, mobileOpen = false, onMobileClose
           )}
         </div>
 
-        {/* Navigation */}
+        {/* Main Navigation */}
         <nav className="flex-1 overflow-y-auto py-4 px-2 space-y-1">
-          {visibleNavItems.map((item) => {
-            const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
-            const Icon = item.icon;
-
-            const navItem = (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-150",
-                  collapsed ? "justify-center" : "",
-                  isActive
-                    ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm"
-                    : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                )}
-              >
-                <Icon className="w-5 h-5 shrink-0" />
-                {!collapsed && (
-                  <span className="truncate">{item.label}</span>
-                )}
-                {!collapsed && item.badge && (
-                  <Badge variant="secondary" className="ml-auto text-[10px] py-0 px-1.5 h-4">
-                    {item.badge}
-                  </Badge>
-                )}
-              </Link>
-            );
-
-            if (collapsed) {
-              return (
-                <Tooltip key={item.href}>
-                  <TooltipTrigger className="w-full">{navItem}</TooltipTrigger>
-                  <TooltipContent side="right">{item.label}</TooltipContent>
-                </Tooltip>
-              );
-            }
-            return navItem;
-          })}
+          {visibleNavItems.map((item) => (
+            <NavLink key={item.href} href={item.href} label={item.label} icon={item.icon} />
+          ))}
         </nav>
 
         {/* Bottom section */}
         <div className="border-t border-sidebar-border p-2 space-y-1">
-          {BOTTOM_ITEMS.map((item) => {
-            const Icon = item.icon;
-            const btn = (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-all",
-                  collapsed ? "justify-center" : ""
-                )}
-              >
-                <Icon className="w-5 h-5 shrink-0" />
-                {!collapsed && <span>{item.label}</span>}
-              </Link>
-            );
-            if (collapsed) return (
-              <Tooltip key={item.href}>
-                <TooltipTrigger className="w-full">{btn}</TooltipTrigger>
-                <TooltipContent side="right">{item.label}</TooltipContent>
-              </Tooltip>
-            );
-            return btn;
-          })}
+          {visibleBottomItems.map((item) => (
+            <NavLink key={item.href} href={item.href} label={item.label} icon={item.icon} />
+          ))}
 
           {/* User profile */}
           <div className={cn(
