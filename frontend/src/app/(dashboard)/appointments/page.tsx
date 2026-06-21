@@ -26,6 +26,7 @@ import {
 } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/auth-context";
+import { useServiceTypes } from "@/hooks/use-service-types";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -39,16 +40,7 @@ const STATUS_MAP: Record<string, { label: string; color: string }> = {
 
 const PENDING = new Set(["Scheduled", "Confirmed"]);
 
-const SERVICE_TYPES = [
-  { value: "RoutineMaintenance",  label: "Routine Maintenance" },
-  { value: "OilChange",           label: "Oil Change" },
-  { value: "TireService",         label: "Tyre Service" },
-  { value: "BrakeService",        label: "Brake Service" },
-  { value: "DiagnosticsRepair",   label: "Diagnostics & Repair" },
-  { value: "BodyworkPainting",    label: "Bodywork & Painting" },
-  { value: "PDI",                 label: "Pre-Delivery Inspection" },
-  { value: "Other",               label: "Other" },
-];
+// SERVICE_TYPES now comes from useServiceTypes() inside components
 
 const DURATIONS = [15, 30, 45, 60, 90, 120];
 
@@ -78,6 +70,8 @@ function NewAppointmentDialog({ open, onClose }: { open: boolean; onClose: () =>
     queryKey: ["technicians"],
     queryFn: () => techniciansApi.list(),
   });
+
+  const serviceTypes = useServiceTypes();
 
   const mutation = useMutation({
     mutationFn: (payload: BookAppointmentPayload) => appointmentsApi.book(payload),
@@ -179,7 +173,7 @@ function NewAppointmentDialog({ open, onClose }: { open: boolean; onClose: () =>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {SERVICE_TYPES.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
+                  {serviceTypes.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>

@@ -18,7 +18,8 @@ public record UpdateCompanySettingsCommand(
     bool DeliveryNoteShowFooter,
     string? FooterDisclaimer,
     string? EmailJobCardMessage,
-    string? EmailDeliveryNoteMessage
+    string? EmailDeliveryNoteMessage,
+    string? ServiceTypesConfig
 ) : IRequest<bool>;
 
 public class UpdateCompanySettingsCommandHandler : IRequestHandler<UpdateCompanySettingsCommand, bool>
@@ -34,7 +35,6 @@ public class UpdateCompanySettingsCommandHandler : IRequestHandler<UpdateCompany
 
         if (settings is null)
         {
-            // Row missing — create it
             settings = new CompanySettings { Id = CompanySettings.SingletonId };
             _db.CompanySettings.Add(settings);
         }
@@ -52,6 +52,7 @@ public class UpdateCompanySettingsCommandHandler : IRequestHandler<UpdateCompany
         settings.FooterDisclaimer          = request.FooterDisclaimer;
         settings.EmailJobCardMessage       = request.EmailJobCardMessage;
         settings.EmailDeliveryNoteMessage  = request.EmailDeliveryNoteMessage;
+        settings.ServiceTypesConfig        = request.ServiceTypesConfig;
         settings.UpdatedAt                 = DateTime.UtcNow;
 
         await _db.SaveChangesAsync(ct);

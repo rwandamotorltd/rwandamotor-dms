@@ -11,6 +11,7 @@ import { Search, Wrench, ChevronLeft, ChevronRight, Calendar, Pencil, X, Trash2,
 import { serviceRecordsApi, techniciansApi, type UpdateServiceRecordPayload } from "@/lib/api";
 import type { ServiceRecordListItem, ServiceType } from "@/types";
 import { formatDate, formatMileage, SERVICE_TYPE_LABELS } from "@/lib/utils";
+import { useServiceTypes } from "@/hooks/use-service-types";
 import { useAuth } from "@/contexts/auth-context";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -22,10 +23,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 
-const SERVICE_TYPES: ServiceType[] = [
-  "RoutineMaintenance", "OilChange", "MajorService", "TyreRotation",
-  "BrakeService", "WarrantyRepair", "ElectricalDiagnostics", "Inspection",
-];
+// SERVICE_TYPES is now dynamic via useServiceTypes() inside each component
 
 // ── Edit Modal ────────────────────────────────────────────────────────────────
 
@@ -64,6 +62,8 @@ function EditServiceRecordModal({
     queryKey: ["technicians"],
     queryFn: () => techniciansApi.list(),
   });
+
+  const serviceTypes = useServiceTypes();
 
   const mutation = useMutation({
     mutationFn: (payload: UpdateServiceRecordPayload) => serviceRecordsApi.update(payload),
@@ -140,8 +140,8 @@ function EditServiceRecordModal({
                 <SelectValue placeholder="Select service type" />
               </SelectTrigger>
               <SelectContent>
-                {SERVICE_TYPES.map(t => (
-                  <SelectItem key={t} value={t}>{SERVICE_TYPE_LABELS[t]}</SelectItem>
+                {serviceTypes.map(t => (
+                  <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -280,6 +280,7 @@ export default function ServiceRecordsPage() {
   const qc = useQueryClient();
   const canEdit   = hasPermission("serviceRecords.edit");
   const canDelete = hasPermission("serviceRecords.delete");
+  const serviceTypesForFilter = useServiceTypes();
 
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -501,7 +502,7 @@ export default function ServiceRecordsPage() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Types</SelectItem>
-            {SERVICE_TYPES.map(t => <SelectItem key={t} value={t}>{SERVICE_TYPE_LABELS[t]}</SelectItem>)}
+            {serviceTypesForFilter.map(t => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
           </SelectContent>
         </Select>
         <div className="flex items-center gap-2">

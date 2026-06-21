@@ -10,7 +10,7 @@ public class CompanySettings
 
     public Guid Id { get; set; } = SingletonId;
 
-    // ── Company Info ──────────────────────────────────────────
+    // Company Info
     public string CompanyName { get; set; } = "RwandaMotor";
     public string? Address { get; set; }
     public string? Phone { get; set; }
@@ -18,27 +18,28 @@ public class CompanySettings
     public string? TinNumber { get; set; }
     public string? Website { get; set; }
 
-    // ── Print Toggles ─────────────────────────────────────────
-    /// <summary>Show company header block on Job Card prints</summary>
+    // Print Toggles
     public bool JobCardShowHeader { get; set; } = true;
-    /// <summary>Show footer disclaimer on Job Card prints</summary>
     public bool JobCardShowFooter { get; set; } = true;
-    /// <summary>Show company header block on Delivery Note prints</summary>
     public bool DeliveryNoteShowHeader { get; set; } = true;
-    /// <summary>Show footer disclaimer on Delivery Note prints</summary>
     public bool DeliveryNoteShowFooter { get; set; } = true;
 
-    // ── Footer / Terms ────────────────────────────────────────
+    // Footer / Terms
     public string? FooterDisclaimer { get; set; } =
         "RwandaMotor declines all responsibility for materials not listed above.";
 
-    // ── Email Templates ───────────────────────────────────────
+    // Email Templates
     // Job card supports: {CustomerName}
     // Delivery note supports: {CustomerName}, {VehicleModel}
     public string? EmailJobCardMessage { get; set; } =
         "Dear {CustomerName}, your vehicle has been received and a repair order has been opened. Our team will keep you informed of progress.";
     public string? EmailDeliveryNoteMessage { get; set; } =
         "Dear {CustomerName}, thank you for trusting RWANDAMOTOR LTD with your {VehicleModel}. It was a pleasure serving you and we hope our service met your expectations. We look forward to welcoming you again.";
+
+    // Service Types Config
+    // JSON: [{ "value": "OilChange", "label": "Oil Change", "isActive": true, "isBuiltIn": true }]
+    // Null = system defaults apply. Admin-managed via Settings -> Catalogue.
+    public string? ServiceTypesConfig { get; set; }
 
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 }

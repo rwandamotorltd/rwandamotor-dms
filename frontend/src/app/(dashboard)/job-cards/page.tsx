@@ -20,6 +20,7 @@ import { toast } from "sonner";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Plus, Search, FileText, ArrowRight, Printer, Mail, ClipboardList, X } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
+import { useServiceTypes } from "@/hooks/use-service-types";
 import { format } from "date-fns";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -30,11 +31,7 @@ const ACCESSORIES = [
   "Owner's Manual", "Locking Wheel Nut Key",
 ];
 
-const SERVICE_TYPES: ServiceType[] = [
-  "RoutineMaintenance","OilChange","MajorService","TyreRotation","BrakeService",
-  "TransmissionService","AirConditioningService","ElectricalDiagnostics","BodyRepair",
-  "WarrantyRepair","RecallRepair","PDI","EmergencyRepair","Inspection","Other",
-];
+// SERVICE_TYPES now comes from useServiceTypes() inside components
 
 const FUEL_LEVELS: { value: FuelLevel; label: string }[] = [
   { value: "Empty",        label: "Empty (0)" },
@@ -470,6 +467,8 @@ function CreateJobCardDialog({ open, onClose, onCreated }: {
     enabled: open,
   });
 
+  const serviceTypes = useServiceTypes();
+
   const mutation = useMutation({
     mutationFn: (payload: CreateJobCardPayload) => jobCardsApi.create(payload),
     onSuccess: (res) => {
@@ -649,10 +648,14 @@ function CreateJobCardDialog({ open, onClose, onCreated }: {
               <div className="space-y-1">
                 <Label>Service Type <span className="text-red-500">*</span></Label>
                 <Select value={serviceType} onValueChange={v => setServiceType(v as ServiceType)}>
-                  <SelectTrigger className="w-full"><span className="flex flex-1 text-left">{serviceTypeLabel(serviceType)}</span></SelectTrigger>
+                  <SelectTrigger className="w-full">
+                    <span className="flex flex-1 text-left">
+                      {serviceTypes.find(t => t.value === serviceType)?.label ?? serviceTypeLabel(serviceType)}
+                    </span>
+                  </SelectTrigger>
                   <SelectContent>
-                    {SERVICE_TYPES.map(t => (
-                      <SelectItem key={t} value={t}>{serviceTypeLabel(t)}</SelectItem>
+                    {serviceTypes.map(t => (
+                      <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -828,6 +831,7 @@ function JobCardsContent() {
   const canPrint   = hasPermission("jobCards.print");
   const canShare   = hasPermission("jobCards.share");
   const canConvert = hasPermission("jobCards.convert");
+  const serviceTypesForFilter = useServiceTypes();
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<JobCardStatus | "">(() => {
@@ -906,12 +910,16 @@ function JobCardsContent() {
         </Select>
         <Select value={serviceTypeFilter} onValueChange={v => { setServiceTypeFilter(v as ServiceType | ""); setPage(1); }}>
           <SelectTrigger className="w-48">
-            <span className={`flex flex-1 text-left${!serviceTypeFilter ? " text-muted-foreground" : ""}`}>{serviceTypeFilter ? serviceTypeLabel(serviceTypeFilter) : "All service types"}</span>
+            <span className={`flex flex-1 text-left${!serviceTypeFilter ? " text-muted-foreground" : ""}`}>
+              {serviceTypeFilter
+                ? (serviceTypesForFilter.find(t => t.value === serviceTypeFilter)?.label ?? serviceTypeLabel(serviceTypeFilter))
+                : "All service types"}
+            </span>
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="">All service types</SelectItem>
-            {SERVICE_TYPES.map(t => (
-              <SelectItem key={t} value={t}>{serviceTypeLabel(t)}</SelectItem>
+            {serviceTypesForFilter.map(t => (
+              <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
             ))}
           </SelectContent>
         </Select>

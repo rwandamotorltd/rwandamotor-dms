@@ -160,6 +160,15 @@ using (var scope = app.Services.CreateScope())
                 ) THEN
                     ALTER TABLE ""CompanySettings"" ADD COLUMN ""EmailDeliveryNoteMessage"" text;
                 END IF;
+
+                IF NOT EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_schema = 'public'
+                      AND table_name   = 'CompanySettings'
+                      AND column_name  = 'ServiceTypesConfig'
+                ) THEN
+                    ALTER TABLE ""CompanySettings"" ADD COLUMN ""ServiceTypesConfig"" text;
+                END IF;
             END $$;");
     }
     catch (Exception ex) { Log.Error(ex, "Schema column patch failed"); }

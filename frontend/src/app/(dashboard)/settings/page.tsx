@@ -17,7 +17,8 @@ import {
   type CatalogueBrandDto, type CatalogueModelDto, type BulkImportCatalogueResult,
 } from "@/lib/api";
 import { jobCardsApi } from "@/lib/api";
-import type { CompanySettings } from "@/types";
+import type { CompanySettings, ServiceTypeItem } from "@/types";
+import { DEFAULT_SERVICE_TYPES, parseServiceTypesConfig } from "@/hooks/use-service-types";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -102,6 +103,29 @@ const MODULES: ModuleDef[] = [
     keys: {
       view: ["nav.retention"],
       full: ["nav.retention", "retention.manage"],
+    },
+  },
+  {
+    key: "followUps", label: "Follow-ups",
+    levels: ["none", "view", "full"],
+    keys: {
+      view: ["nav.followUps", "followUps.view"],
+      full: ["nav.followUps", "followUps.view", "followUps.manage"],
+    },
+  },
+  {
+    key: "appointments", label: "Appointments",
+    levels: ["none", "view", "full"],
+    keys: {
+      view: ["nav.appointments", "appointments.view"],
+      full: ["nav.appointments", "appointments.view", "appointments.manage"],
+    },
+  },
+  {
+    key: "reports", label: "Reports",
+    levels: ["none", "view"],
+    keys: {
+      view: ["nav.reports"],
     },
   },
   {
@@ -845,6 +869,7 @@ const EMPTY_COMPANY: CompanySettings = {
   footerDisclaimer: "RwandaMotor declines all responsibility for materials not listed above.",
   emailJobCardMessage: DEFAULT_JC_MSG,
   emailDeliveryNoteMessage: DEFAULT_DN_MSG,
+  serviceTypesConfig: null,
 };
 
 function CompanyTab() {
@@ -1060,23 +1085,151 @@ function CompanyTab() {
 
 // ─── Catalogue Tab ─────────────────────────────────────────────────────────────
 
-const SERVICE_TYPE_LABELS: { key: string; label: string }[] = [
-  { key: "RoutineMaintenance",     label: "Routine Maintenance" },
-  { key: "OilChange",             label: "Oil Change" },
-  { key: "MajorService",          label: "Major Service" },
-  { key: "TyreRotation",          label: "Tyre Rotation" },
-  { key: "BrakeService",          label: "Brake Service" },
-  { key: "TransmissionService",   label: "Transmission Service" },
-  { key: "AirConditioningService",label: "Air Conditioning" },
-  { key: "ElectricalDiagnostics", label: "Electrical Diagnostics" },
-  { key: "BodyRepair",            label: "Body Repair" },
-  { key: "WarrantyRepair",        label: "Warranty Repair" },
-  { key: "RecallRepair",          label: "Recall Repair" },
-  { key: "PDI",                   label: "PDI (Pre-Delivery Inspection)" },
-  { key: "EmergencyRepair",       label: "Emergency Repair" },
-  { key: "Inspection",            label: "Inspection" },
-  { key: "Other",                 label: "Other" },
-];
+// ─── Service Types Management Card ───────────────────────────────────────────
+
+function ServiceTypesCard() {
+  const qc = useQueryClient();
+  const [types, setTypes]           = useState<ServiceTypeItem[]>([]);
+  const [editingIdx, setEditingIdx] = useState<number | null>(null);
+  const [editLabel, setEditLabel]   = useState("");
+  const [newValue, setNewValue]     = useState("");
+  const [newLabel, setNewLabel]     = useState("");
+  const [showAdd, setShowAdd]       = useState(false);
+
+  const { data: settings, isLoading } = useQuery({
+    queryKey: ["company-settings"],
+    queryFn:  companySettingsApi.get,
+    staleTime: 10 * 60_000,
+  });
+
+  useEffect(() => {
+    if (settings !== undefined) setTypes(parseServiceTypesConfig(settings?.serviceTypesConfig));
+  }, [settings]);
+
+  const saveMutation = useMutation({
+    mutationFn: (updatedTypes: ServiceTypeItem[]) => {
+      if (!settings) throw new Error("Settings not loaded");
+      return companySettingsApi.update({ ...settings, serviceTypesConfig: JSON.stringify(updatedTypes) });
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["company-settings"] }); toast.success("Service types saved"); },
+    onError:   () => toast.error("Failed to save service types"),
+  });
+
+  const toggle = (idx: number) =>
+    setTypes(prev => prev.map((t, i) => i === idx ? { ...t, isActive: !t.isActive } : t));
+
+  const startEdit = (idx: number) => { setEditingIdx(idx); setEditLabel(types[idx].label); };
+
+  const commitEdit = (idx: number) => {
+    if (editLabel.trim()) setTypes(prev => prev.map((t, i) => i === idx ? { ...t, label: editLabel.trim() } : t));
+    setEditingIdx(null);
+  };
+
+  const addType = () => {
+    const value = newValue.trim().replace(/\s+/g, "");
+    const label = newLabel.trim();
+    if (!value || !label) return;
+    if (types.some(t => t.value.toLowerCase() === value.toLowerCase())) {
+      toast.error("A type with that key already exists");
+      return;
+    }
+    setTypes(prev => [...prev, { value, label, isActive: true, isBuiltIn: false }]);
+    setNewValue(""); setNewLabel(""); setShowAdd(false);
+  };
+
+  const removeCustom = (idx: number) => setTypes(prev => prev.filter((_, i) => i !== idx));
+
+  if (isLoading) return <Skeleton className="h-48 w-full rounded-xl" />;
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Wrench className="w-4 h-4 text-muted-foreground" />
+            <CardTitle className="text-base">Service Types</CardTitle>
+          </div>
+          <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setShowAdd(v => !v)}>
+            <Plus className="w-3.5 h-3.5" /> Add type
+          </Button>
+        </div>
+        <CardDescription>Enable/disable or rename service types shown in job cards, appointments, and service records.</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {showAdd && (
+          <div className="flex gap-2 p-3 border border-dashed border-border rounded-lg">
+            <div className="flex-1 space-y-1">
+              <Input placeholder="Key (e.g. TyreBalance)" value={newValue}
+                onChange={e => setNewValue(e.target.value)} className="h-8 text-sm" />
+              <p className="text-[11px] text-muted-foreground">PascalCase, no spaces</p>
+            </div>
+            <div className="flex-1">
+              <Input placeholder="Label (e.g. Tyre Balancing)" value={newLabel}
+                onChange={e => setNewLabel(e.target.value)} className="h-8 text-sm"
+                onKeyDown={e => e.key === "Enter" && addType()} />
+            </div>
+            <Button size="sm" onClick={addType} className="shrink-0">Add</Button>
+            <button onClick={() => { setShowAdd(false); setNewValue(""); setNewLabel(""); }}
+              className="p-1.5 rounded-md hover:bg-muted">
+              <X className="w-4 h-4 text-muted-foreground" />
+            </button>
+          </div>
+        )}
+
+        <div className="divide-y divide-border rounded-lg border border-border overflow-hidden">
+          {types.map((t, idx) => (
+            <div key={t.value} className="flex items-center gap-3 px-3 py-2.5 bg-card">
+              <div className={`w-2 h-2 rounded-full shrink-0 ${t.isActive ? "bg-emerald-500" : "bg-slate-300 dark:bg-slate-600"}`} />
+
+              {editingIdx === idx ? (
+                <Input autoFocus className="h-7 text-sm flex-1" value={editLabel}
+                  onChange={e => setEditLabel(e.target.value)}
+                  onBlur={() => commitEdit(idx)}
+                  onKeyDown={e => { if (e.key === "Enter") commitEdit(idx); if (e.key === "Escape") setEditingIdx(null); }} />
+              ) : (
+                <span className={`flex-1 text-sm truncate ${!t.isActive ? "text-muted-foreground line-through" : ""}`}>
+                  {t.label}
+                </span>
+              )}
+
+              <span className="text-[10px] text-muted-foreground font-mono shrink-0 hidden sm:inline">{t.value}</span>
+
+              <div className="flex items-center gap-1 shrink-0">
+                <button onClick={() => startEdit(idx)} title="Rename"
+                  className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+                  <Pencil className="w-3.5 h-3.5" />
+                </button>
+                <button onClick={() => toggle(idx)} title={t.isActive ? "Disable" : "Enable"}
+                  className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors ${
+                    t.isActive
+                      ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100"
+                      : "bg-muted text-muted-foreground hover:bg-muted/80"
+                  }`}>
+                  {t.isActive ? "Active" : "Off"}
+                </button>
+                {!t.isBuiltIn && (
+                  <button onClick={() => removeCustom(idx)} title="Delete custom type"
+                    className="p-1.5 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors">
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="flex justify-end pt-1">
+          <Button size="sm" disabled={saveMutation.isPending} onClick={() => saveMutation.mutate(types)} className="gap-2">
+            <Save className="w-3.5 h-3.5" />
+            {saveMutation.isPending ? "Saving…" : "Save Service Types"}
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ─── Catalogue Tab (Brands / Models / Service Types) ────────────────────────
 
 interface BrandForm { name: string; code: string; country: string; }
 interface ModelForm  { name: string; code: string; segment: string; }
@@ -1328,30 +1481,7 @@ function CatalogueTab() {
         </CardContent>
       </Card>
 
-      {/* Service Types */}
-      <Card>
-        <CardHeader className="pb-3">
-          <div className="flex items-center gap-2">
-            <Wrench className="w-4 h-4 text-muted-foreground" />
-            <CardTitle className="text-base">Service Types</CardTitle>
-          </div>
-          <CardDescription>System-defined service types available on job cards</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-            {SERVICE_TYPE_LABELS.map(({ key, label }) => (
-              <div key={key} className="flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm">
-                <div className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
-                <span className="truncate">{label}</span>
-              </div>
-            ))}
-          </div>
-          <p className="text-xs text-muted-foreground mt-3 flex items-center gap-1.5">
-            <Database className="w-3.5 h-3.5" />
-            Service types are system-defined. Contact your administrator to add new types.
-          </p>
-        </CardContent>
-      </Card>
+      <ServiceTypesCard />
     </div>
   );
 }

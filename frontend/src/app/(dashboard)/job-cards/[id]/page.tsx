@@ -6,6 +6,7 @@ import { jobCardsApi, companySettingsApi, techniciansApi } from "@/lib/api";
 import type { CompanySettings, ServiceType, FuelLevel } from "@/types";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/contexts/auth-context";
+import { useServiceTypes } from "@/hooks/use-service-types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -18,11 +19,7 @@ import { ArrowLeft, Printer, ArrowRight, CheckCircle, XCircle, Pencil, X, Save }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const SERVICE_TYPES: ServiceType[] = [
-  "RoutineMaintenance","OilChange","MajorService","TyreRotation",
-  "BrakeService","TransmissionService","AirConditioningService","ElectricalDiagnostics",
-  "BodyRepair","WarrantyRepair","RecallRepair","PDI","EmergencyRepair","Inspection","Other",
-];
+// SERVICE_TYPES now comes from useServiceTypes() inside components
 
 const FUEL_LEVELS: FuelLevel[] = ["Empty","Quarter","Half","ThreeQuarter","Full"];
 
@@ -560,6 +557,8 @@ function JobCardDetailContent() {
     queryFn: () => techniciansApi.list(),
   });
 
+  const serviceTypes = useServiceTypes();
+
   // Auto-print if ?print=1
   useEffect(() => {
     if (searchParams.get("print") === "1" && data && companySettings) {
@@ -656,6 +655,7 @@ function JobCardDetailContent() {
             deliveryNoteShowHeader: true, deliveryNoteShowFooter: true,
             footerDisclaimer: "RwandaMotor declines all responsibility for materials not listed above.",
             emailJobCardMessage: null, emailDeliveryNoteMessage: null,
+            serviceTypesConfig: null,
           }}
         />
       </div>
@@ -813,8 +813,8 @@ function JobCardDetailContent() {
                     <Select value={ef.serviceType} onValueChange={v => setEditForm(f => f ? { ...f, serviceType: v as ServiceType } : f)}>
                       <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        {SERVICE_TYPES.map(s => (
-                          <SelectItem key={s} value={s}>{s.replace(/([A-Z])/g, " $1").trim()}</SelectItem>
+                        {serviceTypes.map(s => (
+                          <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>

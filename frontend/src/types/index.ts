@@ -411,6 +411,14 @@ export interface CompanySettings {
   footerDisclaimer: string | null;
   emailJobCardMessage: string | null;
   emailDeliveryNoteMessage: string | null;
+  serviceTypesConfig: string | null;
+}
+
+export interface ServiceTypeItem {
+  value: string;
+  label: string;
+  isActive: boolean;
+  isBuiltIn: boolean;
 }
 
 // ============================================================
