@@ -80,7 +80,8 @@ function UserAvatar({ name, email }: { name: string; email: string }) {
 }
 
 function ActivityRow({ entry }: { entry: ActivityLogEntry }) {
-  const date = parseISO(entry.occurredAt);
+  const utcStr = /Z|[+-]\d{2}:?\d{2}$/.test(entry.occurredAt) ? entry.occurredAt : entry.occurredAt + "Z";
+  const date = parseISO(utcStr);
   const entityLabel = ENTITY_LABELS[entry.entityType] ?? entry.entityType;
   const href = entry.entityId && ENTITY_LINK[entry.entityType]
     ? ENTITY_LINK[entry.entityType](entry.entityId)
