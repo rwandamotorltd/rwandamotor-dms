@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
   Car, Users, TrendingUp, AlertTriangle,
@@ -47,6 +48,9 @@ function getGreeting() {
 
 export default function DashboardPage() {
   const { user, hasPermission } = useAuth();
+  const [greeting, setGreeting] = useState("");
+
+  useEffect(() => { setGreeting(getGreeting()); }, []);
 
   const showKpi         = hasPermission("dashboard.kpi");
   const showRetention   = hasPermission("dashboard.retention");
@@ -85,7 +89,7 @@ export default function DashboardPage() {
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-2xl font-bold tracking-tight">
-              {getGreeting()}{firstName ? `, ${firstName}` : ""} 👋
+              {greeting}{firstName ? `, ${firstName}` : ""} 👋
             </h2>
             <p className="text-muted-foreground text-sm mt-0.5">
               Here&apos;s your overview for today.
