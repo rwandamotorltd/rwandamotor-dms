@@ -1089,7 +1089,7 @@ function CompanyTab() {
 
 function ServiceTypesCard() {
   const qc = useQueryClient();
-  const [types, setTypes]           = useState<ServiceTypeItem[]>([]);
+  const [types, setTypes]           = useState<ServiceTypeItem[]>(DEFAULT_SERVICE_TYPES);
   const [editingIdx, setEditingIdx] = useState<number | null>(null);
   const [editLabel, setEditLabel]   = useState("");
   const [newValue, setNewValue]     = useState("");

@@ -70,6 +70,9 @@ export default function DashboardPage() {
   const kpis = data;
   const firstName = user?.fullName?.split(" ")[0] ?? "";
 
+  const retentionTrend    = kpis?.retentionTrend  ?? [];
+  const brandRetention    = kpis?.brandRetention  ?? [];
+
   const statusDistribution = kpis ? [
     { name: "Active",    value: kpis.activeVehicles,    color: STATUS_COLORS.Active },
     { name: "Due Soon",  value: kpis.dueSoonVehicles,   color: STATUS_COLORS.DueSoon },
@@ -203,7 +206,7 @@ export default function DashboardPage() {
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={260}>
-                  <AreaChart data={kpis.retentionTrend} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+                  <AreaChart data={retentionTrend} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
                     <defs>
                       <linearGradient id="retentionGrad" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="5%"  stopColor="#6366f1" stopOpacity={0.3} />
@@ -259,7 +262,7 @@ export default function DashboardPage() {
           </div>
 
           {/* Brand Retention */}
-          {kpis.brandRetention.length > 0 && (
+          {brandRetention.length > 0 && (
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-base">Brand Retention Performance</CardTitle>
@@ -267,7 +270,7 @@ export default function DashboardPage() {
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={240}>
-                  <BarChart data={kpis.brandRetention} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+                  <BarChart data={brandRetention} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="currentColor" strokeOpacity={0.08} vertical={false} />
                     <XAxis dataKey="brandName" tick={{ fontSize: 12 }} tickLine={false} axisLine={false} />
                     <YAxis tick={{ fontSize: 11 }} tickLine={false} axisLine={false} domain={[0, 100]} tickFormatter={v => `${v}%`} />
@@ -277,7 +280,7 @@ export default function DashboardPage() {
                       contentStyle={{ borderRadius: "8px", border: "1px solid var(--border)", background: "var(--card)" }}
                     />
                     <Bar dataKey="retentionRate" radius={[4, 4, 0, 0]}>
-                      {kpis.brandRetention.map((_, idx) => (
+                      {brandRetention.map((_, idx) => (
                         <Cell key={idx} fill={CHART_COLORS[idx % CHART_COLORS.length]} />
                       ))}
                     </Bar>
