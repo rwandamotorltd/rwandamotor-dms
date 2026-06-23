@@ -69,11 +69,12 @@ export function Header({ onMenuClick }: HeaderProps) {
 
   const pageTitle = BREADCRUMBS[pathname] ?? BREADCRUMBS[Object.keys(BREADCRUMBS).find(k => pathname.startsWith(k)) ?? ""] ?? "Dashboard";
 
-  const { data: notifData } = useQuery({
+  const { data: notifData, isLoading: notifLoading, isError: notifError } = useQuery({
     queryKey: ["notifications"],
     queryFn: notificationsApi.get,
     refetchInterval: 30_000,
     staleTime: 20_000,
+    retry: 1,
   });
 
   const unreadCount = notifData?.unreadCount ?? 0;
@@ -222,7 +223,11 @@ export function Header({ onMenuClick }: HeaderProps) {
               )}
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            {notifications.length === 0 ? (
+            {notifLoading ? (
+              <div className="py-8 text-center text-sm text-muted-foreground">Loading…</div>
+            ) : notifError ? (
+              <div className="py-8 text-center text-sm text-muted-foreground">Could not load notifications</div>
+            ) : notifications.length === 0 ? (
               <div className="py-8 text-center text-sm text-muted-foreground">No notifications</div>
             ) : (
               <ScrollArea className="max-h-[360px]">
