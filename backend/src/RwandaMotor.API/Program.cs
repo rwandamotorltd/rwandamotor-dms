@@ -140,32 +140,36 @@ using (var scope = app.Services.CreateScope())
     // not yet created by migrations (idempotent, runs on every startup).
     try
     {
+        // Use pg_catalog (not information_schema) — reliable for mixed-case quoted identifiers
         await db.Database.ExecuteSqlRawAsync(@"
             DO $$
             BEGIN
                 IF NOT EXISTS (
-                    SELECT 1 FROM information_schema.columns
-                    WHERE table_schema = 'public'
-                      AND table_name   = 'CompanySettings'
-                      AND column_name  = 'EmailJobCardMessage'
+                    SELECT 1 FROM pg_catalog.pg_attribute a
+                    JOIN pg_catalog.pg_class c ON c.oid = a.attrelid
+                    JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+                    WHERE c.relname = 'CompanySettings' AND n.nspname = 'public'
+                      AND a.attname = 'EmailJobCardMessage' AND a.attnum > 0 AND NOT a.attisdropped
                 ) THEN
                     ALTER TABLE ""CompanySettings"" ADD COLUMN ""EmailJobCardMessage"" text;
                 END IF;
 
                 IF NOT EXISTS (
-                    SELECT 1 FROM information_schema.columns
-                    WHERE table_schema = 'public'
-                      AND table_name   = 'CompanySettings'
-                      AND column_name  = 'EmailDeliveryNoteMessage'
+                    SELECT 1 FROM pg_catalog.pg_attribute a
+                    JOIN pg_catalog.pg_class c ON c.oid = a.attrelid
+                    JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+                    WHERE c.relname = 'CompanySettings' AND n.nspname = 'public'
+                      AND a.attname = 'EmailDeliveryNoteMessage' AND a.attnum > 0 AND NOT a.attisdropped
                 ) THEN
                     ALTER TABLE ""CompanySettings"" ADD COLUMN ""EmailDeliveryNoteMessage"" text;
                 END IF;
 
                 IF NOT EXISTS (
-                    SELECT 1 FROM information_schema.columns
-                    WHERE table_schema = 'public'
-                      AND table_name   = 'CompanySettings'
-                      AND column_name  = 'ServiceTypesConfig'
+                    SELECT 1 FROM pg_catalog.pg_attribute a
+                    JOIN pg_catalog.pg_class c ON c.oid = a.attrelid
+                    JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+                    WHERE c.relname = 'CompanySettings' AND n.nspname = 'public'
+                      AND a.attname = 'ServiceTypesConfig' AND a.attnum > 0 AND NOT a.attisdropped
                 ) THEN
                     ALTER TABLE ""CompanySettings"" ADD COLUMN ""ServiceTypesConfig"" text;
                 END IF;
