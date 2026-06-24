@@ -20,7 +20,7 @@ function createApiClient(): AxiosInstance {
       if (error.response?.status === 401 && typeof window !== 'undefined') {
         localStorage.removeItem('access_token');
         localStorage.removeItem('auth_user');
-        window.location.href = '/login';
+        window.location.replace('/login');
       }
       return Promise.reject(error);
     }

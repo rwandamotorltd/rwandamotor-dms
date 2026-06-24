@@ -19,6 +19,13 @@ import {
   CheckCircle2, Car, User, Clock, CalendarDays, XCircle,
 } from "lucide-react";
 import { format, parseISO } from "date-fns";
+
+// Normalise UTC dates from backend (no Z suffix) + guard against null
+function fmtDate(s: string | null | undefined, fmt: string): string {
+  if (!s) return "—";
+  const utc = /Z|[+-]\d{2}:?\d{2}$/.test(s) ? s : s + "Z";
+  return format(parseISO(utc), fmt);
+}
 import { cn } from "@/lib/utils";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -305,7 +312,7 @@ export default function FollowUpDetailPage() {
         </Button>
         <div>
           <h1 className="text-lg font-bold">Follow-up — {REASON_LABELS[data.reason] ?? data.reason}</h1>
-          <p className="text-xs text-muted-foreground">Created {format(parseISO(data.createdAt), "dd MMM yyyy")}</p>
+          <p className="text-xs text-muted-foreground">Created {fmtDate(data.createdAt, "dd MMM yyyy")}</p>
         </div>
         <div className="ml-auto">
           <Badge className={cn("border", status.color)}>{status.label}</Badge>
@@ -321,10 +328,10 @@ export default function FollowUpDetailPage() {
               <p className="font-semibold text-sm">{data.vehicle.plateNumber ?? data.vehicle.vin}</p>
               <p className="text-xs text-muted-foreground">{data.vehicle.brand} {data.vehicle.model} {data.vehicle.year}</p>
               {data.vehicle.lastServiceDate && (
-                <p className="text-xs text-muted-foreground mt-1">Last service: {format(parseISO(data.vehicle.lastServiceDate), "dd MMM yyyy")}</p>
+                <p className="text-xs text-muted-foreground mt-1">Last service: {fmtDate(data.vehicle.lastServiceDate, "dd MMM yyyy")}</p>
               )}
               {data.vehicle.nextServiceDate && (
-                <p className="text-xs text-muted-foreground">Next service: {format(parseISO(data.vehicle.nextServiceDate), "dd MMM yyyy")}</p>
+                <p className="text-xs text-muted-foreground">Next service: {fmtDate(data.vehicle.nextServiceDate, "dd MMM yyyy")}</p>
               )}
             </div>
           </CardContent>
@@ -346,7 +353,7 @@ export default function FollowUpDetailPage() {
         <CardContent className="p-4 flex items-center gap-6 flex-wrap">
           <div className="flex items-center gap-2 text-sm">
             <Clock className="w-4 h-4 text-muted-foreground" />
-            <span>Due: <strong>{format(parseISO(data.dueDate), "dd MMM yyyy")}</strong></span>
+            <span>Due: <strong>{fmtDate(data.dueDate, "dd MMM yyyy")}</strong></span>
           </div>
           {data.notes && <p className="text-sm text-muted-foreground italic">&quot;{data.notes}&quot;</p>}
         </CardContent>
@@ -396,12 +403,12 @@ export default function FollowUpDetailPage() {
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className={cn("text-sm font-medium", o.color)}>{o.label}</span>
                         {i.createdBy && <span className="text-xs text-muted-foreground">by {i.createdBy}</span>}
-                        <span className="text-xs text-muted-foreground ml-auto">{format(parseISO(i.createdAt), "dd MMM yyyy HH:mm")}</span>
+                        <span className="text-xs text-muted-foreground ml-auto">{fmtDate(i.createdAt, "dd MMM yyyy HH:mm")}</span>
                       </div>
                       {i.notes && <p className="text-sm text-muted-foreground mt-0.5">{i.notes}</p>}
                       {i.nextContactDate && (
                         <p className="text-xs text-violet-600 mt-0.5">
-                          Callback: {format(parseISO(i.nextContactDate), "dd MMM yyyy HH:mm")}
+                          Callback: {fmtDate(i.nextContactDate, "dd MMM yyyy HH:mm")}
                         </p>
                       )}
                     </div>
@@ -427,7 +434,7 @@ export default function FollowUpDetailPage() {
                   <div className="flex items-center gap-3">
                     <CalendarDays className="w-4 h-4 text-muted-foreground shrink-0" />
                     <div>
-                      <p className="text-sm font-medium">{format(parseISO(a.appointmentDate), "dd MMM yyyy HH:mm")}</p>
+                      <p className="text-sm font-medium">{fmtDate(a.appointmentDate, "dd MMM yyyy HH:mm")}</p>
                       <p className="text-xs text-muted-foreground">{a.durationMinutes} min · {a.serviceType}</p>
                     </div>
                   </div>
