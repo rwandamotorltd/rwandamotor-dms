@@ -223,11 +223,12 @@ function PermissionMatrix({
   onToggleWidget: (key: string) => void;
 }) {
   return (
-    <div className="border border-border rounded-lg overflow-hidden text-sm">
+    <div className="border border-border rounded-lg overflow-hidden text-sm overflow-x-auto">
+      <div className="min-w-[360px]">
       <div className="grid grid-cols-5 bg-muted/50 border-b border-border">
-        <div className="px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Module</div>
+        <div className="px-2 py-2 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Module</div>
         {ALL_LEVELS.map(l => (
-          <div key={l} className="px-1 py-2 text-center text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+          <div key={l} className="px-1 py-2 text-center text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">
             {LEVEL_LABELS[l]}
           </div>
         ))}
@@ -279,6 +280,7 @@ function PermissionMatrix({
           )}
         </div>
       ))}
+      </div>
     </div>
   );
 }
@@ -1776,24 +1778,24 @@ export default function SettingsPage() {
   if (!isAdmin) return null;
 
   return (
-    <div className="p-6 space-y-6 max-w-5xl">
+    <div className="space-y-4 sm:space-y-6 max-w-5xl min-w-0">
       <div>
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <Settings className="w-6 h-6" /> Settings
+        <h1 className="text-xl sm:text-2xl font-bold flex items-center gap-2">
+          <Settings className="w-5 h-5 sm:w-6 sm:h-6" /> Settings
         </h1>
-        <p className="text-muted-foreground text-sm mt-1">System configuration, users and permissions</p>
+        <p className="text-muted-foreground text-sm mt-1 hidden sm:block">System configuration, users and permissions</p>
       </div>
 
       <Separator />
 
       <Tabs defaultValue="users">
-        <TabsList className="mb-6">
-          <TabsTrigger value="users" className="gap-2"><Users className="w-4 h-4" />Users</TabsTrigger>
-          <TabsTrigger value="groups" className="gap-2"><ShieldCheck className="w-4 h-4" />Permission Groups</TabsTrigger>
-          <TabsTrigger value="sequence" className="gap-2"><Hash className="w-4 h-4" />Sequence</TabsTrigger>
-          <TabsTrigger value="company" className="gap-2"><Building2 className="w-4 h-4" />Company</TabsTrigger>
-          <TabsTrigger value="catalogue" className="gap-2"><Database className="w-4 h-4" />Catalogue</TabsTrigger>
-          <TabsTrigger value="templates" className="gap-2"><FileText className="w-4 h-4" />Templates</TabsTrigger>
+        <TabsList className="mb-4 sm:mb-6 flex-wrap h-auto gap-1">
+          <TabsTrigger value="users" className="gap-1.5 text-xs sm:text-sm"><Users className="w-3.5 h-3.5" /><span className="hidden sm:inline">Users</span><span className="sm:hidden">Users</span></TabsTrigger>
+          <TabsTrigger value="groups" className="gap-1.5 text-xs sm:text-sm"><ShieldCheck className="w-3.5 h-3.5" /><span className="hidden sm:inline">Permission Groups</span><span className="sm:hidden">Groups</span></TabsTrigger>
+          <TabsTrigger value="sequence" className="gap-1.5 text-xs sm:text-sm"><Hash className="w-3.5 h-3.5" /><span className="hidden sm:inline">Sequence</span><span className="sm:hidden">Seq</span></TabsTrigger>
+          <TabsTrigger value="company" className="gap-1.5 text-xs sm:text-sm"><Building2 className="w-3.5 h-3.5" /><span className="hidden sm:inline">Company</span><span className="sm:hidden">Co.</span></TabsTrigger>
+          <TabsTrigger value="catalogue" className="gap-1.5 text-xs sm:text-sm"><Database className="w-3.5 h-3.5" /><span>Catalogue</span></TabsTrigger>
+          <TabsTrigger value="templates" className="gap-1.5 text-xs sm:text-sm"><FileText className="w-3.5 h-3.5" /><span>Templates</span></TabsTrigger>
         </TabsList>
 
         <TabsContent value="users">

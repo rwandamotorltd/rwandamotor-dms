@@ -261,7 +261,7 @@ function ApptRow({ appt }: { appt: AppointmentDto }) {
         {appt.notes && <p className="text-xs text-muted-foreground italic mt-0.5">&quot;{appt.notes}&quot;</p>}
       </div>
       {pending && (
-        <div className="flex gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+        <div className="flex gap-1 shrink-0 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
           {appt.status === "Scheduled" && (
             <Button size="sm" variant="outline" className="h-7 text-xs px-2" onClick={() => confirmMut.mutate()} disabled={confirmMut.isPending}>
               <CheckCircle2 className="w-3 h-3 mr-1 text-indigo-500" />Confirm

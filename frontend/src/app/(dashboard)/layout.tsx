@@ -74,6 +74,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const { user, isLoading } = useAuth();
   const router = useRouter();
 
+  // Lock body scroll when mobile sidebar is open
+  useEffect(() => {
+    if (mobileOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => { document.body.style.overflow = ""; };
+  }, [mobileOpen]);
+
   useEffect(() => {
     if (!isLoading && !user) router.replace("/login");
   }, [user, isLoading, router]);
@@ -107,7 +117,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       />
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <Header onMenuClick={() => setMobileOpen(o => !o)} />
-        <main className="flex-1 overflow-y-auto p-4 md:p-6">
+        <main className="flex-1 overflow-y-auto p-3 sm:p-4 md:p-6">
           {children}
         </main>
       </div>

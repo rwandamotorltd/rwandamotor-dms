@@ -873,16 +873,16 @@ function JobCardsContent() {
   return (
     <div className="flex flex-col gap-6 p-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
-          <h1 className="text-2xl font-bold">Job Cards</h1>
-          <p className="text-muted-foreground text-sm">
+          <h1 className="text-xl sm:text-2xl font-bold">Job Cards</h1>
+          <p className="text-muted-foreground text-sm hidden sm:block">
             Vehicle reception records with auto-numbered delivery notes
           </p>
         </div>
         {canCreate && (
-          <Button onClick={() => setCreateOpen(true)}>
-            <Plus className="w-4 h-4 mr-2" /> New Job Card
+          <Button onClick={() => setCreateOpen(true)} size="sm" className="shrink-0">
+            <Plus className="w-4 h-4 mr-1.5" /> New Job Card
           </Button>
         )}
       </div>

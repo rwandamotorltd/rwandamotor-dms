@@ -70,6 +70,8 @@ export function Sidebar({ collapsed, onToggle, mobileOpen = false, onMobileClose
     !item.permission || hasPermission(item.permission)
   );
 
+  const isIconOnly = !mobileOpen && collapsed;
+
   function NavLink({ href, label, icon: Icon }: { href: string; label: string; icon: React.ElementType }) {
     const isActive = pathname === href || pathname.startsWith(href + "/");
     const link = (
@@ -78,17 +80,17 @@ export function Sidebar({ collapsed, onToggle, mobileOpen = false, onMobileClose
         onClick={mobileOpen ? onMobileClose : undefined}
         className={cn(
           "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-150",
-          collapsed ? "justify-center" : "",
+          isIconOnly ? "justify-center" : "",
           isActive
             ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm"
             : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
         )}
       >
         <Icon className="w-5 h-5 shrink-0" />
-        {!collapsed && <span className="truncate">{label}</span>}
+        {!isIconOnly && <span className="truncate">{label}</span>}
       </Link>
     );
-    if (collapsed) {
+    if (isIconOnly) {
       return (
         <Tooltip>
           <TooltipTrigger className="w-full">{link}</TooltipTrigger>
@@ -102,7 +104,7 @@ export function Sidebar({ collapsed, onToggle, mobileOpen = false, onMobileClose
   return (
     <TooltipProvider delay={0}>
       <motion.aside
-        animate={{ width: collapsed ? 72 : 256 }}
+        animate={{ width: (mobileOpen || !collapsed) ? 256 : 72 }}
         transition={{ duration: 0.2, ease: "easeInOut" }}
         className={cn(
           "relative flex flex-col h-screen bg-sidebar border-r border-sidebar-border shrink-0 overflow-hidden",
@@ -113,18 +115,18 @@ export function Sidebar({ collapsed, onToggle, mobileOpen = false, onMobileClose
         {/* Logo */}
         <div className={cn(
           "flex items-center h-16 px-4 border-b border-sidebar-border shrink-0",
-          collapsed ? "justify-center" : "gap-3"
+          (!mobileOpen && collapsed) ? "justify-center" : "gap-3"
         )}>
           <div className="flex items-center justify-center w-9 h-9 rounded-lg gradient-primary shrink-0">
             <Shield className="w-5 h-5 text-white" />
           </div>
-          {!collapsed && (
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.1 }} className="flex-1">
-              <p className="text-sm font-semibold text-sidebar-foreground leading-none">Rwandamotor</p>
+          {(mobileOpen || !collapsed) && (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.1 }} className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-sidebar-foreground leading-none truncate">Rwandamotor</p>
               <p className="text-xs text-sidebar-foreground/50 leading-none mt-0.5">CSSR Platform</p>
             </motion.div>
           )}
-          {mobileOpen && !collapsed && (
+          {mobileOpen && (
             <button
               onClick={onMobileClose}
               className="md:hidden ml-auto p-1 rounded-md text-sidebar-foreground/50 hover:text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
@@ -150,18 +152,18 @@ export function Sidebar({ collapsed, onToggle, mobileOpen = false, onMobileClose
           {/* User profile */}
           <div className={cn(
             "flex items-center gap-3 rounded-lg px-3 py-2.5 mt-2",
-            collapsed ? "justify-center" : ""
+            isIconOnly ? "justify-center" : ""
           )}>
             <Avatar className="w-8 h-8 shrink-0">
               <AvatarFallback className="text-xs gradient-primary text-white">{initials}</AvatarFallback>
             </Avatar>
-            {!collapsed && (
+            {!isIconOnly && (
               <div className="flex-1 min-w-0">
                 <p className="text-xs font-medium text-sidebar-foreground truncate">{user?.fullName}</p>
                 <p className="text-[11px] text-sidebar-foreground/50 truncate">{user?.role}</p>
               </div>
             )}
-            {!collapsed && (
+            {!isIconOnly && (
               <Tooltip>
                 <TooltipTrigger
                   onClick={logout}
@@ -175,10 +177,10 @@ export function Sidebar({ collapsed, onToggle, mobileOpen = false, onMobileClose
           </div>
         </div>
 
-        {/* Collapse toggle */}
+        {/* Collapse toggle — desktop only */}
         <button
           onClick={onToggle}
-          className="absolute -right-3.5 top-20 z-10 flex items-center justify-center w-7 h-7 rounded-full bg-sidebar-border border border-sidebar-border text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent transition-all shadow-sm"
+          className="hidden md:flex absolute -right-3.5 top-20 z-10 items-center justify-center w-7 h-7 rounded-full bg-sidebar-border border border-sidebar-border text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent transition-all shadow-sm"
         >
           {collapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronLeft className="w-3.5 h-3.5" />}
         </button>

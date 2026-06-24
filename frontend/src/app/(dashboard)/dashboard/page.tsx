@@ -97,19 +97,19 @@ export default function DashboardPage() {
     <div className="space-y-5">
       {/* Header */}
       <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}>
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
           <div>
-            <h2 className="text-2xl font-bold tracking-tight">
+            <h2 className="text-xl sm:text-2xl font-bold tracking-tight">
               {greeting}{firstName ? `, ${firstName}` : ""} 👋
             </h2>
-            <p className="text-muted-foreground text-sm mt-0.5">
+            <p className="text-muted-foreground text-sm mt-0.5 hidden sm:block">
               Here&apos;s your overview for today.
             </p>
           </div>
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground bg-muted rounded-full px-3 py-1.5">
               <Activity className="w-3.5 h-3.5 text-emerald-500" />
-              Live data
+              <span className="hidden sm:inline">Live data</span>
             </div>
           </div>
         </div>
@@ -152,7 +152,7 @@ export default function DashboardPage() {
 
           {/* Fleet status breakdown (companion to retention) */}
           {showKpi && (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
               <KpiCard title="Total Vehicles"    value={kpis.totalVehicles}                          subtitle="All registered"   icon={Car}       variant="info"    index={0}  href="/vehicles" />
               <KpiCard title="Dealership Fleet"  value={kpis.dealershipVehicles}                     subtitle="Sold by us"       icon={Car}       variant="purple"  index={1}  href="/vehicles?isSoldByDealership=true" />
               <KpiCard title="Customers"         value={kpis.totalCustomers}                          subtitle="Total registered" icon={Users}     variant="default" index={2}  href="/customers" />
@@ -167,7 +167,7 @@ export default function DashboardPage() {
       {showKpi && kpis && !showRetention && (
         <>
           <SectionDivider title="Fleet Status" />
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
             <KpiCard title="Total Vehicles"    value={kpis.totalVehicles}       subtitle="All registered"   icon={Car}    variant="info"    index={0}  href="/vehicles" />
             <KpiCard title="Dealership Fleet"  value={kpis.dealershipVehicles}  subtitle="Sold by us"       icon={Car}    variant="purple"  index={1}  href="/vehicles?isSoldByDealership=true" />
             <KpiCard title="Customers"         value={kpis.totalCustomers}       subtitle="Total registered" icon={Users}  variant="default" index={2}  href="/customers" />
@@ -180,7 +180,7 @@ export default function DashboardPage() {
       {showAnyFollowUp && kpis && (
         <>
           <SectionDivider title="Follow-ups" />
-          <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))" }}>
+          <div className="grid gap-3 sm:gap-4" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))" }}>
             {showFollowUpsCard && (
               <KpiCard title="Active Follow-ups" value={kpis.activeFollowUps}   subtitle="Pending contact"      icon={Activity}      variant="info"    index={0} href={kpis.activeFollowUps > 0 ? "/follow-ups" : undefined} />
             )}
@@ -204,7 +204,7 @@ export default function DashboardPage() {
       {showJobCards && kpis && (
         <>
           <SectionDivider title="Workshop" />
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
             <KpiCard title="Open Job Cards"      value={kpis.openJobCards ?? 0}    subtitle="Awaiting delivery"       icon={ClipboardList} variant="warning" index={0} href="/job-cards?status=Open" />
             <KpiCard title="Today's Receptions"  value={kpis.todayJobCards ?? 0}   subtitle="Vehicles received today" icon={FileCheck}     variant="info"    index={1} href="/job-cards" />
             <KpiCard title="Monthly Job Cards"   value={kpis.monthlyJobCards ?? 0} subtitle="This month"              icon={ClipboardList} variant="default" index={2} href="/job-cards" />

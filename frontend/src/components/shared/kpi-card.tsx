@@ -36,7 +36,7 @@ export function KpiCard({ title, value, subtitle, icon: Icon, trend, variant = "
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, delay: index * 0.05 }}
       className={cn(
-        "rounded-xl border border-border p-5 flex items-start gap-4 shadow-sm transition-all duration-150",
+        "rounded-xl border border-border p-3 sm:p-5 flex items-start gap-3 shadow-sm transition-all duration-150",
         styles.bg,
         hasAccent && "border-l-4",
         hasAccent && styles.accent,
@@ -45,12 +45,12 @@ export function KpiCard({ title, value, subtitle, icon: Icon, trend, variant = "
           : "hover:shadow-md"
       )}
     >
-      <div className={cn("w-10 h-10 rounded-lg flex items-center justify-center shrink-0", styles.icon)}>
-        <Icon className="w-5 h-5" />
+      <div className={cn("w-9 h-9 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center shrink-0", styles.icon)}>
+        <Icon className="w-4 h-4 sm:w-5 sm:h-5" />
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide truncate">{title}</p>
-        <p className="text-2xl font-bold text-foreground mt-0.5 leading-none">{value}</p>
+        <p className="text-[10px] sm:text-xs font-medium text-muted-foreground uppercase tracking-wide truncate">{title}</p>
+        <p className="text-xl sm:text-2xl font-bold text-foreground mt-0.5 leading-none truncate">{value}</p>
         {subtitle && <p className="text-xs text-muted-foreground mt-1 truncate">{subtitle}</p>}
         {trend && (
           <div className={cn(
