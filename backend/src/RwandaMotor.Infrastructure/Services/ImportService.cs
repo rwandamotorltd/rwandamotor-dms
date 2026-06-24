@@ -929,7 +929,9 @@ public class BulkImportCatalogueCommandHandler
             .ToListAsync(ct);
 
         int brandsCreated = 0, brandsSkipped = 0, modelsCreated = 0, modelsSkipped = 0;
-        var brandsSeen    = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        // Track all codes already in DB so we can avoid duplicate-key violations
+        var usedBrandCodes = brands.Select(b => b.Code).ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         // Pass 1: brands
         bool anyNew = false;
@@ -941,7 +943,9 @@ public class BulkImportCatalogueCommandHandler
             if (existing == null)
             {
                 var firstRow = rows.First(r => Get(r, "BrandName").Equals(brandName, StringComparison.OrdinalIgnoreCase));
-                var code     = GetOrGenerate(Get(firstRow, "BrandCode"), brandName);
+                var baseCode = GetOrGenerate(Get(firstRow, "BrandCode"), brandName);
+                var code     = UniqueCode(baseCode, usedBrandCodes);
+                usedBrandCodes.Add(code);
                 var country  = Get(firstRow, "BrandCountry");
                 var brand    = new Brand
                 {
@@ -954,7 +958,7 @@ public class BulkImportCatalogueCommandHandler
                 brands.Add(brand);
                 anyNew = true;
                 brandsCreated++;
-                _log.LogInformation("Bulk import: created brand '{Brand}'", brandName);
+                _log.LogInformation("Bulk import: created brand '{Brand}' code '{Code}'", brandName, code);
             }
             else
             {
@@ -963,7 +967,8 @@ public class BulkImportCatalogueCommandHandler
         }
         if (anyNew) { await _db.SaveChangesAsync(ct); anyNew = false; }
 
-        // Pass 2: models
+        // Pass 2: models — brand.Models includes rows added in this batch,
+        // so usedModelCodes naturally grows as each model is appended.
         foreach (var row in rows)
         {
             var brandName = Get(row, "BrandName");
@@ -976,9 +981,11 @@ public class BulkImportCatalogueCommandHandler
             var existing = brand.Models.FirstOrDefault(m => m.Name.Equals(modelName, StringComparison.OrdinalIgnoreCase));
             if (existing == null)
             {
-                var code    = GetOrGenerate(Get(row, "ModelCode"), modelName);
-                var segment = Get(row, "ModelSegment");
-                var model   = new VehicleModel
+                var usedModelCodes = brand.Models.Select(m => m.Code).ToHashSet(StringComparer.OrdinalIgnoreCase);
+                var baseCode = GetOrGenerate(Get(row, "ModelCode"), modelName);
+                var code     = UniqueCode(baseCode, usedModelCodes);
+                var segment  = Get(row, "ModelSegment");
+                var model    = new VehicleModel
                 {
                     BrandId  = brand.Id,
                     Name     = modelName,
@@ -1008,6 +1015,17 @@ public class BulkImportCatalogueCommandHandler
         return letters.Length > 0
             ? new string(letters).ToUpperInvariant()
             : name[..Math.Min(3, name.Length)].ToUpperInvariant();
+    }
+
+    // Returns baseCode unchanged if not in usedCodes, otherwise appends 2, 3, … until unique.
+    private static string UniqueCode(string baseCode, HashSet<string> usedCodes)
+    {
+        if (!usedCodes.Contains(baseCode)) return baseCode;
+        for (int i = 2; ; i++)
+        {
+            var candidate = baseCode + i;
+            if (!usedCodes.Contains(candidate)) return candidate;
+        }
     }
 
     private static string Get(Dictionary<string, string> d, string key) =>
