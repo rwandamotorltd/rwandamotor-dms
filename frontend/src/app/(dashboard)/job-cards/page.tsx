@@ -18,7 +18,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Plus, Search, FileText, ArrowRight, Printer, Mail, ClipboardList, X } from "lucide-react";
+import { Plus, Search, FileText, ArrowRight, Printer, Mail, ClipboardList, X, Trash2 } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
 import { useServiceTypes } from "@/hooks/use-service-types";
 import { format } from "date-fns";
@@ -826,7 +826,8 @@ function JobCardsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
-  const { hasPermission } = useAuth();
+  const { hasPermission, user } = useAuth();
+  const isAdmin    = user?.role === "Admin";
   const canCreate  = hasPermission("jobCards.create");
   const canPrint   = hasPermission("jobCards.print");
   const canShare   = hasPermission("jobCards.share");
@@ -843,6 +844,8 @@ function JobCardsContent() {
   const [createOpen, setCreateOpen] = useState(false);
   const [shareTarget, setShareTarget] = useState<JobCardListItem | null>(null);
   const [convertTarget, setConvertTarget] = useState<JobCardListItem | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
   const params = useMemo(() => ({
     search: search || undefined,
@@ -866,6 +869,31 @@ function JobCardsContent() {
     onError: () => toast.error("Conversion failed"),
   });
 
+  const bulkDeleteMutation = useMutation({
+    mutationFn: (ids: string[]) => jobCardsApi.deleteMany(ids),
+    onSuccess: (res) => {
+      toast.success(`${res.data} job card(s) deleted`);
+      setSelectedIds(new Set());
+      setDeleteConfirmOpen(false);
+      queryClient.invalidateQueries({ queryKey: ["job-cards"] });
+    },
+    onError: () => toast.error("Delete failed"),
+  });
+
+  const items = data?.items ?? [];
+  const pageIds = items.map(jc => jc.id);
+  const allPageSelected = pageIds.length > 0 && pageIds.every(id => selectedIds.has(id));
+
+  const toggleRow = (id: string) =>
+    setSelectedIds(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s; });
+
+  const togglePage = () =>
+    setSelectedIds(prev => {
+      const s = new Set(prev);
+      allPageSelected ? pageIds.forEach(id => s.delete(id)) : pageIds.forEach(id => s.add(id));
+      return s;
+    });
+
   const handleCreated = () => {
     queryClient.invalidateQueries({ queryKey: ["job-cards"] });
   };
@@ -880,11 +908,22 @@ function JobCardsContent() {
             Vehicle reception records with auto-numbered delivery notes
           </p>
         </div>
-        {canCreate && (
-          <Button onClick={() => setCreateOpen(true)} size="sm" className="shrink-0">
-            <Plus className="w-4 h-4 mr-1.5" /> New Job Card
-          </Button>
-        )}
+        <div className="flex items-center gap-2 shrink-0">
+          {isAdmin && selectedIds.size > 0 && (
+            <Button
+              variant="destructive" size="sm"
+              onClick={() => setDeleteConfirmOpen(true)}
+            >
+              <Trash2 className="w-4 h-4 mr-1.5" />
+              Delete {selectedIds.size} selected
+            </Button>
+          )}
+          {canCreate && (
+            <Button onClick={() => setCreateOpen(true)} size="sm">
+              <Plus className="w-4 h-4 mr-1.5" /> New Job Card
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Filters */}
@@ -932,6 +971,15 @@ function JobCardsContent() {
             <table className="w-full text-sm">
               <thead className="border-b bg-muted/40">
                 <tr>
+                  {isAdmin && (
+                    <th className="px-4 py-3 w-10">
+                      <Checkbox
+                        checked={allPageSelected}
+                        onCheckedChange={togglePage}
+                        aria-label="Select all on page"
+                      />
+                    </th>
+                  )}
                   <th className="text-left px-4 py-3 font-medium text-muted-foreground">Job Card #</th>
                   <th className="text-left px-4 py-3 font-medium text-muted-foreground">Vehicle</th>
                   <th className="text-left px-4 py-3 font-medium text-muted-foreground">Customer</th>
@@ -946,20 +994,25 @@ function JobCardsContent() {
               <tbody className="divide-y">
                 {isLoading && (
                   <tr>
-                    <td colSpan={9} className="text-center py-12 text-muted-foreground">Loading…</td>
+                    <td colSpan={isAdmin ? 10 : 9} className="text-center py-12 text-muted-foreground">Loading…</td>
                   </tr>
                 )}
                 {!isLoading && data?.items.length === 0 && (
                   <tr>
-                    <td colSpan={9} className="text-center py-12 text-muted-foreground">No job cards found</td>
+                    <td colSpan={isAdmin ? 10 : 9} className="text-center py-12 text-muted-foreground">No job cards found</td>
                   </tr>
                 )}
                 {data?.items.map(jc => (
                   <tr
                     key={jc.id}
-                    className="hover:bg-muted/30 transition-colors cursor-pointer"
+                    className={`hover:bg-muted/30 transition-colors cursor-pointer${selectedIds.has(jc.id) ? " bg-muted/50" : ""}`}
                     onClick={() => router.push(`/job-cards/${jc.id}`)}
                   >
+                    {isAdmin && (
+                      <td className="px-4 py-3 w-10" onClick={e => { e.stopPropagation(); toggleRow(jc.id); }}>
+                        <Checkbox checked={selectedIds.has(jc.id)} onCheckedChange={() => toggleRow(jc.id)} />
+                      </td>
+                    )}
                     <td className="px-4 py-3 font-mono font-medium text-primary">{jc.jobCardNumber}</td>
                     <td className="px-4 py-3">
                       <div className="font-medium">{jc.vin}</div>
@@ -1116,6 +1169,39 @@ function JobCardsContent() {
                 >
                   <ArrowRight className="w-4 h-4 mr-2" />
                   {convertMutation.isPending ? "Converting…" : "Yes, Convert"}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Delete confirmation dialog */}
+      {deleteConfirmOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setDeleteConfirmOpen(false)} />
+          <div className="relative bg-card border border-border rounded-xl shadow-2xl w-full max-w-md mx-4 animate-in fade-in-0 zoom-in-95 duration-150">
+            <div className="p-6 space-y-4">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-full bg-destructive/10 flex items-center justify-center shrink-0">
+                  <Trash2 className="w-6 h-6 text-destructive" />
+                </div>
+                <div>
+                  <h2 className="text-base font-semibold">Delete {selectedIds.size} job card{selectedIds.size !== 1 ? "s" : ""}?</h2>
+                  <p className="text-sm text-muted-foreground">This action cannot be undone.</p>
+                </div>
+              </div>
+              <div className="flex items-center justify-end gap-3 pt-1">
+                <Button variant="outline" onClick={() => setDeleteConfirmOpen(false)} disabled={bulkDeleteMutation.isPending}>
+                  Cancel
+                </Button>
+                <Button
+                  variant="destructive"
+                  disabled={bulkDeleteMutation.isPending}
+                  onClick={() => bulkDeleteMutation.mutate(Array.from(selectedIds))}
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  {bulkDeleteMutation.isPending ? "Deleting…" : "Yes, Delete"}
                 </Button>
               </div>
             </div>

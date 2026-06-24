@@ -91,6 +91,20 @@ public class JobCardsController : ControllerBase
     }
 
     // ──────────────────────────────────────────────────────────────
+    // BULK DELETE (Admin only)
+    // ──────────────────────────────────────────────────────────────
+    [HttpDelete]
+    [Authorize(Policy = "Admin")]
+    public async Task<IActionResult> BulkDelete([FromBody] List<Guid> ids)
+    {
+        if (ids == null || ids.Count == 0)
+            return BadRequest(ApiResponse<int>.Fail("No IDs provided"));
+
+        var count = await _mediator.Send(new BulkDeleteJobCardsCommand(ids));
+        return Ok(ApiResponse<int>.Ok(count, $"{count} job card(s) deleted"));
+    }
+
+    // ──────────────────────────────────────────────────────────────
     // SEQUENCE MANAGEMENT (Admin only)
     // ──────────────────────────────────────────────────────────────
     [HttpPut("sequence")]

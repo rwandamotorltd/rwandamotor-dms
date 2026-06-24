@@ -539,6 +539,9 @@ export const jobCardsApi = {
 
   share: (id: string, payload: ShareJobCardPayload) =>
     api.post<ApiResponse<object>>(`/jobcards/${id}/share`, payload).then(r => r.data),
+
+  deleteMany: (ids: string[]) =>
+    api.delete<ApiResponse<number>>('/jobcards', { data: ids }).then(r => r.data),
 };
 
 // ============================================================
