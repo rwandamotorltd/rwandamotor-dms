@@ -445,6 +445,29 @@ export const permissionGroupsApi = {
 };
 
 // ============================================================
+// Admin — Roles
+// ============================================================
+export interface RoleItem {
+  id: string;
+  name: string;
+  displayName: string;
+  description: string | null;
+  isBuiltIn: boolean;
+  userCount: number;
+}
+
+export const rolesApi = {
+  list: () =>
+    api.get<ApiResponse<RoleItem[]>>('/admin/roles').then(r => r.data.data!),
+  create: (name: string, displayName: string, description?: string) =>
+    api.post<ApiResponse<RoleItem>>('/admin/roles', { name, displayName, description }).then(r => r.data),
+  update: (id: string, displayName: string, description?: string) =>
+    api.put<ApiResponse<boolean>>('/admin/roles/' + id, { displayName, description }).then(r => r.data),
+  delete: (id: string) =>
+    api.delete<ApiResponse<boolean>>('/admin/roles/' + id).then(r => r.data),
+};
+
+// ============================================================
 // Admin — Company Settings
 // ============================================================
 export const companySettingsApi = {

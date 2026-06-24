@@ -1,12 +1,16 @@
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using RwandaMotor.Application.Common.Interfaces;
 using RwandaMotor.Application.Common.Models;
 using RwandaMotor.Application.Features.Admin.Commands;
 using RwandaMotor.Application.Features.Admin.Queries;
 using RwandaMotor.Application.Features.Templates.Commands;
 using RwandaMotor.Application.Features.Templates.Queries;
 using RwandaMotor.Application.Features.Vehicles.Queries;
+using RwandaMotor.Domain.Entities;
 
 namespace RwandaMotor.API.Controllers;
 
@@ -16,8 +20,15 @@ namespace RwandaMotor.API.Controllers;
 public class AdminController : ControllerBase
 {
     private readonly IMediator _mediator;
+    private readonly IApplicationDbContext _db;
+    private readonly UserManager<ApplicationUser> _userManager;
 
-    public AdminController(IMediator mediator) => _mediator = mediator;
+    public AdminController(IMediator mediator, IApplicationDbContext db, UserManager<ApplicationUser> userManager)
+    {
+        _mediator = mediator;
+        _db = db;
+        _userManager = userManager;
+    }
 
     [HttpGet("users")]
     public async Task<IActionResult> GetUsers()
@@ -151,6 +162,71 @@ public class AdminController : ControllerBase
         var ok = await _mediator.Send(new DeleteTemplateCommand(id));
         return ok ? Ok(ApiResponse<bool>.Ok(true)) : NotFound(ApiResponse<bool>.Fail("Template not found"));
     }
+
+    // ── Roles ─────────────────────────────────────────────────────────────────
+
+    [HttpGet("roles")]
+    public async Task<IActionResult> GetRoles()
+    {
+        var roles = await _db.AppRoles.OrderBy(r => r.IsBuiltIn ? 0 : 1).ThenBy(r => r.Name).ToListAsync();
+        var users = await _userManager.Users.Select(u => new { u.Role }).ToListAsync();
+        var counts = users.GroupBy(u => u.Role ?? "").ToDictionary(g => g.Key, g => g.Count());
+
+        var dtos = roles.Select(r => new RoleDto(
+            r.Id, r.Name, r.DisplayName, r.Description, r.IsBuiltIn,
+            counts.GetValueOrDefault(r.Name, 0)
+        )).ToList();
+        return Ok(ApiResponse<List<RoleDto>>.Ok(dtos));
+    }
+
+    [HttpPost("roles")]
+    public async Task<IActionResult> CreateRole([FromBody] CreateRoleRequest req)
+    {
+        if (string.IsNullOrWhiteSpace(req.Name) || string.IsNullOrWhiteSpace(req.DisplayName))
+            return BadRequest(ApiResponse<bool>.Fail("Name and DisplayName are required"));
+
+        var nameTrimmed = req.Name.Trim().Replace(" ", "");
+        if (await _db.AppRoles.AnyAsync(r => r.Name == nameTrimmed))
+            return BadRequest(ApiResponse<bool>.Fail("A role with that name already exists"));
+
+        var role = new AppRole
+        {
+            Name = nameTrimmed,
+            DisplayName = req.DisplayName.Trim(),
+            Description = req.Description?.Trim(),
+            IsBuiltIn = false,
+        };
+        _db.AppRoles.Add(role);
+        await _db.SaveChangesAsync();
+        return Ok(ApiResponse<RoleDto>.Ok(new RoleDto(role.Id, role.Name, role.DisplayName, role.Description, false, 0)));
+    }
+
+    [HttpPut("roles/{id:guid}")]
+    public async Task<IActionResult> UpdateRole(Guid id, [FromBody] UpdateRoleRequest req)
+    {
+        var role = await _db.AppRoles.FindAsync(id);
+        if (role is null) return NotFound(ApiResponse<bool>.Fail("Role not found"));
+
+        role.DisplayName = req.DisplayName.Trim();
+        role.Description = req.Description?.Trim();
+        await _db.SaveChangesAsync();
+        return Ok(ApiResponse<bool>.Ok(true));
+    }
+
+    [HttpDelete("roles/{id:guid}")]
+    public async Task<IActionResult> DeleteRole(Guid id)
+    {
+        var role = await _db.AppRoles.FindAsync(id);
+        if (role is null) return NotFound(ApiResponse<bool>.Fail("Role not found"));
+        if (role.IsBuiltIn) return BadRequest(ApiResponse<bool>.Fail("Built-in roles cannot be deleted"));
+
+        var inUse = await _userManager.Users.AnyAsync(u => u.Role == role.Name);
+        if (inUse) return BadRequest(ApiResponse<bool>.Fail("Cannot delete a role that is assigned to users"));
+
+        _db.AppRoles.Remove(role);
+        await _db.SaveChangesAsync();
+        return Ok(ApiResponse<bool>.Ok(true));
+    }
 }
 
 public record ResetPasswordRequest(string NewPassword);
@@ -158,3 +234,6 @@ public record CreateBrandRequest(string Name, string Code, string? Country);
 public record UpdateBrandRequest(string Name, string Code, string? Country, bool IsActive);
 public record CreateModelRequest(string Name, string Code, string? Segment);
 public record UpdateModelRequest(string Name, string Code, string? Segment, bool IsActive);
+public record RoleDto(Guid Id, string Name, string DisplayName, string? Description, bool IsBuiltIn, int UserCount);
+public record CreateRoleRequest(string Name, string DisplayName, string? Description);
+public record UpdateRoleRequest(string DisplayName, string? Description);

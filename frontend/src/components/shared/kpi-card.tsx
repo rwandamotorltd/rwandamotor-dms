@@ -49,9 +49,9 @@ export function KpiCard({ title, value, subtitle, icon: Icon, trend, variant = "
         <Icon className="w-4 h-4 sm:w-5 sm:h-5" />
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-[10px] sm:text-xs font-medium text-muted-foreground uppercase tracking-wide truncate">{title}</p>
-        <p className="text-xl sm:text-2xl font-bold text-foreground mt-0.5 leading-none truncate">{value}</p>
-        {subtitle && <p className="text-xs text-muted-foreground mt-1 truncate">{subtitle}</p>}
+        <p className="text-[10px] sm:text-xs font-medium text-muted-foreground uppercase tracking-wide leading-tight">{title}</p>
+        <p className="text-xl sm:text-2xl font-bold text-foreground mt-1 leading-none">{value}</p>
+        {subtitle && <p className="text-[10px] sm:text-xs text-muted-foreground mt-1 leading-tight">{subtitle}</p>}
         {trend && (
           <div className={cn(
             "inline-flex items-center gap-1 text-xs font-medium mt-1.5 px-1.5 py-0.5 rounded",

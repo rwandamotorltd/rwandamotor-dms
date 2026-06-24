@@ -152,12 +152,12 @@ export default function DashboardPage() {
 
           {/* Fleet status breakdown (companion to retention) */}
           {showKpi && (
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
-              <KpiCard title="Total Vehicles"    value={kpis.totalVehicles}                          subtitle="All registered"   icon={Car}       variant="info"    index={0}  href="/vehicles" />
-              <KpiCard title="Dealership Fleet"  value={kpis.dealershipVehicles}                     subtitle="Sold by us"       icon={Car}       variant="purple"  index={1}  href="/vehicles?isSoldByDealership=true" />
-              <KpiCard title="Customers"         value={kpis.totalCustomers}                          subtitle="Total registered" icon={Users}     variant="default" index={2}  href="/customers" />
-              <KpiCard title="Monthly Services"  value={kpis.monthlyServiceCount}                     subtitle="This month"       icon={Wrench}    variant="default" index={3}  href="/service-records" />
-              <KpiCard title="6-Month Rate"      value={formatPercentage(kpis.sixMonthRetentionRate)} subtitle="Rolling 6 months" icon={TrendingUp} variant="success" index={4}  href="/retention" />
+            <div className="flex gap-3 overflow-x-auto pb-1 -mx-3 px-3 sm:mx-0 sm:px-0 sm:grid sm:grid-cols-3 lg:grid-cols-5 sm:gap-4 sm:overflow-visible">
+              <div className="shrink-0 w-44 sm:w-auto"><KpiCard title="Total Vehicles"    value={kpis.totalVehicles}                          subtitle="All registered"   icon={Car}       variant="info"    index={0}  href="/vehicles" /></div>
+              <div className="shrink-0 w-44 sm:w-auto"><KpiCard title="Dealership Fleet"  value={kpis.dealershipVehicles}                     subtitle="Sold by us"       icon={Car}       variant="purple"  index={1}  href="/vehicles?isSoldByDealership=true" /></div>
+              <div className="shrink-0 w-44 sm:w-auto"><KpiCard title="Customers"         value={kpis.totalCustomers}                          subtitle="Total registered" icon={Users}     variant="default" index={2}  href="/customers" /></div>
+              <div className="shrink-0 w-44 sm:w-auto"><KpiCard title="Monthly Services"  value={kpis.monthlyServiceCount}                     subtitle="This month"       icon={Wrench}    variant="default" index={3}  href="/service-records" /></div>
+              <div className="shrink-0 w-44 sm:w-auto"><KpiCard title="6-Month Rate"      value={formatPercentage(kpis.sixMonthRetentionRate)} subtitle="Rolling 6 months" icon={TrendingUp} variant="success" index={4}  href="/retention" /></div>
             </div>
           )}
         </>
@@ -167,11 +167,11 @@ export default function DashboardPage() {
       {showKpi && kpis && !showRetention && (
         <>
           <SectionDivider title="Fleet Status" />
-          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-            <KpiCard title="Total Vehicles"    value={kpis.totalVehicles}       subtitle="All registered"   icon={Car}    variant="info"    index={0}  href="/vehicles" />
-            <KpiCard title="Dealership Fleet"  value={kpis.dealershipVehicles}  subtitle="Sold by us"       icon={Car}    variant="purple"  index={1}  href="/vehicles?isSoldByDealership=true" />
-            <KpiCard title="Customers"         value={kpis.totalCustomers}       subtitle="Total registered" icon={Users}  variant="default" index={2}  href="/customers" />
-            <KpiCard title="Monthly Services"  value={kpis.monthlyServiceCount}  subtitle="This month"       icon={Wrench} variant="default" index={3}  href="/service-records" />
+          <div className="flex gap-3 overflow-x-auto pb-1 -mx-3 px-3 sm:mx-0 sm:px-0 sm:grid sm:grid-cols-2 lg:grid-cols-4 sm:gap-4 sm:overflow-visible">
+            <div className="shrink-0 w-44 sm:w-auto"><KpiCard title="Total Vehicles"    value={kpis.totalVehicles}       subtitle="All registered"   icon={Car}    variant="info"    index={0}  href="/vehicles" /></div>
+            <div className="shrink-0 w-44 sm:w-auto"><KpiCard title="Dealership Fleet"  value={kpis.dealershipVehicles}  subtitle="Sold by us"       icon={Car}    variant="purple"  index={1}  href="/vehicles?isSoldByDealership=true" /></div>
+            <div className="shrink-0 w-44 sm:w-auto"><KpiCard title="Customers"         value={kpis.totalCustomers}       subtitle="Total registered" icon={Users}  variant="default" index={2}  href="/customers" /></div>
+            <div className="shrink-0 w-44 sm:w-auto"><KpiCard title="Monthly Services"  value={kpis.monthlyServiceCount}  subtitle="This month"       icon={Wrench} variant="default" index={3}  href="/service-records" /></div>
           </div>
         </>
       )}
@@ -180,21 +180,33 @@ export default function DashboardPage() {
       {showAnyFollowUp && kpis && (
         <>
           <SectionDivider title="Follow-ups" />
-          <div className="grid gap-3 sm:gap-4" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))" }}>
+          {/* Mobile: horizontal scroll strip; sm+: responsive grid */}
+          <div className="flex gap-3 overflow-x-auto pb-1 -mx-3 px-3 sm:mx-0 sm:px-0 sm:grid sm:gap-4 sm:overflow-visible"
+               style={{ gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))" }}>
             {showFollowUpsCard && (
-              <KpiCard title="Active Follow-ups" value={kpis.activeFollowUps}   subtitle="Pending contact"      icon={Activity}      variant="info"    index={0} href={kpis.activeFollowUps > 0 ? "/follow-ups" : undefined} />
+              <div className="shrink-0 w-44 sm:w-auto">
+                <KpiCard title="Active Follow-ups" value={kpis.activeFollowUps}   subtitle="Pending contact"      icon={Activity}      variant="info"    index={0} href={kpis.activeFollowUps > 0 ? "/follow-ups" : undefined} />
+              </div>
             )}
             {showDueSoonCard && (
-              <KpiCard title="Due Soon"          value={kpis.dueSoonVehicles}   subtitle="Needs outreach"       icon={Clock}         variant="warning" index={1} href={kpis.dueSoonVehicles > 0 ? "/retention" : undefined} />
+              <div className="shrink-0 w-44 sm:w-auto">
+                <KpiCard title="Due Soon"          value={kpis.dueSoonVehicles}   subtitle="Needs outreach"       icon={Clock}         variant="warning" index={1} href={kpis.dueSoonVehicles > 0 ? "/retention" : undefined} />
+              </div>
             )}
             {showOverdueCard && (
-              <KpiCard title="Overdue"           value={kpis.overdueVehicles}   subtitle="Missed interval"      icon={AlertTriangle} variant="warning" index={2} href={kpis.overdueVehicles > 0 ? "/retention" : undefined} />
+              <div className="shrink-0 w-44 sm:w-auto">
+                <KpiCard title="Overdue"           value={kpis.overdueVehicles}   subtitle="Missed interval"      icon={AlertTriangle} variant="warning" index={2} href={kpis.overdueVehicles > 0 ? "/retention" : undefined} />
+              </div>
             )}
             {showLostCard && (
-              <KpiCard title="Lost"              value={kpis.lostVehicles}      subtitle="12m no service"       icon={AlertTriangle} variant="danger"  index={3} href={kpis.lostVehicles > 0 ? "/retention" : undefined} />
+              <div className="shrink-0 w-44 sm:w-auto">
+                <KpiCard title="Lost"              value={kpis.lostVehicles}      subtitle="12m no service"       icon={AlertTriangle} variant="danger"  index={3} href={kpis.lostVehicles > 0 ? "/retention" : undefined} />
+              </div>
             )}
             {showRecoveredCard && (
-              <KpiCard title="Recovered"         value={kpis.recoveredVehicles} subtitle="Returned for service" icon={RefreshCw}     variant="success" index={4} href={kpis.recoveredVehicles > 0 ? "/follow-ups" : undefined} />
+              <div className="shrink-0 w-44 sm:w-auto">
+                <KpiCard title="Recovered"         value={kpis.recoveredVehicles} subtitle="Returned for service" icon={RefreshCw}     variant="success" index={4} href={kpis.recoveredVehicles > 0 ? "/follow-ups" : undefined} />
+              </div>
             )}
           </div>
         </>

@@ -12,10 +12,11 @@ import {
 import { useAuth } from "@/contexts/auth-context";
 import { useRouter, usePathname } from "next/navigation";
 import {
-  adminApi, permissionGroupsApi, companySettingsApi, catalogueApi, templatesApi,
+  adminApi, permissionGroupsApi, companySettingsApi, catalogueApi, templatesApi, rolesApi,
   type UserItem, type CreateUserPayload, type UpdateUserPayload,
   type PermissionGroupItem, type CreatePermissionGroupPayload,
   type CatalogueBrandDto, type CatalogueModelDto, type BulkImportCatalogueResult,
+  type RoleItem,
 } from "@/lib/api";
 import { DOCUMENT_TYPE_LABELS } from "@/types/templates";
 import { jobCardsApi } from "@/lib/api";
@@ -35,7 +36,7 @@ import { toast } from "sonner";
 
 // ─── Constants ────────────────────────────────────────────────
 
-const ROLES = ["Admin", "TechnicalDirector", "CRMOfficer", "CRE"];
+const ROLES_FALLBACK = ["Admin", "TechnicalDirector", "CRMOfficer", "CRE"];
 
 const ROLE_COLORS: Record<string, string> = {
   Admin:             "bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-400",
@@ -304,12 +305,13 @@ const EMPTY_USER_FORM: UserFormState = {
 };
 
 function UserModal({
-  title, form, isCreate, groups, onChange, onSave, onClose, saving, error,
+  title, form, isCreate, groups, roles, onChange, onSave, onClose, saving, error,
 }: {
   title: string;
   form: UserFormState;
   isCreate: boolean;
   groups: PermissionGroupItem[];
+  roles: string[];
   onChange: (patch: Partial<UserFormState>) => void;
   onSave: () => void;
   onClose: () => void;
@@ -372,7 +374,7 @@ function UserModal({
             <Select value={form.role} onValueChange={v => onChange({ role: v ?? "CRE" })}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                {ROLES.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+                {roles.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
@@ -573,6 +575,9 @@ function PermissionGroupModal({
 
 function UsersTab({ groups }: { groups: PermissionGroupItem[] }) {
   const qc = useQueryClient();
+  const { data: roleItems = [] } = useQuery({ queryKey: ["app-roles"], queryFn: () => rolesApi.list() });
+  const roleNames = roleItems.length > 0 ? roleItems.map(r => r.name) : ROLES_FALLBACK;
+
   const [showCreate, setShowCreate] = useState(false);
   const [createForm, setCreateForm] = useState<UserFormState>(EMPTY_USER_FORM);
   const [createError, setCreateError] = useState<string | null>(null);
@@ -707,14 +712,14 @@ function UsersTab({ groups }: { groups: PermissionGroupItem[] }) {
       </div>
 
       {showCreate && (
-        <UserModal title="New User" form={createForm} isCreate groups={groups}
+        <UserModal title="New User" form={createForm} isCreate groups={groups} roles={roleNames}
           onChange={p => setCreateForm(f => ({ ...f, ...p }))}
           onSave={() => createMutation.mutate({ fullName: createForm.fullName.trim(), email: createForm.email.trim(), password: createForm.password, role: createForm.role, permissionGroupId: createForm.permissionGroupId || null, customPermissions: createForm.useCustomPermissions ? createForm.customPermissions : null })}
           onClose={() => setShowCreate(false)} saving={createMutation.isPending} error={createError} />
       )}
 
       {editingUser && (
-        <UserModal title={`Edit — ${editingUser.fullName}`} form={editForm} isCreate={false} groups={groups}
+        <UserModal title={`Edit — ${editingUser.fullName}`} form={editForm} isCreate={false} groups={groups} roles={roleNames}
           onChange={p => setEditForm(f => ({ ...f, ...p }))}
           onSave={() => updateMutation.mutate({ userId: editingUser.id, fullName: editForm.fullName.trim(), role: editForm.role, isActive: editForm.isActive, permissionGroupId: editForm.permissionGroupId || null, customPermissions: editForm.useCustomPermissions ? editForm.customPermissions : null })}
           onClose={() => setEditingUser(null)} saving={updateMutation.isPending} error={editError} />
@@ -1759,6 +1764,171 @@ function TemplatesTab() {
   );
 }
 
+// ─── Roles Tab ────────────────────────────────────────────────
+
+function RolesTab() {
+  const qc = useQueryClient();
+  const [showCreate, setShowCreate] = useState(false);
+  const [editingRole, setEditingRole] = useState<RoleItem | null>(null);
+  const [formName, setFormName] = useState("");
+  const [formDisplay, setFormDisplay] = useState("");
+  const [formDesc, setFormDesc] = useState("");
+
+  const { data: roles = [], isLoading } = useQuery({
+    queryKey: ["app-roles"],
+    queryFn: () => rolesApi.list(),
+  });
+
+  const createMut = useMutation({
+    mutationFn: () => rolesApi.create(formName, formDisplay, formDesc || undefined),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["app-roles"] }); setShowCreate(false); resetForm(); toast.success("Role created"); },
+    onError: (e: { response?: { data?: { message?: string } } }) => toast.error(e?.response?.data?.message ?? "Failed to create role"),
+  });
+
+  const updateMut = useMutation({
+    mutationFn: (r: RoleItem) => rolesApi.update(r.id, formDisplay, formDesc || undefined),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["app-roles"] }); setEditingRole(null); toast.success("Role updated"); },
+    onError: (e: { response?: { data?: { message?: string } } }) => toast.error(e?.response?.data?.message ?? "Failed to update role"),
+  });
+
+  const deleteMut = useMutation({
+    mutationFn: (id: string) => rolesApi.delete(id),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["app-roles"] }); toast.success("Role deleted"); },
+    onError: (e: { response?: { data?: { message?: string } } }) => toast.error(e?.response?.data?.message ?? "Cannot delete this role"),
+  });
+
+  function resetForm() { setFormName(""); setFormDisplay(""); setFormDesc(""); }
+
+  function openEdit(r: RoleItem) {
+    setEditingRole(r);
+    setFormDisplay(r.displayName);
+    setFormDesc(r.description ?? "");
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h2 className="font-semibold text-base">Roles</h2>
+          <p className="text-xs text-muted-foreground mt-0.5">Define roles assigned to users. Built-in roles cannot be deleted.</p>
+        </div>
+        <Button size="sm" onClick={() => { resetForm(); setShowCreate(true); }} className="shrink-0">
+          <Plus className="w-4 h-4 mr-1.5" />Add Role
+        </Button>
+      </div>
+
+      <Card>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Name</TableHead>
+              <TableHead>Display Name</TableHead>
+              <TableHead className="hidden sm:table-cell">Description</TableHead>
+              <TableHead className="text-center hidden sm:table-cell">Users</TableHead>
+              <TableHead className="text-center">Type</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {isLoading && (
+              <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Loading…</TableCell></TableRow>
+            )}
+            {!isLoading && roles.length === 0 && (
+              <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">No roles found</TableCell></TableRow>
+            )}
+            {roles.map(r => (
+              <TableRow key={r.id}>
+                <TableCell className="font-mono text-xs font-medium">{r.name}</TableCell>
+                <TableCell className="font-medium">{r.displayName}</TableCell>
+                <TableCell className="text-muted-foreground text-sm hidden sm:table-cell">{r.description ?? <span className="text-muted-foreground/40 italic">—</span>}</TableCell>
+                <TableCell className="text-center hidden sm:table-cell">
+                  <span className="text-sm font-medium">{r.userCount}</span>
+                </TableCell>
+                <TableCell className="text-center">
+                  {r.isBuiltIn
+                    ? <Badge variant="outline" className="text-[10px]">Built-in</Badge>
+                    : <Badge variant="secondary" className="text-[10px]">Custom</Badge>}
+                </TableCell>
+                <TableCell>
+                  <div className="flex items-center justify-end gap-1">
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(r)}>
+                      <Pencil className="w-3.5 h-3.5" />
+                    </Button>
+                    {!r.isBuiltIn && (
+                      <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive"
+                        onClick={() => { if (confirm(`Delete role "${r.displayName}"?`)) deleteMut.mutate(r.id); }}>
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
+                    )}
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </Card>
+
+      {/* Create modal */}
+      {showCreate && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowCreate(false)} />
+          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
+            className="relative bg-card border border-border rounded-xl shadow-2xl w-full max-w-sm p-5 space-y-4">
+            <h2 className="text-lg font-semibold">New Role</h2>
+            <div className="space-y-1.5">
+              <Label>Role Name (key) <span className="text-destructive">*</span></Label>
+              <Input value={formName} onChange={e => setFormName(e.target.value.replace(/\s/g, ""))} placeholder="e.g. SalesManager" />
+              <p className="text-[10px] text-muted-foreground">No spaces. Used internally as the role identifier.</p>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Display Name <span className="text-destructive">*</span></Label>
+              <Input value={formDisplay} onChange={e => setFormDisplay(e.target.value)} placeholder="e.g. Sales Manager" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Description</Label>
+              <Input value={formDesc} onChange={e => setFormDesc(e.target.value)} placeholder="Optional description" />
+            </div>
+            <div className="flex justify-end gap-2 pt-1">
+              <Button variant="outline" onClick={() => setShowCreate(false)}>Cancel</Button>
+              <Button onClick={() => createMut.mutate()} disabled={createMut.isPending || !formName.trim() || !formDisplay.trim()} className="gradient-primary text-white">
+                {createMut.isPending ? "Saving…" : "Create Role"}
+              </Button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Edit modal */}
+      {editingRole && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setEditingRole(null)} />
+          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
+            className="relative bg-card border border-border rounded-xl shadow-2xl w-full max-w-sm p-5 space-y-4">
+            <div>
+              <h2 className="text-lg font-semibold">Edit Role</h2>
+              <p className="text-xs text-muted-foreground mt-0.5 font-mono">{editingRole.name}</p>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Display Name <span className="text-destructive">*</span></Label>
+              <Input value={formDisplay} onChange={e => setFormDisplay(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Description</Label>
+              <Input value={formDesc} onChange={e => setFormDesc(e.target.value)} />
+            </div>
+            <div className="flex justify-end gap-2 pt-1">
+              <Button variant="outline" onClick={() => setEditingRole(null)}>Cancel</Button>
+              <Button onClick={() => updateMut.mutate(editingRole)} disabled={updateMut.isPending || !formDisplay.trim()} className="gradient-primary text-white">
+                {updateMut.isPending ? "Saving…" : "Save Changes"}
+              </Button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function SettingsPage() {
   const { user } = useAuth();
   const router = useRouter();
@@ -1796,6 +1966,7 @@ export default function SettingsPage() {
           <TabsTrigger value="company" className="gap-1.5 text-xs sm:text-sm"><Building2 className="w-3.5 h-3.5" /><span className="hidden sm:inline">Company</span><span className="sm:hidden">Co.</span></TabsTrigger>
           <TabsTrigger value="catalogue" className="gap-1.5 text-xs sm:text-sm"><Database className="w-3.5 h-3.5" /><span>Catalogue</span></TabsTrigger>
           <TabsTrigger value="templates" className="gap-1.5 text-xs sm:text-sm"><FileText className="w-3.5 h-3.5" /><span>Templates</span></TabsTrigger>
+          <TabsTrigger value="roles" className="gap-1.5 text-xs sm:text-sm"><KeyRound className="w-3.5 h-3.5" /><span>Roles</span></TabsTrigger>
         </TabsList>
 
         <TabsContent value="users">
@@ -1820,6 +1991,10 @@ export default function SettingsPage() {
 
         <TabsContent value="templates">
           <TemplatesTab />
+        </TabsContent>
+
+        <TabsContent value="roles">
+          <RolesTab />
         </TabsContent>
       </Tabs>
     </div>

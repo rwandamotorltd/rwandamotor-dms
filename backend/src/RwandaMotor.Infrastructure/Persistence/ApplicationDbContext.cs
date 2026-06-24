@@ -38,6 +38,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>, IApplica
     public DbSet<Appointment> Appointments => Set<Appointment>();
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<DocumentTemplate> DocumentTemplates => Set<DocumentTemplate>();
+    public DbSet<AppRole> AppRoles => Set<AppRole>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -91,6 +92,11 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>, IApplica
         builder.Entity<CompanySettings>()
             .Property(c => c.Id)
             .ValueGeneratedNever();
+
+        // AppRole — unique Name index
+        builder.Entity<AppRole>()
+            .HasIndex(r => r.Name)
+            .IsUnique();
     }
 
     public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)

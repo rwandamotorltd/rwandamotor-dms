@@ -29,6 +29,7 @@ public class ApplicationDbSeeder
     {
         await _db.Database.MigrateAsync();
         await SeedRoles();
+        await SeedAppRoles();
         await SeedUsers();
         await SeedBrands();
         await SeedServicePolicies();
@@ -46,6 +47,24 @@ public class ApplicationDbSeeder
         foreach (var role in roles)
             if (!await _roleManager.RoleExistsAsync(role))
                 await _roleManager.CreateAsync(new IdentityRole(role));
+    }
+
+    private async Task SeedAppRoles()
+    {
+        var builtIn = new[]
+        {
+            new AppRole { Name = "Admin",             DisplayName = "Administrator",           Description = "Full system access",                          IsBuiltIn = true },
+            new AppRole { Name = "CRMOfficer",        DisplayName = "CRM Officer",             Description = "Customer relations and service management",    IsBuiltIn = true },
+            new AppRole { Name = "TechnicalDirector", DisplayName = "Technical Director",      Description = "Workshop oversight and technical operations",   IsBuiltIn = true },
+            new AppRole { Name = "CRE",               DisplayName = "Customer Relation Exec.", Description = "Follow-ups, appointments and outreach",         IsBuiltIn = true },
+        };
+
+        foreach (var role in builtIn)
+        {
+            if (!await _db.AppRoles.AnyAsync(r => r.Name == role.Name))
+                _db.AppRoles.Add(role);
+        }
+        await _db.SaveChangesAsync();
     }
 
     private async Task SeedUsers()
