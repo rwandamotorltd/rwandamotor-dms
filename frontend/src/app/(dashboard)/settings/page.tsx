@@ -1095,6 +1095,7 @@ function ServiceTypesCard() {
   const [newValue, setNewValue]     = useState("");
   const [newLabel, setNewLabel]     = useState("");
   const [showAdd, setShowAdd]       = useState(false);
+  const [selected, setSelected]     = useState<Set<number>>(new Set());
 
   const { data: settings, isLoading } = useQuery({
     queryKey: ["company-settings"],
@@ -1139,6 +1140,17 @@ function ServiceTypesCard() {
 
   const removeCustom = (idx: number) => setTypes(prev => prev.filter((_, i) => i !== idx));
 
+  const toggleSelect = (idx: number) =>
+    setSelected(prev => { const n = new Set(prev); n.has(idx) ? n.delete(idx) : n.add(idx); return n; });
+
+  const allSelected = types.length > 0 && selected.size === types.length;
+  const toggleAll   = () => setSelected(allSelected ? new Set() : new Set(types.map((_, i) => i)));
+
+  const deleteSelected = () => {
+    setTypes(prev => prev.filter((_, i) => !selected.has(i)));
+    setSelected(new Set());
+  };
+
   if (isLoading) return <Skeleton className="h-48 w-full rounded-xl" />;
 
   return (
@@ -1176,46 +1188,65 @@ function ServiceTypesCard() {
           </div>
         )}
 
-        <div className="divide-y divide-border rounded-lg border border-border overflow-hidden">
-          {types.map((t, idx) => (
-            <div key={t.value} className="flex items-center gap-3 px-3 py-2.5 bg-card">
-              <div className={`w-2 h-2 rounded-full shrink-0 ${t.isActive ? "bg-emerald-500" : "bg-slate-300 dark:bg-slate-600"}`} />
+        <div className="rounded-lg border border-border overflow-hidden">
+          {/* Select-all header */}
+          <div className="flex items-center gap-3 px-3 py-2 bg-muted/40 border-b border-border">
+            <input type="checkbox" className="rounded cursor-pointer" checked={allSelected}
+              onChange={toggleAll} title="Select all" />
+            <span className="text-xs text-muted-foreground flex-1">
+              {selected.size > 0 ? `${selected.size} selected` : `${types.length} types`}
+            </span>
+            {selected.size > 0 && (
+              <button
+                onClick={deleteSelected}
+                className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium text-destructive hover:bg-destructive/10 transition-colors"
+              >
+                <Trash2 className="w-3 h-3" /> Delete {selected.size}
+              </button>
+            )}
+          </div>
 
-              {editingIdx === idx ? (
-                <Input autoFocus className="h-7 text-sm flex-1" value={editLabel}
-                  onChange={e => setEditLabel(e.target.value)}
-                  onBlur={() => commitEdit(idx)}
-                  onKeyDown={e => { if (e.key === "Enter") commitEdit(idx); if (e.key === "Escape") setEditingIdx(null); }} />
-              ) : (
-                <span className={`flex-1 text-sm truncate ${!t.isActive ? "text-muted-foreground line-through" : ""}`}>
-                  {t.label}
-                </span>
-              )}
+          <div className="divide-y divide-border">
+            {types.map((t, idx) => (
+              <div key={t.value} className={`flex items-center gap-3 px-3 py-2.5 bg-card transition-colors ${selected.has(idx) ? "bg-destructive/5" : ""}`}>
+                <input type="checkbox" className="rounded cursor-pointer shrink-0"
+                  checked={selected.has(idx)} onChange={() => toggleSelect(idx)} />
+                <div className={`w-2 h-2 rounded-full shrink-0 ${t.isActive ? "bg-emerald-500" : "bg-slate-300 dark:bg-slate-600"}`} />
 
-              <span className="text-[10px] text-muted-foreground font-mono shrink-0 hidden sm:inline">{t.value}</span>
+                {editingIdx === idx ? (
+                  <Input autoFocus className="h-7 text-sm flex-1" value={editLabel}
+                    onChange={e => setEditLabel(e.target.value)}
+                    onBlur={() => commitEdit(idx)}
+                    onKeyDown={e => { if (e.key === "Enter") commitEdit(idx); if (e.key === "Escape") setEditingIdx(null); }} />
+                ) : (
+                  <span className={`flex-1 text-sm truncate ${!t.isActive ? "text-muted-foreground line-through" : ""}`}>
+                    {t.label}
+                  </span>
+                )}
 
-              <div className="flex items-center gap-1 shrink-0">
-                <button onClick={() => startEdit(idx)} title="Rename"
-                  className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
-                  <Pencil className="w-3.5 h-3.5" />
-                </button>
-                <button onClick={() => toggle(idx)} title={t.isActive ? "Disable" : "Enable"}
-                  className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors ${
-                    t.isActive
-                      ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100"
-                      : "bg-muted text-muted-foreground hover:bg-muted/80"
-                  }`}>
-                  {t.isActive ? "Active" : "Off"}
-                </button>
-                {!t.isBuiltIn && (
-                  <button onClick={() => removeCustom(idx)} title="Delete custom type"
+                <span className="text-[10px] text-muted-foreground font-mono shrink-0 hidden sm:inline">{t.value}</span>
+
+                <div className="flex items-center gap-1 shrink-0">
+                  <button onClick={() => startEdit(idx)} title="Rename"
+                    className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+                    <Pencil className="w-3.5 h-3.5" />
+                  </button>
+                  <button onClick={() => toggle(idx)} title={t.isActive ? "Disable" : "Enable"}
+                    className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors ${
+                      t.isActive
+                        ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100"
+                        : "bg-muted text-muted-foreground hover:bg-muted/80"
+                    }`}>
+                    {t.isActive ? "Active" : "Off"}
+                  </button>
+                  <button onClick={() => removeCustom(idx)} title="Delete"
                     className="p-1.5 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors">
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
-                )}
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
 
         <div className="flex justify-end pt-1">
@@ -1236,15 +1267,17 @@ interface ModelForm  { name: string; code: string; segment: string; }
 
 function CatalogueTab() {
   const qc = useQueryClient();
-  const [importing, setImporting]      = useState(false);
-  const fileInputRef                   = useRef<HTMLInputElement>(null);
-  const [expandedBrand, setExpanded]   = useState<string | null>(null);
-  const [editingBrand,  setEditBrand]  = useState<CatalogueBrandDto | null>(null);
-  const [addingBrand,   setAddBrand]   = useState(false);
-  const [editingModel,  setEditModel]  = useState<(CatalogueModelDto & { brandId: string }) | null>(null);
-  const [addingModel,   setAddModel]   = useState<string | null>(null); // brandId
-  const [brandForm,     setBrandForm]  = useState<BrandForm>({ name: "", code: "", country: "" });
-  const [modelForm,     setModelForm]  = useState<ModelForm>({ name: "", code: "", segment: "" });
+  const [importing, setImporting]        = useState(false);
+  const fileInputRef                     = useRef<HTMLInputElement>(null);
+  const [expandedBrand, setExpanded]     = useState<string | null>(null);
+  const [editingBrand,  setEditBrand]    = useState<CatalogueBrandDto | null>(null);
+  const [addingBrand,   setAddBrand]     = useState(false);
+  const [editingModel,  setEditModel]    = useState<(CatalogueModelDto & { brandId: string }) | null>(null);
+  const [addingModel,   setAddModel]     = useState<string | null>(null);
+  const [brandForm,     setBrandForm]    = useState<BrandForm>({ name: "", code: "", country: "" });
+  const [modelForm,     setModelForm]    = useState<ModelForm>({ name: "", code: "", segment: "" });
+  const [selectedBrands, setSelBrands]  = useState<Set<string>>(new Set());
+  const [selectedModels, setSelModels]  = useState<Set<string>>(new Set());
 
   const { data: brands = [], isLoading } = useQuery({
     queryKey: ["catalogue-brands"],
@@ -1311,6 +1344,32 @@ function CatalogueTab() {
     onSuccess: () => { toast.success("Model removed"); invalidate(); },
     onError:   () => toast.error("Failed to remove model"),
   });
+
+  const toggleBrand = (id: string) =>
+    setSelBrands(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  const allBrandsSelected = brands.length > 0 && selectedBrands.size === brands.length;
+  const toggleAllBrands   = () => setSelBrands(allBrandsSelected ? new Set() : new Set(brands.map(b => b.id)));
+
+  const bulkDeleteBrands = async () => {
+    const ids = [...selectedBrands];
+    await Promise.all(ids.map(id => catalogueApi.deleteBrand(id)));
+    setSelBrands(new Set());
+    setExpanded(null);
+    invalidate();
+    toast.success(`${ids.length} brand${ids.length > 1 ? "s" : ""} removed`);
+  };
+
+  const toggleModel = (id: string) =>
+    setSelModels(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+
+  const bulkDeleteModels = async (models: CatalogueModelDto[]) => {
+    const ids = models.filter(m => selectedModels.has(m.id)).map(m => m.id);
+    if (!ids.length) return;
+    await Promise.all(ids.map(id => catalogueApi.deleteModel(id)));
+    setSelModels(new Set());
+    invalidate();
+    toast.success(`${ids.length} model${ids.length > 1 ? "s" : ""} removed`);
+  };
 
   const openEditBrand = (b: CatalogueBrandDto) => {
     setBrandForm({ name: b.name, code: b.code, country: b.country ?? "" });
@@ -1381,6 +1440,25 @@ function CatalogueTab() {
             </div>
           )}
 
+          {/* Bulk-select header for brands */}
+          {!isLoading && brands.length > 0 && (
+            <div className="flex items-center gap-3 px-3 py-2 bg-muted/40 rounded-lg border border-border mb-2">
+              <input type="checkbox" className="rounded cursor-pointer" checked={allBrandsSelected}
+                onChange={toggleAllBrands} title="Select all brands" />
+              <span className="text-xs text-muted-foreground flex-1">
+                {selectedBrands.size > 0 ? `${selectedBrands.size} selected` : `${brands.length} brands`}
+              </span>
+              {selectedBrands.size > 0 && (
+                <button
+                  onClick={bulkDeleteBrands}
+                  className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium text-destructive hover:bg-destructive/10 transition-colors"
+                >
+                  <Trash2 className="w-3 h-3" /> Delete {selectedBrands.size}
+                </button>
+              )}
+            </div>
+          )}
+
           {isLoading ? (
             <div className="space-y-2">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
           ) : brands.length === 0 ? (
@@ -1401,10 +1479,15 @@ function CatalogueTab() {
                   </div>
                 </div>
               ) : (
-                <button
-                  className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-muted/40 transition-colors text-left"
-                  onClick={() => setExpanded(expandedBrand === brand.id ? null : brand.id)}
-                >
+                <div className="flex items-center gap-2 px-3 py-2.5 hover:bg-muted/40 transition-colors">
+                  <input type="checkbox" className="rounded cursor-pointer shrink-0"
+                    checked={selectedBrands.has(brand.id)}
+                    onChange={() => toggleBrand(brand.id)}
+                    onClick={e => e.stopPropagation()} />
+                  <button
+                    className="flex-1 flex items-center gap-3 text-left"
+                    onClick={() => setExpanded(expandedBrand === brand.id ? null : brand.id)}
+                  >
                   {expandedBrand === brand.id
                     ? <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />
                     : <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />}
@@ -1417,12 +1500,43 @@ function CatalogueTab() {
                     <button className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground" onClick={() => openEditBrand(brand)}><Pencil className="w-3.5 h-3.5" /></button>
                     <button className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive" onClick={() => { if (confirm(`Remove brand "${brand.name}"?`)) deleteBrand.mutate(brand.id); }}><Trash2 className="w-3.5 h-3.5" /></button>
                   </div>
-                </button>
+                  </button>
+                </div>
               )}
 
               {/* Models (expanded) */}
               {expandedBrand === brand.id && (
                 <div className="border-t border-border bg-muted/20">
+                  {/* Model bulk-select bar */}
+                  {brand.models.length > 0 && (
+                    <div className="flex items-center gap-3 px-4 py-1.5 border-b border-border/50 bg-muted/30">
+                      <input type="checkbox" className="rounded cursor-pointer"
+                        checked={brand.models.length > 0 && brand.models.every(m => selectedModels.has(m.id))}
+                        onChange={() => {
+                          const allSel = brand.models.every(m => selectedModels.has(m.id));
+                          setSelModels(prev => {
+                            const n = new Set(prev);
+                            if (allSel) brand.models.forEach(m => n.delete(m.id));
+                            else brand.models.forEach(m => n.add(m.id));
+                            return n;
+                          });
+                        }} />
+                      <span className="text-xs text-muted-foreground flex-1">
+                        {brand.models.filter(m => selectedModels.has(m.id)).length > 0
+                          ? `${brand.models.filter(m => selectedModels.has(m.id)).length} selected`
+                          : `${brand.models.length} models`}
+                      </span>
+                      {brand.models.some(m => selectedModels.has(m.id)) && (
+                        <button
+                          onClick={() => bulkDeleteModels(brand.models)}
+                          className="flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium text-destructive hover:bg-destructive/10 transition-colors"
+                        >
+                          <Trash2 className="w-3 h-3" /> Delete {brand.models.filter(m => selectedModels.has(m.id)).length}
+                        </button>
+                      )}
+                    </div>
+                  )}
+
                   {brand.models.map(model => (
                     <div key={model.id} className="border-b border-border/50 last:border-0">
                       {editingModel?.id === model.id ? (
@@ -1438,7 +1552,9 @@ function CatalogueTab() {
                           </div>
                         </div>
                       ) : (
-                        <div className="flex items-center gap-3 px-4 py-2 text-sm">
+                        <div className={`flex items-center gap-3 px-4 py-2 text-sm ${selectedModels.has(model.id) ? "bg-destructive/5" : ""}`}>
+                          <input type="checkbox" className="rounded cursor-pointer shrink-0"
+                            checked={selectedModels.has(model.id)} onChange={() => toggleModel(model.id)} />
                           <span className="flex-1 font-medium">{model.name}</span>
                           <span className="text-xs text-muted-foreground font-mono">{model.code}</span>
                           {model.segment && <span className="text-xs text-muted-foreground hidden sm:inline">{model.segment}</span>}
