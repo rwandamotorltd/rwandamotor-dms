@@ -802,3 +802,36 @@ export const reportsApi = {
   downloadExcel: (year: number, month: number) =>
     api.get('/reports/follow-ups/excel', { params: { year, month }, responseType: 'blob' }).then(r => r.data as Blob),
 };
+
+// ── Document Templates ───────────────────────────────────────────────────────
+
+export interface TemplateDtoApi {
+  id: string;
+  documentType: string;
+  name: string;
+  pageWidth: number;
+  pageHeight: number;
+  fieldsJson: string;
+  isDefault: boolean;
+  updatedAt: string;
+}
+
+export const templatesApi = {
+  list: (documentType?: string) =>
+    api.get<ApiResponse<TemplateDtoApi[]>>('/admin/templates', { params: documentType ? { documentType } : {} })
+      .then(r => r.data.data!),
+
+  save: (payload: {
+    id?: string | null;
+    documentType: string;
+    name: string;
+    pageWidth: number;
+    pageHeight: number;
+    fieldsJson: string;
+    isDefault: boolean;
+  }) =>
+    api.post<ApiResponse<TemplateDtoApi>>('/admin/templates', payload).then(r => r.data.data!),
+
+  delete: (id: string) =>
+    api.delete<ApiResponse<boolean>>(`/admin/templates/${id}`).then(r => r.data),
+};

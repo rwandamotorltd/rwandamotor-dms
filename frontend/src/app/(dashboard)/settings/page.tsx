@@ -6,16 +6,18 @@ import { motion } from "framer-motion";
 import {
   Settings, Hash, AlertTriangle, Users, ShieldCheck,
   Plus, Pencil, Trash2, X, Eye, EyeOff, KeyRound, Building2, Save,
-  ChevronDown, ChevronRight, Database, Car, Wrench, Upload, Download
+  ChevronDown, ChevronRight, Database, Car, Wrench, Upload, Download,
+  FileText, ExternalLink,
 } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import {
-  adminApi, permissionGroupsApi, companySettingsApi, catalogueApi,
+  adminApi, permissionGroupsApi, companySettingsApi, catalogueApi, templatesApi,
   type UserItem, type CreateUserPayload, type UpdateUserPayload,
   type PermissionGroupItem, type CreatePermissionGroupPayload,
   type CatalogueBrandDto, type CatalogueModelDto, type BulkImportCatalogueResult,
 } from "@/lib/api";
+import { DOCUMENT_TYPE_LABELS } from "@/types/templates";
 import { jobCardsApi } from "@/lib/api";
 import type { CompanySettings, ServiceTypeItem } from "@/types";
 import { DEFAULT_SERVICE_TYPES, parseServiceTypesConfig } from "@/hooks/use-service-types";
@@ -1602,6 +1604,104 @@ function CatalogueTab() {
   );
 }
 
+// ─── Templates Tab ─────────────────────────────────────────────────────────
+
+function TemplatesTab() {
+  const router = useRouter();
+  const qc     = useQueryClient();
+  const docTypes = Object.keys(DOCUMENT_TYPE_LABELS);
+
+  const { data: allTemplates = [] } = useQuery({
+    queryKey: ["templates"],
+    queryFn:  () => templatesApi.list(),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => templatesApi.delete(id),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["templates"] }); toast.success("Template deleted"); },
+    onError: () => toast.error("Failed to delete template"),
+  });
+
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-muted-foreground">
+        Design custom print layouts for each document type. Drag and position fields on an A4 canvas, then save as the default template.
+      </p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {docTypes.map(docType => {
+          const typeTemplates = allTemplates.filter(t => t.documentType === docType);
+          const def = typeTemplates.find(t => t.isDefault) ?? typeTemplates[0];
+          return (
+            <Card key={docType}>
+              <CardContent className="p-4 flex items-start gap-3">
+                <div className="p-2 rounded-lg bg-primary/10 shrink-0">
+                  <FileText className="w-5 h-5 text-primary" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-sm">{DOCUMENT_TYPE_LABELS[docType]}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {def ? `"${def.name}" · last updated ${new Date(def.updatedAt).toLocaleDateString()}` : "No template yet"}
+                  </p>
+                  {typeTemplates.length > 1 && (
+                    <p className="text-xs text-muted-foreground">{typeTemplates.length} templates</p>
+                  )}
+                </div>
+                <Button size="sm" variant="outline" className="gap-1.5 shrink-0"
+                  onClick={() => router.push(`/settings/templates/${docType}`)}>
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  {def ? "Edit" : "Create"}
+                </Button>
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
+
+      {allTemplates.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm">All templates</CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <table className="w-full text-sm">
+              <thead><tr className="border-b border-border">
+                <th className="text-left px-4 py-2 text-xs font-medium text-muted-foreground">Name</th>
+                <th className="text-left px-4 py-2 text-xs font-medium text-muted-foreground">Type</th>
+                <th className="text-left px-4 py-2 text-xs font-medium text-muted-foreground">Updated</th>
+                <th className="w-20" />
+              </tr></thead>
+              <tbody>
+                {allTemplates.map(t => (
+                  <tr key={t.id} className="border-b border-border/50 last:border-0 hover:bg-muted/30">
+                    <td className="px-4 py-2">
+                      <span className="font-medium">{t.name}</span>
+                      {t.isDefault && <Badge variant="outline" className="ml-2 text-[10px]">Default</Badge>}
+                    </td>
+                    <td className="px-4 py-2 text-muted-foreground">{DOCUMENT_TYPE_LABELS[t.documentType] ?? t.documentType}</td>
+                    <td className="px-4 py-2 text-muted-foreground text-xs">{new Date(t.updatedAt).toLocaleDateString()}</td>
+                    <td className="px-4 py-2">
+                      <div className="flex items-center gap-1 justify-end">
+                        <button className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground"
+                          onClick={() => router.push(`/settings/templates/${t.documentType}`)}>
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                        <button className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
+                          onClick={() => { if (confirm(`Delete "${t.name}"?`)) deleteMutation.mutate(t.id); }}>
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+}
+
 export default function SettingsPage() {
   const { user } = useAuth();
   const router = useRouter();
@@ -1638,6 +1738,7 @@ export default function SettingsPage() {
           <TabsTrigger value="sequence" className="gap-2"><Hash className="w-4 h-4" />Sequence</TabsTrigger>
           <TabsTrigger value="company" className="gap-2"><Building2 className="w-4 h-4" />Company</TabsTrigger>
           <TabsTrigger value="catalogue" className="gap-2"><Database className="w-4 h-4" />Catalogue</TabsTrigger>
+          <TabsTrigger value="templates" className="gap-2"><FileText className="w-4 h-4" />Templates</TabsTrigger>
         </TabsList>
 
         <TabsContent value="users">
@@ -1658,6 +1759,10 @@ export default function SettingsPage() {
 
         <TabsContent value="catalogue">
           <CatalogueTab />
+        </TabsContent>
+
+        <TabsContent value="templates">
+          <TemplatesTab />
         </TabsContent>
       </Tabs>
     </div>

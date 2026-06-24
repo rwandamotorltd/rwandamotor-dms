@@ -26,6 +26,7 @@ public interface IApplicationDbContext
     DbSet<FollowUpInteraction> FollowUpInteractions { get; }
     DbSet<Appointment> Appointments { get; }
     DbSet<Notification> Notifications { get; }
+    DbSet<DocumentTemplate> DocumentTemplates { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

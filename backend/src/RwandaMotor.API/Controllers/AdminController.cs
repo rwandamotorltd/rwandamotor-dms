@@ -4,6 +4,8 @@ using Microsoft.AspNetCore.Mvc;
 using RwandaMotor.Application.Common.Models;
 using RwandaMotor.Application.Features.Admin.Commands;
 using RwandaMotor.Application.Features.Admin.Queries;
+using RwandaMotor.Application.Features.Templates.Commands;
+using RwandaMotor.Application.Features.Templates.Queries;
 using RwandaMotor.Application.Features.Vehicles.Queries;
 
 namespace RwandaMotor.API.Controllers;
@@ -125,6 +127,29 @@ public class AdminController : ControllerBase
 
         var result = await _mediator.Send(new BulkImportCatalogueCommand(ms.ToArray(), file.FileName));
         return Ok(ApiResponse<BulkImportCatalogueResultDto>.Ok(result));
+    }
+
+    // ── Document Templates ──────────────────────────────────────────────────
+
+    [HttpGet("templates")]
+    public async Task<IActionResult> GetTemplates([FromQuery] string? documentType = null)
+    {
+        var list = await _mediator.Send(new GetTemplatesQuery(documentType));
+        return Ok(ApiResponse<List<TemplateDto>>.Ok(list));
+    }
+
+    [HttpPost("templates")]
+    public async Task<IActionResult> SaveTemplate([FromBody] SaveTemplateCommand command)
+    {
+        var dto = await _mediator.Send(command);
+        return Ok(ApiResponse<TemplateDto>.Ok(dto));
+    }
+
+    [HttpDelete("templates/{id:guid}")]
+    public async Task<IActionResult> DeleteTemplate(Guid id)
+    {
+        var ok = await _mediator.Send(new DeleteTemplateCommand(id));
+        return ok ? Ok(ApiResponse<bool>.Ok(true)) : NotFound(ApiResponse<bool>.Fail("Template not found"));
     }
 }
 

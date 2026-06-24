@@ -1,0 +1,816 @@
+# Rwandamotor DMS — Project Reference
+
+> **Last updated:** 2026-06-21  
+> **Status:** Production (backend self-hosted + frontend Vercel)
+
+---
+
+## 1. Overview
+
+Custom-built **Dealer Management System (DMS)** for **Rwandamotor Ltd** — a multi-brand automotive dealership in Rwanda. This is *not* Odoo; Odoo runs separately on the same server for ERP/accounting.
+
+**Core modules:**
+- Vehicle & Customer 360 profiles
+- Job Cards (workshop intake → delivery note)
+- Service Records & retention tracking
+- Follow-ups (CRM outreach workflow)
+- Appointments calendar
+- Reports (monthly follow-up PDF/Excel)
+- Role-based permission system (RBAC with per-user and group overrides)
+- Bulk CSV import (customers, vehicles, service records, job cards)
+- Activity/audit log
+- Sales history (auto-created on PDI job card close)
+
+---
+
+## 2. Live URLs
+
+| Service | URL |
+|---|---|
+| **Frontend (production)** | https://app.rwandamotor.com |
+| **Backend API** | https://api.rwandamotor.com |
+| **Swagger** | https://api.rwandamotor.com/swagger |
+| **GitHub repo** | https://github.com/rwandamotorltd/rwandamotor-dms |
+| **Vercel dashboard** | https://vercel.com/rwandamotorltd-2493s-projects/rwandamotor-dms-g8xq |
+| **Vercel preview** | rwandamotor-dms-g8xq-git-preview-rwandamotorltd-2493s-projects.vercel.app |
+
+---
+
+## 3. Credentials & Secrets
+
+### Server SSH
+```
+Host:     100.66.112.125   (Tailscale IP — odoo-server)
+User:     rwandamotor
+Password: Mukwagatandatu@2026
+```
+
+### Production Database
+```
+Engine:   PostgreSQL 16
+Database: rwandamotordms
+User:     rwandamotor_api
+Password: RwandaApi@2026#
+Host:     localhost:5432
+Env file: /etc/rwandamotor/api.env
+```
+
+### Admin Account
+```
+Email:    admin@rwandamotor.com
+```
+
+### JWT (from /etc/rwandamotor/api.env)
+```
+JWT_SECRET:  (stored in api.env, not in git)
+Issuer:      https://api.rwandamotor.com
+Audience:    https://app.rwandamotor.com
+Expiry:      8 hours
+```
+
+### Vercel (GitHub Actions secrets)
+```
+VERCEL_TOKEN:       (in GitHub repo secrets)
+VERCEL_ORG_ID:      team_PN1B26MCXvspPgQKoJvliMVm
+VERCEL_PROJECT_ID:  prj_k98hN2kHZGnTU6lTDWE0m5ofsvjA
+VERCEL_DEPLOY_HOOK: (in GitHub repo secrets — triggers production deploy)
+```
+
+### Email (SMTP — not yet fully configured)
+```
+From:            noreply@rwandamotor.com
+AlertRecipient:  admin@rwandamotor.com
+Config:          EMAIL_HOST / EMAIL_USERNAME / EMAIL_PASSWORD env vars in api.env
+```
+
+---
+
+## 4. Infrastructure
+
+### Server (`odoo-server`)
+- **OS:** Ubuntu (self-hosted runner)
+- **API runtime:** .NET 9, deployed to `/opt/rwandamotor-api/`
+- **Systemd service:** `rwandamotor-api` (managed via `rwandamotor-deploy`)
+- **Deploy script:** `/usr/local/bin/rwandamotor-deploy` (copies `/tmp/rwandamotor-publish` → `/opt/rwandamotor-api`, restarts service)
+- **Env file:** `/etc/rwandamotor/api.env` (holds DB password, JWT secret, email creds)
+- **Reverse proxy:** Nginx + Cloudflare Tunnel on port 5000 → https://api.rwandamotor.com
+- **Database:** PostgreSQL 16, local socket, auto-migrated on startup
+
+### Frontend
+- **Host:** Vercel
+- **Framework:** Next.js 16 (App Router) with Turbopack
+- **Build:** triggered by `main` branch push via Vercel Deploy Hook in GitHub Actions
+- **Env var:** `NEXT_PUBLIC_API_URL=https://api.rwandamotor.com/api` (set in Vercel project settings)
+
+---
+
+## 5. Tech Stack
+
+### Backend
+| Layer | Technology |
+|---|---|
+| Runtime | .NET 9 / C# |
+| Architecture | Clean Architecture (Domain / Application / Infrastructure / API) |
+| ORM | EF Core 9 + Npgsql 8 |
+| Database | PostgreSQL 16 |
+| Auth | ASP.NET Core Identity + JWT Bearer |
+| CQRS | MediatR + FluentValidation pipeline |
+| Background jobs | Quartz.NET (nightly RetentionEvaluationJob at 02:00 UTC) |
+| Email | SmtpClient via `IEmailService` / `SmtpEmailService` |
+| Reports | QuestPDF (PDF) + ClosedXML (Excel) |
+| Logging | Serilog → Console + rolling file (`logs/rwandamotor-*.log`) |
+| Serialisation | `System.Text.Json` with `JsonStringEnumConverter` (enums as strings) |
+
+### Frontend
+| Layer | Technology |
+|---|---|
+| Runtime | Node.js 22 |
+| Framework | Next.js 16 (App Router) |
+| Language | TypeScript (strict) |
+| UI | shadcn/ui + Tailwind CSS |
+| Data fetching | TanStack Query v5 |
+| Tables | TanStack Table v8 |
+| Charts | Recharts |
+| Animation | Framer Motion |
+| Toasts | Sonner |
+| Date utils | date-fns |
+| HTTP client | Axios (with JWT interceptor + 401 auto-redirect) |
+
+---
+
+## 6. Repository Structure
+
+```
+rwandamotor-dms/
+├── backend/
+│   └── src/
+│       ├── RwandaMotor.Domain/         # Entities, Enums, Events, Common
+│       ├── RwandaMotor.Application/    # CQRS Commands/Queries, Interfaces, Permissions
+│       ├── RwandaMotor.Infrastructure/ # EF Core, Migrations, Services, Jobs, Reports
+│       └── RwandaMotor.API/            # Controllers, Middleware, Program.cs
+│
+├── frontend/
+│   └── src/
+│       ├── app/
+│       │   ├── (auth)/login/           # Public login page
+│       │   └── (dashboard)/            # Protected layout + all pages
+│       │       ├── layout.tsx          # Shell: Sidebar + Header
+│       │       ├── dashboard/          # Executive dashboard KPIs
+│       │       ├── vehicles/           # Vehicle list + [id] 360 view
+│       │       ├── customers/          # Customer list + [id] 360 view
+│       │       ├── job-cards/          # Job cards list + [id] detail/print
+│       │       ├── service-records/    # Service records list
+│       │       ├── follow-ups/         # Follow-up list + [id] detail
+│       │       ├── appointments/       # Appointments calendar (week view)
+│       │       ├── reports/            # Reports hub + follow-ups/
+│       │       ├── retention/          # Retention analytics + cohort
+│       │       ├── import/             # Bulk CSV import with progress
+│       │       ├── sales/              # PDI sales history
+│       │       ├── activity/           # Audit log
+│       │       ├── settings/           # Company settings + catalogue
+│       │       └── admin/              # Users + Technicians (Admin only)
+│       ├── components/
+│       │   ├── layout/header.tsx       # Notification bell + user menu
+│       │   ├── layout/sidebar.tsx      # Collapsible sidebar, permission-filtered
+│       │   ├── providers/              # QueryProvider, ThemeProvider
+│       │   ├── shared/                 # KpiCard, RetentionBadge
+│       │   └── ui/                     # shadcn/ui components
+│       ├── contexts/auth-context.tsx   # Auth state + hasPermission()
+│       ├── lib/api.ts                  # All Axios API calls + DTOs
+│       └── types/index.ts              # TypeScript types mirroring backend DTOs
+│
+└── .github/workflows/
+    ├── ci.yml                          # Build + lint + typecheck on push/PR
+    └── deploy.yml                      # Deploy API (self-hosted) + Frontend (Vercel)
+```
+
+---
+
+## 7. Backend — Domain Entities
+
+### BaseEntity (all entities inherit)
+```csharp
+Guid     Id           // auto-generated
+bool     IsDeleted    // soft delete (global query filter)
+DateTime? DeletedAt
+string?  DeletedBy
+DateTime  CreatedAt
+string?  CreatedBy
+DateTime? UpdatedAt
+string?  UpdatedBy
+```
+
+### Core Entities
+
+| Entity | Key Fields |
+|---|---|
+| `Vehicle` | VIN, PlateNumber, BrandId, ModelId, Year, CustomerId, IsSoldByDealership, CurrentMileage, LastServiceDate, NextServiceDate, NextServiceMileage, LastServiceMileage, RetentionStatus, WarrantyStartDate, WarrantyEndDate, WarrantyKmLimit, ServicePolicyId, Color, FuelType, EngineNumber, Transmission, EngineCapacityCC, SaleDate, SalePrice |
+| `Customer` | FullName, Phone, Email, Category, CompanyName, TaxId, City, Country, Address, PreferredContactMethod, IsActive |
+| `JobCard` | JobCardNumber (`OR-YYYY-NNNNN`), VehicleId, CustomerId, ServiceType, FuelLevel, Mileage, Status (Open/Closed), AccessoriesPresent (jsonb), Notes, AdditionalInfo, TechnicianId, ReceivedByUserId, ClosedAt, ClosedByUserId, DeliveryNoteNumber, DeliveryNoteGeneratedAt |
+| `JobCardSequence` | Year (unique), CurrentSequence, StartingSequence |
+| `ServiceRecord` | VehicleId, TechnicianId, ServiceDate, MileageAtService, ServiceType, InvoiceNumber, LaborCost, PartsCost, TotalCost, NextServiceMileage, NextServiceDate, IsWarrantyJob, IsRecallJob, Notes, ServiceDescription |
+| `ServicePart` | ServiceRecordId, PartNumber, PartName, Quantity, UnitPrice, TotalPrice |
+| `FollowUp` | VehicleId, CustomerId, AssignedToUserId, Status, Priority, ContactMethod, Reason, DueDate, ContactedAt, ResolvedAt, RecoveryAchieved, Notes |
+| `FollowUpInteraction` | FollowUpId, Outcome, Notes, NextContactDate, EmailType |
+| `Appointment` | VehicleId, CustomerId, FollowUpId, TechnicianId, AppointmentDate, DurationMinutes, ServiceType, Status, Notes, ConfirmedAt, CompletedJobCardId |
+| `Notification` | Title, Message, Type, IsRead, Link, TargetUserId (null = broadcast), VehicleId, CustomerId, FollowUpId, AppointmentId |
+| `SalesHistory` | VehicleId, CustomerId, JobCardId, SaleDate, SaleType ("PDI"), VIN, PlateNumber snapshot, BrandName, ModelName, Year, DeliveryNoteNumber |
+| `Brand` | Name, Code, LogoUrl, Country, IsActive |
+| `VehicleModel` | BrandId, Name, Code, Segment, IsActive |
+| `ServicePolicy` | BrandId (nullable), ModelId (nullable), Name, IntervalKm, IntervalMonths, DueSoonLeadDays, DueSoonLeadKm, LostThresholdMonths, IsDefault, IsActive |
+| `Technician` | FullName, Phone, Email, Specialisation, IsActive |
+| `PermissionGroup` | Name, Description, Permissions (jsonb string[]) |
+| `CompanySettings` | **Singleton** PK=`00000000-0000-0000-0000-000000000001`, CompanyName, Address, Phone, Email, TinNumber, Website, JobCardShowHeader, JobCardShowFooter, DeliveryNoteShowHeader, DeliveryNoteShowFooter, FooterDisclaimer, EmailJobCardMessage, EmailDeliveryNoteMessage |
+| `AuditLog` | UserId, UserEmail, UserName, Action, EntityType, EntityId, EntityLabel, OccurredAt — **immutable, never soft-deleted** |
+| `ImportLog` | FileName, ImportType, Status, TotalRows, ValidRows, ImportedRows, ErrorRows, DuplicateRows, ErrorDetailsJson, StartedAt, CompletedAt, IsRolledBack |
+| `ApplicationUser` | FullName, Role, PermissionGroupId, CustomPermissions (jsonb), IsActive, LastLoginAt, RefreshToken, RefreshTokenExpiry (extends IdentityUser) |
+
+### Enums (serialized as strings in API)
+```csharp
+RetentionStatus:  Active, DueSoon, Overdue, Lost, Recovered, External
+JobCardStatus:    Open, Closed
+FuelLevel:        Empty, Quarter, Half, ThreeQuarter, Full
+ServiceType:      RoutineMaintenance, OilChange, MajorService, TyreRotation, BrakeService,
+                  TransmissionService, AirConditioningService, ElectricalDiagnostics,
+                  BodyRepair, WarrantyRepair, RecallRepair, PDI, EmergencyRepair, Inspection, Other
+CustomerCategory: Retail, Corporate, Government, NGO, Fleet, VIP, External
+ContactMethod:    Phone, SMS, Email, WhatsApp, InPerson
+FollowUpStatus:   Pending, Contacted, AppointmentBooked, Recovered, Unreachable, Declined, Closed
+FollowUpPriority: Low, Medium, High, Critical
+AppointmentStatus:Scheduled, Confirmed, Completed, Cancelled, NoShow
+NotificationType: WelcomeCall, ServiceDueSoon, ServiceDue15Days, CustomerLost,
+                  FollowUpDue, AppointmentReminder, AppointmentConfirmed
+ImportType:       Vehicles, Customers, ServiceRecords, JobCards
+ImportStatus:     Pending, Validating, Valid, Invalid, Importing, Completed, CompletedWithErrors, RolledBack, Failed
+InteractionOutcome: Reached, NoAnswer, LeftMessage, CallbackScheduled,
+                    ServiceReminderEmailSent, SatisfactionEmailSent, AppointmentBooked
+```
+
+---
+
+## 8. Backend — API Controllers
+
+| Controller | Route Prefix | Auth Policy |
+|---|---|---|
+| `AuthController` | `POST /api/auth/login` | Anonymous |
+| `DashboardController` | `GET /api/dashboard/kpis` | `[Authorize]` |
+| `VehiclesController` | `/api/vehicles` | `[Authorize]` |
+| `CustomersController` | `/api/customers` | `[Authorize]` |
+| `ServiceRecordsController` | `/api/servicerecords` | `[Authorize]` |
+| `JobCardsController` | `/api/jobcards` | `[Authorize]` |
+| `FollowUpsController` | `/api/follow-ups` | `[Authorize]` |
+| `AppointmentsController` | `/api/appointments` | `[Authorize]` |
+| `NotificationsController` | `/api/notifications` | `[Authorize]` |
+| `ReportsController` | `/api/reports` | `[Authorize]` |
+| `RetentionController` | `/api/retention` | `[Authorize]` |
+| `SalesController` | `/api/sales` | `[Authorize]` |
+| `ActivityController` | `/api/activity` | `[Authorize]` |
+| `ImportController` | `/api/import` | `[Authorize]` |
+| `CompanySettingsController` | `/api/company-settings` | `[Authorize]` |
+| `TechniciansController` | `/api/technicians` | `[Authorize]` |
+| `ServicePoliciesController` | `/api/servicepolicies` | `[Authorize]` |
+| `AdminController` | `/api/admin` | `Admin` policy |
+| `PermissionGroupsController` | `/api/admin/permission-groups` | `Admin` policy |
+
+### Authorization Policies
+```csharp
+"Admin"             → role == Admin
+"TechnicalDirector" → role in {Admin, TechnicalDirector}
+"CRMOfficer"        → role in {Admin, TechnicalDirector, CRMOfficer}
+"CRE"               → role in {Admin, CRE}
+```
+
+> **IMPORTANT:** Class-level `[Authorize(Policy="Admin")]` + method-level `[Authorize]` = AND. Use separate controllers if you need mixed policy on the same resource.
+
+### Key API Endpoints by Controller
+
+**JobCardsController**
+```
+GET    /api/jobcards                       List (paged, filters: status, serviceType, search, date)
+GET    /api/jobcards/{id}                  Detail
+POST   /api/jobcards                       Create (generates OR-YYYY-NNNNN number)
+PUT    /api/jobcards/{id}                  Update
+POST   /api/jobcards/{id}/convert          Convert to delivery note (closes + creates service record)
+GET    /api/jobcards/{id}/print            Print-ready HTML
+POST   /api/jobcards/{id}/share            Email delivery note to customer
+```
+
+**FollowUpsController**
+```
+GET    /api/follow-ups                     List (paged, filters: status, priority, assignedTo)
+GET    /api/follow-ups/{id}               Detail with interaction history
+POST   /api/follow-ups/generate            Trigger auto-generation for overdue/dueSoon/lost
+POST   /api/follow-ups/{id}/interactions   Log interaction (outcome, notes, nextContactDate)
+PUT    /api/follow-ups/{id}/close          Close follow-up
+POST   /api/follow-ups/{id}/send-email     Send service reminder / satisfaction email
+```
+
+**AppointmentsController**
+```
+GET    /api/appointments                   List (paged, filters: status, technicianId, week)
+POST   /api/appointments                   Book appointment
+PUT    /api/appointments/{id}              Update status/details
+```
+
+**RetentionController**
+```
+GET    /api/retention/summary              Summary KPIs (period: monthly/quarterly/yearly)
+GET    /api/retention/trend                Month-by-month trend (last N months)
+GET    /api/retention/by-brand             Rate per brand
+GET    /api/retention/cohorts              Cohort retention @ 3m/6m/12m/24m
+GET    /api/retention/visit-frequency      Year-wise & model-wise visit frequency
+GET    /api/retention/cohort-vehicles      Vehicles in a specific cohort slot
+```
+
+**ReportsController**
+```
+GET    /api/reports/follow-ups/monthly     Monthly follow-up report (PDF/Excel)
+```
+
+---
+
+## 9. Backend — Key Patterns
+
+### ApiResponse<T> Wrapper — MANDATORY
+Every controller action must return:
+```csharp
+return Ok(ApiResponse<T>.Ok(result));
+// NOT:
+return Ok(result);   // ← breaks frontend (expects .data.data wrapper)
+```
+```csharp
+public record ApiResponse<T>(bool Success, T? Data, string? Message, IEnumerable<string>? Errors = null)
+{
+    public static ApiResponse<T> Ok(T data, string? message = null) => new(true, data, message);
+    public static ApiResponse<T> Fail(string message, IEnumerable<string>? errors = null) => new(false, default, message, errors);
+}
+```
+
+### Soft Delete + Global Filters
+All domain entities have `IsDeleted` + global query filters in `OnModelCreating`:
+```csharp
+builder.HasQueryFilter(e => !e.IsDeleted);
+```
+Never hard-delete — set `IsDeleted = true` with timestamp + actor.
+
+### Audit Log (auto)
+`SaveChangesAsync` in `ApplicationDbContext` auto-creates `AuditLog` entries for all Create/Update/Delete on `BaseEntity` descendants.
+
+### CQRS Pattern
+Every feature = one or more of:
+```
+XxxCommand (IRequest<T>)        + XxxCommandHandler
+XxxQuery   (IRequest<T>)        + XxxQueryHandler
+XxxCommandValidator             (FluentValidation)
+```
+All under `RwandaMotor.Application/Features/{Module}/Commands|Queries/`.
+
+### Job Card Numbering
+```
+Format: OR-YYYY-NNNNN   e.g. OR-2600001
+Table:  JobCardSequence (one row per year, auto-incremented in CreateJobCardCommand)
+```
+
+### CompanySettings Singleton
+```csharp
+Id = new Guid("00000000-0000-0000-0000-000000000001")
+builder.HasKey(e => e.Id).ValueGeneratedNever(); // EF never auto-generates PK
+```
+
+### Npgsql Workaround — Must Be First
+```csharp
+// First line in Program.cs before anything else
+AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
+```
+
+### Enum Serialisation
+```csharp
+opts.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+```
+All enums are sent/received as strings (`"Active"` not `1`). Frontend types mirror exactly.
+
+### List<T> jsonb Columns
+```csharp
+dataSourceBuilder.EnableDynamicJson(); // required in DependencyInjection.cs
+```
+Used for `JobCard.AccessoriesPresent`, `PermissionGroup.Permissions`, `ApplicationUser.CustomPermissions`.
+
+### CORS Policy ("DmsPolicy")
+- Explicit origins from `appsettings.json` (`AllowedOrigins`)
+- All `*.vercel.app` origins automatically allowed (preview deployments)
+- `AllowCredentials = true`
+
+### Validation Pipeline
+- FluentValidation validator per Command/Query
+- MediatR pipeline: `ValidationBehaviour<TRequest, TResponse>`
+- ValidationException → 400 with error list
+- `ExceptionHandlingMiddleware`: `UnauthorizedAccessException` → 401, `KeyNotFoundException` → 404, generic → 500
+
+### Pagination
+```csharp
+public record PaginatedResult<T>(
+    IReadOnlyList<T> Items, int TotalCount, int PageNumber, int PageSize,
+    int TotalPages, bool HasNextPage, bool HasPreviousPage);
+```
+Query params: `?pageNumber=1&pageSize=25`
+
+---
+
+## 10. Backend — Business Logic
+
+### A. Retention Engine
+**File:** `RwandaMotor.Infrastructure/Services/RetentionEngine.cs`
+
+Vehicle classification (evaluated nightly or on-demand):
+```
+Active     → within the "DueSoon" threshold
+DueSoon    → within DueSoonLeadDays of next service date, OR DueSoonLeadKm of next mileage
+Overdue    → past next service date or next service mileage
+Lost       → LostThresholdMonths (default 12) since last service with no visit
+Recovered  → was Lost, returned for service → status changes to Recovered (then → Active on next cycle)
+External   → IsSoldByDealership == false (never tracked)
+```
+**CRITICAL:** Always key follow-up logic off `Vehicle.RetentionStatus`, NOT raw date arithmetic. The nightly job is the single source of truth.
+
+Key methods:
+- `EvaluateVehicleStatusAsync(vehicleId)` — single re-evaluation
+- `EvaluateAllVehiclesAsync()` — batch all dealership vehicles
+- `GetRetentionSummaryAsync(period, asOf?)` — rate + counts
+- `GetRetentionTrendAsync(months)` — monthly rolling trend
+- `GetRetentionByBrandAsync(from, to)` — per-brand rate
+- `GetCohortRetentionAsync(cohortYear)` — quarterly cohorts @ 3m/6m/12m/24m
+
+### B. Service Interval Engine
+**File:** `RwandaMotor.Infrastructure/Services/ServiceIntervalEngine.cs`
+
+Policy resolution order (first match wins):
+1. `Vehicle.ServicePolicyId` — vehicle-level override
+2. Model-level policy: `ServicePolicy.ModelId == vehicle.ModelId`
+3. Brand-level policy: `ServicePolicy.BrandId == vehicle.BrandId && ModelId == null`
+4. System default: `ServicePolicy.IsDefault == true`
+5. Hardcoded fallback: 5,000 km / 6 months
+
+### C. Follow-Up Auto-Generation
+**File:** `RwandaMotor.Application/Features/FollowUps/Commands/GenerateFollowUpsCommand.cs`
+
+Runs nightly (Quartz) and on-demand via `POST /api/follow-ups/generate`:
+1. **Overdue vehicles** → Reason="ServiceDueReminder", Priority=High, Notification(ServiceDueSoon)
+2. **DueSoon vehicles** → Reason="ServiceDue15Days", Priority=Medium, Notification(ServiceDue15Days)
+3. **Lost vehicles** → Reason="LostRecovery", Priority=Critical
+
+Deduplication: skips if an existing Pending/InProgress follow-up with the same Reason exists for the vehicle.
+
+### D. Job Card → Delivery Note Conversion
+**File:** `RwandaMotor.Application/Features/JobCards/Commands/ConvertToDeliveryNoteCommand.cs`
+
+Steps on `POST /api/jobcards/{id}/convert`:
+1. Close job card: `Status=Closed`, `ClosedAt=now`, `DeliveryNoteNumber="DN"+JobCardNumber[2:]`
+2. Auto-create ServiceRecord with next-service date/mileage from `ServiceIntervalEngine`
+3. Update Vehicle: `LastServiceDate`, `LastServiceMileage`, `CurrentMileage`, `NextServiceDate`, `NextServiceMileage`
+4. Trigger `RetentionEngine.EvaluateVehicleStatusAsync()` to refresh status
+5. **If ServiceType == PDI:**
+   - Create `SalesHistory` (SaleType="PDI")
+   - Auto-generate FollowUp (Reason="WelcomeCall", Priority=High, DueDate=today)
+   - Create Notification (NotificationType=WelcomeCall)
+
+### E. Job Card Numbering
+```
+Format: OR + YY + 5-digit  →  e.g. OR2600001 (year 2026, sequence #1)
+JobCardSequence table: one row per year, CurrentSequence auto-incremented atomically
+```
+
+---
+
+## 11. Background Jobs (Quartz.NET)
+
+### RetentionEvaluationJob — nightly 02:00 UTC
+1. `RetentionEngine.EvaluateAllVehiclesAsync()` — recomputes status on all dealership vehicles
+2. Creates `ServiceDueReminder` follow-ups for Overdue vehicles
+3. Creates `ServiceDue15Days` follow-ups for DueSoon vehicles
+4. Creates `LostRecovery` follow-ups for Lost vehicles
+5. Sends admin alert email listing newly-due vehicles
+
+### BackfillJobCardServiceRecordsService — startup (one-time)
+Ensures closed job cards created before the auto-create-service-record feature have `ServiceRecord` rows.
+
+### GenerateFollowUpsCommand — on-demand
+`POST /api/follow-ups/generate` — same logic as nightly job, useful for demo/manual trigger.
+
+---
+
+## 12. Permission System
+
+### Architecture (3-tier)
+```
+CustomPermissions (per-user jsonb)        ← highest priority
+  └── PermissionGroupId → PermissionGroup.Permissions (jsonb)
+        └── DefaultPermissions.ForRole(role)  ← fallback
+```
+
+Login response includes resolved `permissions[]` array. Frontend `hasPermission(key)` checks this array. **Admin role always returns true** regardless of array.
+
+### All Permission Keys
+```
+Navigation (13):
+  nav.dashboard, nav.vehicles, nav.customers, nav.serviceRecords, nav.jobCards,
+  nav.retention, nav.followUps, nav.appointments, nav.reports, nav.import,
+  nav.settings, nav.activity, nav.sales
+
+Job Cards (6):
+  jobCards.create, jobCards.edit, jobCards.delete, jobCards.convert,
+  jobCards.print, jobCards.share
+
+Vehicles (3):       vehicles.create, vehicles.edit, vehicles.delete
+Customers (3):      customers.create, customers.edit, customers.delete
+Service Records (3): serviceRecords.create, serviceRecords.edit, serviceRecords.delete
+
+Retention:     retention.manage
+Follow-ups:    followUps.view, followUps.manage
+Appointments:  appointments.view, appointments.manage
+Settings:      settings.users, settings.company, settings.groups
+Dashboard:     dashboard.kpi, dashboard.retention, dashboard.jobCardsWidget
+```
+
+### Role Defaults (`DefaultPermissions.ForRole`)
+| Role | Key Permissions |
+|---|---|
+| **Admin** | All 30+ keys |
+| **CRMOfficer** | Full nav except admin settings; full CRUD on vehicles/customers/jobs/records/follow-ups/appointments; all dashboard widgets |
+| **TechnicalDirector** | Dashboard, vehicles, customers, serviceRecords, jobCards, retention, appointments, reports; appointments.view/manage; all dashboard widgets |
+| **CRE** | dashboard.kpi, nav.customers, nav.vehicles, nav.followUps, nav.appointments, followUps.view/manage, appointments.view/manage |
+| **Default** | nav.dashboard only |
+
+### Permission Groups (Settings > Groups tab)
+Named sets of permission keys; assigned to users via `ApplicationUser.PermissionGroupId`. Override role defaults. Per-user `CustomPermissions` overrides groups.
+
+---
+
+## 13. Database Migrations
+
+Migrations run **automatically on startup** via `db.Database.MigrateAsync()`.
+
+| Migration | Date | Content |
+|---|---|---|
+| `InitialCreate` | 2026-06-11 | Customers, Vehicles, Brands, VehicleModels, ServiceRecords, ServiceParts, ServicePolicies, Technicians, WorkshopBays, FollowUps, ImportLogs, ASP.NET Identity tables |
+| `AddJobCards` | 2026-06-15 | JobCardSequences, JobCards |
+| `AddJobCards` (duplicate) | 2026-06-15 | Ensures JobCards table structure |
+| `AddPermissionGroups` | 2026-06-15 | PermissionGroups table |
+| `AddCompanySettings` | 2026-06-15 | CompanySettings singleton |
+| `EnsureCompanySettingsTable` | 2026-06-16 | Belt-and-suspenders schema patch |
+| `AddUserCustomPermissions` | 2026-06-16 | ApplicationUser.CustomPermissions (jsonb) |
+| `AllowExternalVehicleImport` | 2026-06-16 | Vehicle.IsSoldByDealership, ImportLog/ImportLogRows tables |
+| `AddAuditLog` | 2026-06-16 | AuditLog table (immutable) |
+| `AddEmailTemplates` | 2026-06-17 | CompanySettings.EmailJobCardMessage, EmailDeliveryNoteMessage |
+| `AddEmailTemplatesEnsure` | 2026-06-17 | Idempotent patch for email columns |
+| `AddFollowUpInteractionAppointmentNotification` | 2026-06-18 | FollowUpInteraction, Appointment, Notification, SalesHistory tables |
+
+> Startup also runs an idempotent SQL patch for email template columns in case a migration failed silently.
+
+---
+
+## 14. Frontend — Pages
+
+| Route | Page File | Purpose |
+|---|---|---|
+| `/dashboard` | `dashboard/page.tsx` | KPI cards (active/due/overdue/lost vehicles, retention rates, job cards, sales); retention trend chart; brand retention grid |
+| `/vehicles` | `vehicles/page.tsx` | Paginated vehicle list; filters: retention status, brand, warranty, search |
+| `/vehicles/[id]` | `vehicles/[id]/page.tsx` | Vehicle 360: service timeline, follow-up history, job cards, technician history, next service |
+| `/customers` | `customers/page.tsx` | Customer directory; filter by category, search |
+| `/customers/[id]` | `customers/[id]/page.tsx` | Customer 360: all vehicles, service history, job cards, follow-ups |
+| `/service-records` | `service-records/page.tsx` | Service record list; filter by date, vehicle, technician, service type |
+| `/job-cards` | `job-cards/page.tsx` | Job card inbox; filter by status, service type, date; create new job card |
+| `/job-cards/[id]` | `job-cards/[id]/page.tsx` | Job card detail; edit; convert to delivery note; print/share |
+| `/retention` | `retention/page.tsx` | Retention dashboard: summary KPIs, trend chart, by-brand table, cohort analysis (Q1-Q4 2025 @ 3m/6m/12m/24m), visit frequency |
+| `/follow-ups` | `follow-ups/page.tsx` | Follow-up task list; filter by status, priority, assigned user; log interaction |
+| `/follow-ups/[id]` | `follow-ups/[id]/page.tsx` | Follow-up detail; full interaction history; book appointment; send email |
+| `/appointments` | `appointments/page.tsx` | Weekly calendar view; book appointment; filter by technician |
+| `/reports` | `reports/page.tsx` | Reports index; links to sub-reports |
+| `/reports/follow-ups` | `reports/follow-ups/page.tsx` | Monthly follow-up metrics; download PDF/Excel |
+| `/import` | `import/page.tsx` | CSV upload; choose type; progress tracker; error row download |
+| `/sales` | `sales/page.tsx` | PDI sales history; VIN, customer, delivery note, date |
+| `/activity` | `activity/page.tsx` | Audit log; filter by action, entity, user, date |
+| `/settings` | `settings/page.tsx` | Company info; print header/footer toggles; email templates; brand/model catalogue |
+| `/admin/users` | `admin/users/page.tsx` | User management: create/edit/toggle; assign roles, permission groups, custom permissions |
+| `/admin/technicians` | `admin/technicians/page.tsx` | Technician CRUD |
+
+---
+
+## 15. Frontend — Key Patterns
+
+### API Response Unwrapping
+```typescript
+// The outer .data = Axios response body; the inner .data = ApiResponse<T>.data
+api.get<ApiResponse<T>>('/endpoint').then(r => r.data.data!)
+
+// For paginated:
+api.get<ApiResponse<PaginatedResult<T>>>('/endpoint').then(r => r.data.data!)
+```
+
+### Auth Context
+```typescript
+const { user, hasPermission, login, logout } = useAuth();
+// user: AuthUser | null  { userId, fullName, email, role, permissions: string[] }
+// hasPermission: Admin always true; others check permissions[]
+```
+
+### Rules of Hooks + Permission Guards
+Permission checks that conditionally return early MUST be placed **after all hooks**:
+```typescript
+export function SomePage() {
+  // ALL hooks first — unconditionally
+  const { hasPermission } = useAuth();
+  const [state, setState] = useState(...);
+  const { data } = useQuery(...);
+
+  // Permission guard AFTER all hooks
+  if (!hasPermission("some.key")) return <AccessDenied />;
+
+  return <PageContent />;
+}
+```
+
+### useSearchParams + Suspense (Next.js 16 requirement)
+Any page using `useSearchParams()` must be wrapped in `<Suspense>`:
+```typescript
+export default function SomePage() {
+  return <Suspense><SomePageContent /></Suspense>;
+}
+function SomePageContent() {
+  const searchParams = useSearchParams();   // safe inside Suspense
+}
+```
+Pages using this: `follow-ups/`, `vehicles/`, `job-cards/`, `job-cards/[id]/`.
+
+### TypeScript Type Narrowing
+```typescript
+// WRONG — TS cannot narrow through compound condition:
+if (needsData && !kpis) return null;
+value={kpis.someField}   // still "possibly undefined"
+
+// RIGHT — guard inline at each usage:
+{showKpi && kpis && <div>{kpis.someField}</div>}
+```
+
+### Select onValueChange Null Guard
+`Select.onValueChange` returns `string | null`. Always provide a fallback:
+```typescript
+// WRONG:
+onValueChange={v => setState(v)}       // null not assignable to string state
+
+// RIGHT:
+onValueChange={v => setState(v ?? "defaultValue")}
+```
+
+### Notification Bell Routing (`header.tsx`)
+```typescript
+if (n.link) router.push(n.link);
+else if (n.followUpId) router.push("/follow-ups/" + n.followUpId);
+else if (n.appointmentId) router.push("/appointments");
+else router.push("/follow-ups");
+```
+
+### Sidebar Nav Permission Filtering
+Items rendered only when `hasPermission(item.permission)`:
+```typescript
+{ href: "/vehicles",       label: "Vehicles",       permission: "nav.vehicles" }
+{ href: "/customers",      label: "Customers",       permission: "nav.customers" }
+{ href: "/service-records",label: "Service Records", permission: "nav.serviceRecords" }
+{ href: "/job-cards",      label: "Job Cards",       permission: "nav.jobCards" }
+{ href: "/follow-ups",     label: "Follow-Ups",      permission: "nav.followUps" }
+{ href: "/appointments",   label: "Appointments",    permission: "nav.appointments" }
+{ href: "/retention",      label: "Retention",       permission: "nav.retention" }
+{ href: "/reports",        label: "Reports",         permission: "nav.reports" }
+{ href: "/import",         label: "Import",          permission: "nav.import" }
+{ href: "/sales",          label: "Sales History",   permission: "nav.sales" }
+{ href: "/activity",       label: "Activity",        permission: "nav.activity" }
+{ href: "/settings",       label: "Settings",        permission: "nav.settings" }
+```
+
+### Frontend Type: ServiceType
+```typescript
+// types/index.ts
+export type ServiceType =
+  'RoutineMaintenance' | 'OilChange' | 'MajorService' | 'TyreRotation' |
+  'BrakeService' | 'TransmissionService' | 'AirConditioningService' | 'ElectricalDiagnostics' |
+  'BodyRepair' | 'WarrantyRepair' | 'RecallRepair' | 'PDI' | 'EmergencyRepair' | 'Inspection' | 'Other';
+
+// utils.ts
+export const SERVICE_TYPE_LABELS: Record<ServiceType, string> = {
+  RoutineMaintenance:    "Routine Maintenance",
+  OilChange:             "Oil Change",
+  MajorService:          "Major Service",
+  TyreRotation:          "Tyre Rotation",
+  BrakeService:          "Brake Service",
+  TransmissionService:   "Transmission Service",
+  AirConditioningService:"A/C Service",
+  ElectricalDiagnostics: "Electrical Diagnostics",
+  BodyRepair:            "Body Repair",
+  WarrantyRepair:        "Warranty Repair",
+  RecallRepair:          "Recall Repair",
+  PDI:                   "PDI",
+  EmergencyRepair:       "Emergency Repair",
+  Inspection:            "Inspection",
+  Other:                 "Other",
+};
+```
+
+---
+
+## 16. Email System
+
+`IEmailService` / `SmtpEmailService` — configured via `SmtpSettings`:
+```csharp
+Host, Port (587), Username, Password, EnableSsl,
+FromAddress: noreply@rwandamotor.com
+FromName:    RWANDAMOTOR LTD
+AlertRecipient: admin@rwandamotor.com
+```
+
+Config precedence: `appsettings.json` → env vars (`EMAIL_HOST`, `EMAIL_USERNAME`, `EMAIL_PASSWORD`, `EMAIL_ALERT_RECIPIENT`, `EMAIL_PORT`).
+
+**Email triggers:**
+- Nightly retention job → admin alert email (list of newly-due vehicles)
+- `POST /api/jobcards/{id}/share` → job card + custom message to customer
+- Delivery note email → on conversion if configured
+- `POST /api/follow-ups/{id}/send-email` → service reminder or satisfaction check
+
+**Template variables in CompanySettings:**
+- `EmailJobCardMessage`: supports `{CustomerName}`
+- `EmailDeliveryNoteMessage`: supports `{CustomerName}`, `{VehicleModel}`
+
+**Current status:** Nightly alert wired. Job card/delivery note email exists in API. SMTP must be configured in `api.env` to activate.
+
+---
+
+## 17. CI/CD Workflow
+
+### Branch Strategy
+```
+main    → backend deploy to odoo-server + Vercel production deploy
+preview → Vercel preview deploy only
+```
+
+> **Rule:** Always push to `preview` first (`git push origin main:preview`). Review on preview URL, then push to `main`.
+
+### GitHub Actions
+
+**ci.yml** — runs on push/PR to `main`:
+1. Backend: `dotnet restore` → `dotnet build` → `dotnet test`
+2. Frontend: `npm ci` → `tsc --noEmit` → `eslint` → `next build`
+
+**deploy.yml** — runs on push to `main` or `preview`:
+
+On `main` (both jobs):
+- `deploy-api` (self-hosted runner): `dotnet publish` → `sudo rwandamotor-deploy` (copies + restarts systemd)
+- `deploy-frontend`: `curl -X POST $VERCEL_DEPLOY_HOOK`
+
+On `preview` only:
+- `deploy-preview`: `npx vercel deploy --token=...` → preview URL
+
+### Useful Git Commands
+```bash
+# Push to preview (safe — no production impact)
+git push origin main:preview
+# OR
+git push origin HEAD:preview
+
+# After approval, push to production
+git push origin main
+
+# Revert to specific commit and force-push preview
+git reset --hard <commit-sha>
+git push origin main:preview --force
+```
+
+---
+
+## 18. Known Patterns & Pitfalls
+
+| Situation | Fix |
+|---|---|
+| Controller returns 200 but frontend shows empty | Wrap result: `Ok(ApiResponse<T>.Ok(result))` |
+| `useSearchParams()` runtime crash (Next.js 16) | Wrap page in `<Suspense><Content /></Suspense>` |
+| Rules of Hooks violation on permission guard | Move `if (!hasPermission(...)) return` to AFTER all hooks |
+| TypeScript `kpis possibly undefined` | Guard inline `{kpis && <div>{kpis.field}</div>}` — don't rely on compound guard |
+| `Select.onValueChange` `null` not assignable to `string` | `onValueChange={v => setState(v ?? "defaultValue")}` |
+| Follow-ups never generated (demo data) | Use `RetentionStatus` field — demo vehicles have recent service dates |
+| Auth policy stacking AND logic | Class + method `[Authorize]` = AND; use separate controllers for mixed access |
+| Npgsql UTC crash | `AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true)` — must be first line in Program.cs |
+| `List<T>` jsonb columns | `dataSourceBuilder.EnableDynamicJson()` required in DependencyInjection.cs |
+| CompanySettings migration failure | Startup idempotent SQL patch auto-adds missing columns |
+| Vercel preview CORS | All `*.vercel.app` origins automatically allowed |
+| PDI job card close | Creates SalesHistory + WelcomeCall follow-up + Notification automatically |
+
+---
+
+## 19. Backlog (as of 2026-06-21)
+
+| # | Item | Notes |
+|---|---|---|
+| 1 | **Email delivery** | SMTP credentials needed in `api.env`. Job card share + delivery note endpoints already exist. |
+| 2 | **Service alerts (SMS/WhatsApp)** | Customer-facing reminders when service is due soon |
+| 3 | **Mobile intake form** | Offline-capable PWA for workshop staff (job card creation on tablet/phone) |
+| 4 | **Parts inventory module** | Track parts used per job card, maintain stock levels, low-stock alerts |
+| 5 | **Reports module content** | `/reports` page + `nav.reports` permission exist; only monthly follow-up report implemented; retention/service reports TBD |
+| 6 | **Follow-ups/Appointments/Reports in Permission Groups matrix** | UI in Settings > Groups tab — columns exist but these modules not yet shown in the permission matrix |
+| 7 | **Service Types as admin-managed catalogue** | Currently a fixed C# enum; roadmap is to make it a DB-managed table with CRUD in settings |
