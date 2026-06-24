@@ -52,13 +52,21 @@ export default function DashboardPage() {
 
   useEffect(() => { setGreeting(getGreeting()); }, []);
 
-  const showKpi         = hasPermission("dashboard.kpi");
+  const showKpi         = hasPermission("dashboard.kpi");  // legacy: enables all KPI cards
   const showRetention   = hasPermission("dashboard.retention");
   const showJobCards    = hasPermission("dashboard.jobCardsWidget");
   const showFollowUps   = hasPermission("followUps.view") || hasPermission("followUps.manage");
   const showAppts       = hasPermission("appointments.view") || hasPermission("appointments.manage");
 
-  const needsKpiData = showKpi || showRetention || showJobCards;
+  // Individual KPI card permissions (fall back to legacy showKpi)
+  const showFollowUpsCard = showKpi || hasPermission("dashboard.kpi.followUps");
+  const showDueSoonCard   = showKpi || hasPermission("dashboard.kpi.dueSoon");
+  const showOverdueCard   = showKpi || hasPermission("dashboard.kpi.overdue");
+  const showLostCard      = showKpi || hasPermission("dashboard.kpi.lost");
+  const showRecoveredCard = showKpi || hasPermission("dashboard.kpi.recovered");
+  const showAnyFollowUp   = showFollowUpsCard || showDueSoonCard || showOverdueCard || showLostCard || showRecoveredCard;
+
+  const needsKpiData = showKpi || showAnyFollowUp || showRetention || showJobCards;
 
   const { data, isLoading } = useQuery({
     queryKey: ["dashboard-kpis"],
@@ -169,15 +177,25 @@ export default function DashboardPage() {
       )}
 
       {/* ──────────────────────── FOLLOW-UPS SECTION ──────────────────────── */}
-      {showKpi && kpis && (
+      {showAnyFollowUp && kpis && (
         <>
           <SectionDivider title="Follow-ups" />
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-            <KpiCard title="Active Follow-ups" value={kpis.activeFollowUps}      subtitle="Pending contact"     icon={Activity}      variant="info"    index={0} href="/follow-ups" />
-            <KpiCard title="Due Soon"          value={kpis.dueSoonVehicles}      subtitle="Needs outreach"      icon={Clock}         variant="warning" index={1} href="/retention" />
-            <KpiCard title="Overdue"           value={kpis.overdueVehicles}      subtitle="Missed interval"     icon={AlertTriangle} variant="warning" index={2} href="/retention" />
-            <KpiCard title="Lost"              value={kpis.lostVehicles}         subtitle="12m no service"      icon={AlertTriangle} variant="danger"  index={3} href="/retention" />
-            <KpiCard title="Recovered"         value={kpis.recoveredVehicles}    subtitle="Returned for service" icon={RefreshCw}    variant="success" index={4} href="/follow-ups" />
+          <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))" }}>
+            {showFollowUpsCard && (
+              <KpiCard title="Active Follow-ups" value={kpis.activeFollowUps}   subtitle="Pending contact"      icon={Activity}      variant="info"    index={0} href={kpis.activeFollowUps > 0 ? "/follow-ups" : undefined} />
+            )}
+            {showDueSoonCard && (
+              <KpiCard title="Due Soon"          value={kpis.dueSoonVehicles}   subtitle="Needs outreach"       icon={Clock}         variant="warning" index={1} href={kpis.dueSoonVehicles > 0 ? "/retention" : undefined} />
+            )}
+            {showOverdueCard && (
+              <KpiCard title="Overdue"           value={kpis.overdueVehicles}   subtitle="Missed interval"      icon={AlertTriangle} variant="warning" index={2} href={kpis.overdueVehicles > 0 ? "/retention" : undefined} />
+            )}
+            {showLostCard && (
+              <KpiCard title="Lost"              value={kpis.lostVehicles}      subtitle="12m no service"       icon={AlertTriangle} variant="danger"  index={3} href={kpis.lostVehicles > 0 ? "/retention" : undefined} />
+            )}
+            {showRecoveredCard && (
+              <KpiCard title="Recovered"         value={kpis.recoveredVehicles} subtitle="Returned for service" icon={RefreshCw}     variant="success" index={4} href={kpis.recoveredVehicles > 0 ? "/follow-ups" : undefined} />
+            )}
           </div>
         </>
       )}

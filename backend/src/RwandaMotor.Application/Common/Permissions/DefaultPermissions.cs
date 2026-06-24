@@ -58,9 +58,15 @@ public static class DefaultPermissions
     public const string SettingsGroups  = "settings.groups";
 
     // ── Dashboard widgets ─────────────────────────────────────────────────────
-    public const string DashboardKpi            = "dashboard.kpi";
+    public const string DashboardKpi            = "dashboard.kpi";           // legacy: enables all KPI cards
     public const string DashboardRetention      = "dashboard.retention";
     public const string DashboardJobCardsWidget = "dashboard.jobCardsWidget";
+    // Individual KPI card permissions
+    public const string DashboardKpiFollowUps   = "dashboard.kpi.followUps";
+    public const string DashboardKpiDueSoon     = "dashboard.kpi.dueSoon";
+    public const string DashboardKpiOverdue     = "dashboard.kpi.overdue";
+    public const string DashboardKpiLost        = "dashboard.kpi.lost";
+    public const string DashboardKpiRecovered   = "dashboard.kpi.recovered";
 
     // ── Full list ─────────────────────────────────────────────────────────────
     public static readonly List<string> All = new()
@@ -77,6 +83,7 @@ public static class DefaultPermissions
         AppointmentsView, AppointmentsManage,
         SettingsUsers, SettingsCompany, SettingsGroups,
         DashboardKpi, DashboardRetention, DashboardJobCardsWidget,
+        DashboardKpiFollowUps, DashboardKpiDueSoon, DashboardKpiOverdue, DashboardKpiLost, DashboardKpiRecovered,
     };
 
     /// <summary>Returns default permissions when a user has no permission group or custom permissions assigned.</summary>
@@ -95,7 +102,8 @@ public static class DefaultPermissions
             RetentionManage,
             FollowUpsView, FollowUpsManage,
             AppointmentsView, AppointmentsManage,
-            DashboardKpi, DashboardRetention, DashboardJobCardsWidget,
+            DashboardKpiFollowUps, DashboardKpiDueSoon, DashboardKpiOverdue, DashboardKpiLost, DashboardKpiRecovered,
+            DashboardRetention, DashboardJobCardsWidget,
         },
 
         "TechnicalDirector" => new()
@@ -103,7 +111,8 @@ public static class DefaultPermissions
             NavDashboard, NavVehicles, NavCustomers,
             NavServiceRecords, NavJobCards, NavRetention, NavAppointments, NavReports,
             AppointmentsView, AppointmentsManage,
-            DashboardKpi, DashboardRetention, DashboardJobCardsWidget,
+            DashboardKpiDueSoon, DashboardKpiOverdue, DashboardKpiLost,
+            DashboardRetention, DashboardJobCardsWidget,
         },
 
         // CRE: Customer Relation Executive — focuses on customer outreach
@@ -113,7 +122,7 @@ public static class DefaultPermissions
             NavFollowUps, NavAppointments,
             FollowUpsView, FollowUpsManage,
             AppointmentsView, AppointmentsManage,
-            DashboardKpi,
+            DashboardKpiFollowUps, DashboardKpiDueSoon, DashboardKpiOverdue, DashboardKpiLost, DashboardKpiRecovered,
         },
 
         _ => new() { NavDashboard },

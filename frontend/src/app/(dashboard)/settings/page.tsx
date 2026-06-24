@@ -48,11 +48,14 @@ const ROLE_COLORS: Record<string, string> = {
 
 type PermLevel = "none" | "view" | "edit" | "full";
 
+interface WidgetDef { key: string; label: string; }
+
 interface ModuleDef {
   key: string;
   label: string;
   levels: PermLevel[];
   keys: Partial<Record<PermLevel, string[]>>;
+  widgets?: WidgetDef[];  // individual toggles shown inside the module row
 }
 
 const MODULES: ModuleDef[] = [
@@ -60,8 +63,17 @@ const MODULES: ModuleDef[] = [
     key: "dashboard", label: "Dashboard",
     levels: ["none", "view"],
     keys: {
-      view: ["nav.dashboard", "dashboard.kpi", "dashboard.retention", "dashboard.jobCardsWidget"],
+      view: ["nav.dashboard"],
     },
+    widgets: [
+      { key: "dashboard.kpi.followUps",  label: "Active Follow-ups" },
+      { key: "dashboard.kpi.dueSoon",    label: "Due Soon" },
+      { key: "dashboard.kpi.overdue",    label: "Overdue" },
+      { key: "dashboard.kpi.lost",       label: "Lost" },
+      { key: "dashboard.kpi.recovered",  label: "Recovered" },
+      { key: "dashboard.retention",      label: "Retention Charts" },
+      { key: "dashboard.jobCardsWidget", label: "Workshop KPIs" },
+    ],
   },
   {
     key: "vehicles", label: "Vehicles",
@@ -179,25 +191,36 @@ function keysToLevel(mod: ModuleDef, permissions: string[]): PermLevel {
   return "none";
 }
 
+const ALL_WIDGET_KEYS = MODULES.flatMap(m => m.widgets ?? []).map(w => w.key);
+
 function permissionsToLevels(permissions: string[]): Record<string, PermLevel> {
   return Object.fromEntries(MODULES.map(m => [m.key, keysToLevel(m, permissions)]));
 }
 
-function levelsToPermissions(levels: Record<string, PermLevel>): string[] {
+function permissionsToWidgetKeys(permissions: string[]): Set<string> {
+  return new Set(permissions.filter(p => ALL_WIDGET_KEYS.includes(p)));
+}
+
+function levelsToPermissions(levels: Record<string, PermLevel>, widgetKeys: Set<string>): string[] {
   const keys = new Set<string>();
   for (const mod of MODULES) {
     const level = levels[mod.key] ?? "none";
     for (const k of mod.keys[level] ?? []) keys.add(k);
   }
+  for (const k of widgetKeys) keys.add(k);
   return [...keys];
 }
 
 function PermissionMatrix({
   levels,
+  widgetKeys,
   onChange,
+  onToggleWidget,
 }: {
   levels: Record<string, PermLevel>;
+  widgetKeys: Set<string>;
   onChange: (levels: Record<string, PermLevel>) => void;
+  onToggleWidget: (key: string) => void;
 }) {
   return (
     <div className="border border-border rounded-lg overflow-hidden text-sm">
@@ -210,28 +233,50 @@ function PermissionMatrix({
         ))}
       </div>
       {MODULES.map((mod, i) => (
-        <div key={mod.key} className={`grid grid-cols-5 border-b border-border last:border-0 ${i % 2 === 1 ? "bg-muted/20" : ""}`}>
-          <div className="px-3 py-2.5 font-medium text-sm flex items-center">{mod.label}</div>
-          {ALL_LEVELS.map(level => {
-            const supported = mod.levels.includes(level);
-            const selected = levels[mod.key] === level;
-            return (
-              <div key={level} className="flex items-center justify-center py-2.5">
-                {supported ? (
-                  <button
-                    type="button"
-                    onClick={() => onChange({ ...levels, [mod.key]: level })}
-                    className={`w-4 h-4 rounded-full border-2 transition-colors ${
-                      selected ? "bg-primary border-primary" : "border-muted-foreground/30 hover:border-primary/60"
-                    }`}
-                    aria-label={`Set ${mod.label} to ${LEVEL_LABELS[level]}`}
-                  />
-                ) : (
-                  <span className="text-muted-foreground/20 select-none">—</span>
-                )}
+        <div key={mod.key} className={`border-b border-border last:border-0 ${i % 2 === 1 ? "bg-muted/20" : ""}`}>
+          {/* Module level row */}
+          <div className="grid grid-cols-5">
+            <div className="px-3 py-2.5 font-medium text-sm flex items-center">{mod.label}</div>
+            {ALL_LEVELS.map(level => {
+              const supported = mod.levels.includes(level);
+              const selected = levels[mod.key] === level;
+              return (
+                <div key={level} className="flex items-center justify-center py-2.5">
+                  {supported ? (
+                    <button
+                      type="button"
+                      onClick={() => onChange({ ...levels, [mod.key]: level })}
+                      className={`w-4 h-4 rounded-full border-2 transition-colors ${
+                        selected ? "bg-primary border-primary" : "border-muted-foreground/30 hover:border-primary/60"
+                      }`}
+                      aria-label={`Set ${mod.label} to ${LEVEL_LABELS[level]}`}
+                    />
+                  ) : (
+                    <span className="text-muted-foreground/20 select-none">—</span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          {/* Widget checkboxes (shown when module level is not none) */}
+          {mod.widgets && levels[mod.key] !== "none" && (
+            <div className="col-span-5 px-4 pb-3 pt-0.5 border-t border-border/40 bg-muted/10">
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-semibold mb-2">Visible KPI cards</p>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
+                {mod.widgets.map(w => (
+                  <label key={w.key} className="flex items-center gap-2 text-xs cursor-pointer select-none hover:text-foreground text-muted-foreground transition-colors">
+                    <input
+                      type="checkbox"
+                      className="rounded cursor-pointer accent-primary"
+                      checked={widgetKeys.has(w.key)}
+                      onChange={() => onToggleWidget(w.key)}
+                    />
+                    {w.label}
+                  </label>
+                ))}
               </div>
-            );
-          })}
+            </div>
+          )}
         </div>
       ))}
     </div>
@@ -341,7 +386,7 @@ function UserModal({
               </button>
               <button
                 type="button"
-                onClick={() => onChange({ useCustomPermissions: true, permissionGroupId: "", customPermissions: form.customPermissions.length > 0 ? form.customPermissions : levelsToPermissions(Object.fromEntries(MODULES.map(m => [m.key, "none"]))) })}
+                onClick={() => onChange({ useCustomPermissions: true, permissionGroupId: "", customPermissions: form.customPermissions.length > 0 ? form.customPermissions : levelsToPermissions(Object.fromEntries(MODULES.map(m => [m.key, "none"])), new Set()) })}
                 className={`flex-1 py-1.5 px-3 rounded-lg border text-xs font-medium transition-colors ${form.useCustomPermissions ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:border-primary/40"}`}
               >
                 Custom Permissions
@@ -370,7 +415,13 @@ function UserModal({
                 <Label className="text-xs text-muted-foreground">Module permissions for this user</Label>
                 <PermissionMatrix
                   levels={permissionsToLevels(form.customPermissions)}
-                  onChange={levels => onChange({ customPermissions: levelsToPermissions(levels) })}
+                  widgetKeys={permissionsToWidgetKeys(form.customPermissions)}
+                  onChange={levels => onChange({ customPermissions: levelsToPermissions(levels, permissionsToWidgetKeys(form.customPermissions)) })}
+                  onToggleWidget={key => {
+                    const wk = permissionsToWidgetKeys(form.customPermissions);
+                    wk.has(key) ? wk.delete(key) : wk.add(key);
+                    onChange({ customPermissions: levelsToPermissions(permissionsToLevels(form.customPermissions), wk) });
+                  }}
                 />
               </div>
             )}
@@ -468,6 +519,10 @@ function PermissionGroupModal({
   const [name, setName] = useState(initial.name);
   const [description, setDescription] = useState(initial.description);
   const [levels, setLevels] = useState<Record<string, PermLevel>>(() => permissionsToLevels(initial.permissions));
+  const [widgetKeys, setWidgetKeys] = useState<Set<string>>(() => permissionsToWidgetKeys(initial.permissions));
+
+  const toggleWidget = (key: string) =>
+    setWidgetKeys(prev => { const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n; });
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -496,13 +551,13 @@ function PermissionGroupModal({
 
           <div className="space-y-3">
             <Label className="text-sm font-semibold">Permissions</Label>
-            <PermissionMatrix levels={levels} onChange={setLevels} />
+            <PermissionMatrix levels={levels} widgetKeys={widgetKeys} onChange={setLevels} onToggleWidget={toggleWidget} />
           </div>
         </div>
 
         <div className="flex justify-end gap-3 p-5 border-t">
           <Button variant="outline" onClick={onClose} disabled={saving}>Cancel</Button>
-          <Button onClick={() => onSave({ name: name.trim(), description: description.trim() || null, permissions: levelsToPermissions(levels) })}
+          <Button onClick={() => onSave({ name: name.trim(), description: description.trim() || null, permissions: levelsToPermissions(levels, widgetKeys) })}
             disabled={saving || !name.trim()} className="gradient-primary text-white">
             {saving ? "Saving…" : "Save Group"}
           </Button>
