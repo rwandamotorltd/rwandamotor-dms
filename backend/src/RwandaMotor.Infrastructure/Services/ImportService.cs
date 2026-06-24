@@ -299,8 +299,10 @@ public class ProcessImportCommandHandler
         var allCustomers = await _db.Customers
             .Where(c => !c.IsDeleted)
             .ToListAsync(ct);
-        var customerMap = allCustomers
-            .ToDictionary(c => c.FullName, StringComparer.OrdinalIgnoreCase);
+        // TryAdd keeps the first match when duplicate names exist in the DB
+        var customerMap = new Dictionary<string, Customer>(StringComparer.OrdinalIgnoreCase);
+        foreach (var c in allCustomers)
+            customerMap.TryAdd(c.FullName, c);
 
         // Re-check VINs against live DB (validation may be minutes stale)
         var existingVins = (await _db.Vehicles

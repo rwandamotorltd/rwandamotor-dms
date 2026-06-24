@@ -263,7 +263,7 @@ export default function Vehicle360Page({ params }: { params: Promise<{ id: strin
   const [editForm, setEditForm] = useState<EditFormState | null>(null);
   const [editError, setEditError] = useState<string | null>(null);
 
-  const { data: vehicle, isLoading } = useQuery({
+  const { data: vehicle, isLoading, isError } = useQuery({
     queryKey: ["vehicle-360", id],
     queryFn: () => vehiclesApi.get360(id),
   });
@@ -333,6 +333,7 @@ export default function Vehicle360Page({ params }: { params: Promise<{ id: strin
   };
 
   if (isLoading) return <Vehicle360Skeleton />;
+  if (isError) return <div className="text-center py-20 text-muted-foreground">Failed to load vehicle data. Please try again.</div>;
   if (!vehicle) return <div className="text-center py-20 text-muted-foreground">Vehicle not found.</div>;
 
   const warrantyExpired = vehicle.warrantyEndDate && new Date(vehicle.warrantyEndDate) < new Date();
@@ -489,7 +490,13 @@ export default function Vehicle360Page({ params }: { params: Promise<{ id: strin
                     </AvatarFallback>
                   </Avatar>
                   <div>
-                    <p className="font-semibold">{vehicle.customerName}</p>
+                    {vehicle.customerId ? (
+                      <Link href={"/customers/" + vehicle.customerId} className="font-semibold hover:text-primary hover:underline underline-offset-2 transition-colors">
+                        {vehicle.customerName}
+                      </Link>
+                    ) : (
+                      <p className="font-semibold">{vehicle.customerName}</p>
+                    )}
                     <p className="text-xs text-muted-foreground">{vehicle.customerCategory}</p>
                   </div>
                 </div>

@@ -247,6 +247,7 @@ export interface Vehicle360 {
   color: string | null;
   fuelType: string | null;
   engineNumber: string | null;
+  customerId: string | null;
   customerName: string | null;
   customerPhone: string | null;
   customerEmail: string | null;
