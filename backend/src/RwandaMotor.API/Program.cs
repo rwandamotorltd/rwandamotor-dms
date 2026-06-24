@@ -190,6 +190,63 @@ using (var scope = app.Services.CreateScope())
     }
     catch (Exception ex) { Log.Error(ex, "Schema column patch failed"); }
 
+    // Belt-and-suspenders: create AppRoles + DocumentTemplates if migrations failed
+    try
+    {
+        await db.Database.ExecuteSqlRawAsync(@"
+            DO $$
+            BEGIN
+                -- DocumentTemplates table
+                IF NOT EXISTS (
+                    SELECT 1 FROM pg_catalog.pg_class c
+                    JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+                    WHERE c.relname = 'DocumentTemplates' AND n.nspname = 'public'
+                ) THEN
+                    CREATE TABLE ""DocumentTemplates"" (
+                        ""Id""           uuid    NOT NULL,
+                        ""DocumentType"" text    NOT NULL,
+                        ""Name""         text    NOT NULL,
+                        ""PageWidth""    integer NOT NULL,
+                        ""PageHeight""   integer NOT NULL,
+                        ""FieldsJson""   text    NOT NULL,
+                        ""IsDefault""    boolean NOT NULL,
+                        ""CreatedAt""    timestamp without time zone NOT NULL,
+                        ""UpdatedAt""    timestamp without time zone,
+                        ""CreatedBy""    text,
+                        ""UpdatedBy""    text,
+                        ""IsDeleted""    boolean NOT NULL,
+                        ""DeletedAt""    timestamp without time zone,
+                        ""DeletedBy""    text,
+                        CONSTRAINT ""PK_DocumentTemplates"" PRIMARY KEY (""Id"")
+                    );
+                    INSERT INTO ""__EFMigrationsHistory"" (""MigrationId"", ""ProductVersion"")
+                    VALUES ('20260624071434_AddDocumentTemplates', '9.0.1')
+                    ON CONFLICT DO NOTHING;
+                END IF;
+
+                -- AppRoles table
+                IF NOT EXISTS (
+                    SELECT 1 FROM pg_catalog.pg_class c
+                    JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+                    WHERE c.relname = 'AppRoles' AND n.nspname = 'public'
+                ) THEN
+                    CREATE TABLE ""AppRoles"" (
+                        ""Id""          uuid    NOT NULL,
+                        ""Name""        text    NOT NULL,
+                        ""DisplayName"" text    NOT NULL,
+                        ""Description"" text,
+                        ""IsBuiltIn""   boolean NOT NULL,
+                        CONSTRAINT ""PK_AppRoles"" PRIMARY KEY (""Id"")
+                    );
+                    CREATE UNIQUE INDEX ""IX_AppRoles_Name"" ON ""AppRoles"" (""Name"");
+                    INSERT INTO ""__EFMigrationsHistory"" (""MigrationId"", ""ProductVersion"")
+                    VALUES ('20260624081238_AddAppRoles', '9.0.1')
+                    ON CONFLICT DO NOTHING;
+                END IF;
+            END $$;");
+    }
+    catch (Exception ex) { Log.Error(ex, "Schema table patch failed"); }
+
     // Seed reference data
     try
     {
