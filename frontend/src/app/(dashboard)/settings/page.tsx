@@ -1780,9 +1780,11 @@ function RolesTab() {
   });
 
   const createMut = useMutation({
-    mutationFn: () => rolesApi.create(formName, formDisplay, formDesc || undefined),
+    mutationFn: (data: { name: string; displayName: string; description?: string }) =>
+      rolesApi.create(data.name, data.displayName, data.description),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["app-roles"] }); setShowCreate(false); resetForm(); toast.success("Role created"); },
-    onError: (e: { response?: { data?: { message?: string } } }) => toast.error(e?.response?.data?.message ?? "Failed to create role"),
+    onError: (e: { response?: { data?: { message?: string; title?: string } }; message?: string }) =>
+      toast.error(e?.response?.data?.message ?? e?.response?.data?.title ?? e?.message ?? "Failed to create role"),
   });
 
   const updateMut = useMutation({
@@ -1890,7 +1892,7 @@ function RolesTab() {
             </div>
             <div className="flex justify-end gap-2 pt-1">
               <Button variant="outline" onClick={() => setShowCreate(false)}>Cancel</Button>
-              <Button onClick={() => createMut.mutate()} disabled={createMut.isPending || !formName.trim() || !formDisplay.trim()} className="gradient-primary text-white">
+              <Button onClick={() => createMut.mutate({ name: formName.trim(), displayName: formDisplay.trim(), description: formDesc.trim() || undefined })} disabled={createMut.isPending || !formName.trim() || !formDisplay.trim()} className="gradient-primary text-white">
                 {createMut.isPending ? "Saving…" : "Create Role"}
               </Button>
             </div>

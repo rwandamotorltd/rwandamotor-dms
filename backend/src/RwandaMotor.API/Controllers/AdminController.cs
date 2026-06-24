@@ -189,16 +189,23 @@ public class AdminController : ControllerBase
         if (await _db.AppRoles.AnyAsync(r => r.Name == nameTrimmed))
             return BadRequest(ApiResponse<bool>.Fail("A role with that name already exists"));
 
-        var role = new AppRole
+        try
         {
-            Name = nameTrimmed,
-            DisplayName = req.DisplayName.Trim(),
-            Description = req.Description?.Trim(),
-            IsBuiltIn = false,
-        };
-        _db.AppRoles.Add(role);
-        await _db.SaveChangesAsync();
-        return Ok(ApiResponse<RoleDto>.Ok(new RoleDto(role.Id, role.Name, role.DisplayName, role.Description, false, 0)));
+            var role = new AppRole
+            {
+                Name = nameTrimmed,
+                DisplayName = req.DisplayName.Trim(),
+                Description = req.Description?.Trim(),
+                IsBuiltIn = false,
+            };
+            _db.AppRoles.Add(role);
+            await _db.SaveChangesAsync();
+            return Ok(ApiResponse<RoleDto>.Ok(new RoleDto(role.Id, role.Name, role.DisplayName, role.Description, false, 0)));
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, ApiResponse<bool>.Fail(ex.InnerException?.Message ?? ex.Message));
+        }
     }
 
     [HttpPut("roles/{id:guid}")]
