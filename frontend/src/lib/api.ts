@@ -379,9 +379,9 @@ export const catalogueApi = {
   bulkImport: (file: File): Promise<BulkImportCatalogueResult> => {
     const form = new FormData();
     form.append('file', file);
+    // Do NOT set Content-Type manually — Axios must auto-set it with the multipart boundary
     return api.post<ApiResponse<BulkImportCatalogueResult>>(
       '/admin/catalogue/import', form,
-      { headers: { 'Content-Type': 'multipart/form-data' } },
     ).then(r => r.data.data!);
   },
 };

@@ -1365,8 +1365,9 @@ function CatalogueTab() {
       if (!parts.length)    parts.push("nothing new to import");
       toast.success(`Import complete — ${parts.join(", ")}`);
       invalidate();
-    } catch {
-      toast.error("Import failed — check the file format and try again");
+    } catch (e: unknown) {
+      const msg = (e as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      toast.error(msg ?? "Import failed — check the file format and try again");
     } finally {
       setImporting(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
