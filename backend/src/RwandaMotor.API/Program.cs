@@ -97,6 +97,19 @@ builder.Services.AddControllers()
         // Allow string <-> enum round-trip (frontend sends "Phone", "Retail", etc.)
         opts.JsonSerializerOptions.Converters.Add(
             new System.Text.Json.Serialization.JsonStringEnumConverter());
+    })
+    .ConfigureApiBehaviorOptions(opts =>
+    {
+        // Return ApiResponse format on model validation failure instead of ValidationProblemDetails
+        opts.InvalidModelStateResponseFactory = ctx =>
+        {
+            var msg = ctx.ModelState.Values
+                .SelectMany(v => v.Errors)
+                .Select(e => e.ErrorMessage)
+                .FirstOrDefault() ?? "Invalid request";
+            return new Microsoft.AspNetCore.Mvc.BadRequestObjectResult(
+                new { success = false, message = msg });
+        };
     });
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>

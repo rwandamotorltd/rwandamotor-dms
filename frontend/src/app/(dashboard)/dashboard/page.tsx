@@ -180,33 +180,21 @@ export default function DashboardPage() {
       {showAnyFollowUp && kpis && (
         <>
           <SectionDivider title="Follow-ups" />
-          {/* Mobile: horizontal scroll strip; sm+: responsive grid */}
-          <div className="flex gap-3 overflow-x-auto pb-1 -mx-3 px-3 sm:mx-0 sm:px-0 sm:grid sm:gap-4 sm:overflow-visible"
-               style={{ gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))" }}>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
             {showFollowUpsCard && (
-              <div className="shrink-0 w-44 sm:w-auto">
-                <KpiCard title="Active Follow-ups" value={kpis.activeFollowUps}   subtitle="Pending contact"      icon={Activity}      variant="info"    index={0} href={kpis.activeFollowUps > 0 ? "/follow-ups" : undefined} />
-              </div>
+              <KpiCard title="Active Follow-ups" value={kpis.activeFollowUps}   subtitle="Pending contact"      icon={Activity}      variant="info"    index={0} href={kpis.activeFollowUps > 0 ? "/follow-ups" : undefined} />
             )}
             {showDueSoonCard && (
-              <div className="shrink-0 w-44 sm:w-auto">
-                <KpiCard title="Due Soon"          value={kpis.dueSoonVehicles}   subtitle="Needs outreach"       icon={Clock}         variant="warning" index={1} href={kpis.dueSoonVehicles > 0 ? "/retention" : undefined} />
-              </div>
+              <KpiCard title="Due Soon"          value={kpis.dueSoonVehicles}   subtitle="Needs outreach"       icon={Clock}         variant="warning" index={1} href={kpis.dueSoonVehicles > 0 ? "/vehicles?status=DueSoon" : undefined} />
             )}
             {showOverdueCard && (
-              <div className="shrink-0 w-44 sm:w-auto">
-                <KpiCard title="Overdue"           value={kpis.overdueVehicles}   subtitle="Missed interval"      icon={AlertTriangle} variant="warning" index={2} href={kpis.overdueVehicles > 0 ? "/retention" : undefined} />
-              </div>
+              <KpiCard title="Overdue"           value={kpis.overdueVehicles}   subtitle="Missed interval"      icon={AlertTriangle} variant="warning" index={2} href={kpis.overdueVehicles > 0 ? "/vehicles?status=Overdue" : undefined} />
             )}
             {showLostCard && (
-              <div className="shrink-0 w-44 sm:w-auto">
-                <KpiCard title="Lost"              value={kpis.lostVehicles}      subtitle="12m no service"       icon={AlertTriangle} variant="danger"  index={3} href={kpis.lostVehicles > 0 ? "/retention" : undefined} />
-              </div>
+              <KpiCard title="Lost"              value={kpis.lostVehicles}      subtitle="12m no service"       icon={AlertTriangle} variant="danger"  index={3} href={kpis.lostVehicles > 0 ? "/vehicles?status=Lost" : undefined} />
             )}
             {showRecoveredCard && (
-              <div className="shrink-0 w-44 sm:w-auto">
-                <KpiCard title="Recovered"         value={kpis.recoveredVehicles} subtitle="Returned for service" icon={RefreshCw}     variant="success" index={4} href={kpis.recoveredVehicles > 0 ? "/follow-ups" : undefined} />
-              </div>
+              <KpiCard title="Recovered"         value={kpis.recoveredVehicles} subtitle="Returned for service" icon={RefreshCw}     variant="success" index={4} href={kpis.recoveredVehicles > 0 ? "/vehicles?status=Recovered" : undefined} />
             )}
           </div>
         </>
