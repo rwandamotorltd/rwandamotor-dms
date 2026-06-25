@@ -1069,8 +1069,12 @@ public class BulkImportCatalogueCommandHandler
 
         int brandsCreated = 0, brandsSkipped = 0, modelsCreated = 0, modelsSkipped = 0;
 
-        // Track all codes already in DB so we can avoid duplicate-key violations
-        var usedBrandCodes = brands.Select(b => b.Code).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        // Load ALL brand codes including soft-deleted to avoid IX_Brands_Code violations
+        // (soft-deleted rows still occupy the unique index on the Code column)
+        var usedBrandCodes = (await _db.Brands
+            .Select(b => b.Code)
+            .ToListAsync(ct))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         // Pass 1: brands
         bool anyNew = false;

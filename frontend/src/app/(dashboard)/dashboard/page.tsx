@@ -69,7 +69,9 @@ export default function DashboardPage() {
     queryKey: ["dashboard-kpis"],
     queryFn: dashboardApi.getKpis,
     enabled: needsKpiData,
-    refetchInterval: 5 * 60_000,
+    staleTime: 0,
+    refetchOnMount: "always",
+    refetchInterval: 60_000,
   });
 
   const kpis = data;
