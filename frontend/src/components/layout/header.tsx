@@ -2,13 +2,23 @@
 
 import { useState, useEffect, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { Moon, Sun, Search, Menu, Car, User, X } from "lucide-react";
+import { Moon, Sun, Search, Menu, Car, User, X, Bell, LogOut, ChevronDown } from "lucide-react";
 import { useTheme } from "next-themes";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { vehiclesApi, customersApi } from "@/lib/api";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { vehiclesApi, customersApi, notificationsApi, type NotificationItem } from "@/lib/api";
+import { useAuth } from "@/contexts/auth-context";
 
 const BREADCRUMBS: Record<string, string> = {
   "/dashboard":         "Executive Dashboard",
@@ -110,6 +120,25 @@ function SearchDropdown({ inputEl, showDropdown, isSearching, debouncedSearch, v
   );
 }
 
+// ── Notification helpers ──────────────────────────────────────
+function timeAgo(dateStr: string): string {
+  const norm = (s: string) => /Z|[+-]\d{2}:?\d{2}$/.test(s) ? s : s + "Z";
+  const diff = Date.now() - new Date(norm(dateStr)).getTime();
+  const mins = Math.floor(diff / 60_000);
+  if (mins < 1)  return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24)  return `${hrs}h ago`;
+  return `${Math.floor(hrs / 24)}d ago`;
+}
+
+function notificationLink(n: NotificationItem): string {
+  if (n.link) return n.link;
+  if (n.followUpId) return `/follow-ups/${n.followUpId}`;
+  if (n.appointmentId) return `/appointments`;
+  return "/follow-ups";
+}
+
 interface HeaderProps {
   onMenuClick: () => void;
 }
@@ -118,6 +147,8 @@ export function Header({ onMenuClick }: HeaderProps) {
   const pathname = usePathname();
   const router   = useRouter();
   const { theme, setTheme } = useTheme();
+  const { user, logout }    = useAuth();
+  const queryClient         = useQueryClient();
 
   const pageTitle = BREADCRUMBS[pathname] ?? BREADCRUMBS[Object.keys(BREADCRUMBS).find(k => pathname.startsWith(k)) ?? ""] ?? "Dashboard";
 
@@ -165,6 +196,33 @@ export function Header({ onMenuClick }: HeaderProps) {
     setMobileSearchOpen(false);
   };
 
+  // ── Notifications ────────────────────────────────────────────
+  const [notifOpen, setNotifOpen] = useState(false);
+  const { data: notifData } = useQuery({
+    queryKey: ["notifications"],
+    queryFn:  notificationsApi.get,
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+  });
+  const unreadCount  = notifData?.unreadCount ?? 0;
+  const notifications = notifData?.items ?? [];
+
+  const markReadMutation = useMutation({
+    mutationFn: notificationsApi.markRead,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["notifications"] }),
+  });
+
+  const handleBellClick = () => {
+    setNotifOpen(prev => !prev);
+    const unreadIds = notifications.filter(n => !n.isRead).map(n => n.id);
+    if (unreadIds.length > 0) markReadMutation.mutate(unreadIds);
+  };
+
+  const handleNotifNavigate = (n: NotificationItem) => {
+    setNotifOpen(false);
+    router.push(notificationLink(n));
+  };
+
   return (
     <>
       <header className="h-16 border-b border-border bg-background/80 backdrop-blur-sm flex items-center gap-3 px-4 md:px-6 shrink-0">
@@ -209,9 +267,80 @@ export function Header({ onMenuClick }: HeaderProps) {
             <Search className="w-4 h-4" />
           </Button>
 
+          {/* Theme toggle */}
           <Button variant="ghost" size="icon" onClick={() => setTheme(theme === "dark" ? "light" : "dark")}>
             {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
           </Button>
+
+          {/* Notification bell */}
+          <div className="relative">
+            <Button variant="ghost" size="icon" onClick={handleBellClick} aria-label="Notifications">
+              <Bell className="w-4 h-4" />
+              {unreadCount > 0 && (
+                <span className="absolute top-1 right-1 min-w-[16px] h-4 rounded-full bg-red-500 text-[10px] font-bold text-white flex items-center justify-center px-0.5 leading-none pointer-events-none">
+                  {unreadCount > 99 ? "99+" : unreadCount}
+                </span>
+              )}
+            </Button>
+
+            {notifOpen && (
+              <div className="absolute right-0 top-full mt-1 w-80 bg-popover border border-border rounded-lg shadow-lg z-50 overflow-hidden">
+                <div className="px-4 py-2.5 border-b border-border flex items-center justify-between">
+                  <span className="text-sm font-semibold">Notifications</span>
+                  <button className="text-xs text-muted-foreground hover:text-foreground" onClick={() => setNotifOpen(false)}>
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+                <ScrollArea className="max-h-80">
+                  {notifications.length === 0 ? (
+                    <div className="py-8 text-center text-sm text-muted-foreground">No notifications</div>
+                  ) : (
+                    notifications.map(n => (
+                      <button
+                        key={n.id}
+                        className={`w-full text-left px-4 py-3 border-b border-border last:border-0 hover:bg-accent transition-colors flex gap-3 ${!n.isRead ? "bg-blue-50/40 dark:bg-blue-900/10" : ""}`}
+                        onClick={() => handleNotifNavigate(n)}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium leading-tight truncate">{n.title}</p>
+                          <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{n.message}</p>
+                          <p className="text-[10px] text-muted-foreground/70 mt-1">{timeAgo(n.createdAt)}</p>
+                        </div>
+                        {!n.isRead && <span className="mt-1.5 w-2 h-2 rounded-full bg-blue-500 shrink-0" />}
+                      </button>
+                    ))
+                  )}
+                </ScrollArea>
+              </div>
+            )}
+          </div>
+
+          {/* User menu */}
+          <DropdownMenu>
+            <DropdownMenuTrigger className="inline-flex h-8 items-center gap-1.5 rounded-md px-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                <User className="w-4 h-4 text-primary" />
+              </div>
+              <span className="hidden sm:block max-w-[100px] truncate">{user?.fullName ?? "User"}</span>
+              <ChevronDown className="w-3 h-3 text-muted-foreground hidden sm:block" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-52">
+              <DropdownMenuGroup>
+                <DropdownMenuLabel>
+                  <div className="flex flex-col gap-0.5">
+                    <span className="font-medium text-foreground truncate">{user?.fullName}</span>
+                    <span className="text-xs text-muted-foreground truncate">{user?.email}</span>
+                    <span className="text-[10px] text-muted-foreground/70 uppercase tracking-wide mt-0.5">{user?.role}</span>
+                  </div>
+                </DropdownMenuLabel>
+              </DropdownMenuGroup>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem variant="destructive" onClick={logout}>
+                <LogOut className="w-4 h-4 mr-2" />
+                Sign out
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </header>
 
