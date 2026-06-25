@@ -10,7 +10,7 @@ import {
   FileText, ExternalLink,
 } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
-import { useRouter, usePathname } from "next/navigation";
+import { useRouter } from "next/navigation";
 import {
   adminApi, permissionGroupsApi, companySettingsApi, catalogueApi, templatesApi, rolesApi,
   type UserItem, type CreateUserPayload, type UpdateUserPayload,
@@ -424,7 +424,7 @@ function UserModal({
                   onChange={levels => onChange({ customPermissions: levelsToPermissions(levels, permissionsToWidgetKeys(form.customPermissions)) })}
                   onToggleWidget={key => {
                     const wk = permissionsToWidgetKeys(form.customPermissions);
-                    wk.has(key) ? wk.delete(key) : wk.add(key);
+                    if (wk.has(key)) wk.delete(key); else wk.add(key);
                     onChange({ customPermissions: levelsToPermissions(permissionsToLevels(form.customPermissions), wk) });
                   }}
                 />
@@ -527,7 +527,7 @@ function PermissionGroupModal({
   const [widgetKeys, setWidgetKeys] = useState<Set<string>>(() => permissionsToWidgetKeys(initial.permissions));
 
   const toggleWidget = (key: string) =>
-    setWidgetKeys(prev => { const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n; });
+    setWidgetKeys(prev => { const n = new Set(prev); if (n.has(key)) n.delete(key); else n.add(key); return n; });
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -1169,7 +1169,10 @@ function ServiceTypesCard() {
   });
 
   useEffect(() => {
-    if (settings !== undefined) setTypes(parseServiceTypesConfig(settings?.serviceTypesConfig));
+    if (settings !== undefined) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setTypes(parseServiceTypesConfig(settings?.serviceTypesConfig));
+    }
   }, [settings]);
 
   const saveMutation = useMutation({
@@ -1206,7 +1209,7 @@ function ServiceTypesCard() {
   const removeCustom = (idx: number) => setTypes(prev => prev.filter((_, i) => i !== idx));
 
   const toggleSelect = (idx: number) =>
-    setSelected(prev => { const n = new Set(prev); n.has(idx) ? n.delete(idx) : n.add(idx); return n; });
+    setSelected(prev => { const n = new Set(prev); if (n.has(idx)) n.delete(idx); else n.add(idx); return n; });
 
   const allSelected = types.length > 0 && selected.size === types.length;
   const toggleAll   = () => setSelected(allSelected ? new Set() : new Set(types.map((_, i) => i)));
@@ -1432,7 +1435,7 @@ function CatalogueTab() {
   });
 
   const toggleBrand = (id: string) =>
-    setSelBrands(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+    setSelBrands(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   const allBrandsSelected = brands.length > 0 && selectedBrands.size === brands.length;
   const toggleAllBrands   = () => setSelBrands(allBrandsSelected ? new Set() : new Set(brands.map(b => b.id)));
 
@@ -1446,7 +1449,7 @@ function CatalogueTab() {
   };
 
   const toggleModel = (id: string) =>
-    setSelModels(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+    setSelModels(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
 
   const bulkDeleteModels = async (models: CatalogueModelDto[]) => {
     const ids = models.filter(m => selectedModels.has(m.id)).map(m => m.id);

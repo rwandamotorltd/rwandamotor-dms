@@ -903,12 +903,12 @@ function JobCardsContent() {
   const allPageSelected = pageIds.length > 0 && pageIds.every(id => selectedIds.has(id));
 
   const toggleRow = (id: string) =>
-    setSelectedIds(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s; });
+    setSelectedIds(prev => { const s = new Set(prev); if (s.has(id)) s.delete(id); else s.add(id); return s; });
 
   const togglePage = () =>
     setSelectedIds(prev => {
       const s = new Set(prev);
-      allPageSelected ? pageIds.forEach(id => s.delete(id)) : pageIds.forEach(id => s.add(id));
+      if (allPageSelected) pageIds.forEach(id => s.delete(id)); else pageIds.forEach(id => s.add(id));
       return s;
     });
 

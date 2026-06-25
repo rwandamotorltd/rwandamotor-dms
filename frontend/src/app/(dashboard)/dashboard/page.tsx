@@ -1,7 +1,6 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
   Car, Users, TrendingUp, AlertTriangle,
@@ -48,9 +47,7 @@ function getGreeting() {
 
 export default function DashboardPage() {
   const { user, hasPermission } = useAuth();
-  const [greeting, setGreeting] = useState("");
-
-  useEffect(() => { setGreeting(getGreeting()); }, []);
+  const greeting = getGreeting();
 
   const showKpi         = hasPermission("dashboard.kpi");  // legacy: enables all KPI cards
   const showRetention   = hasPermission("dashboard.retention");

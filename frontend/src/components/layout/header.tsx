@@ -25,6 +25,90 @@ const BREADCRUMBS: Record<string, string> = {
   "/settings":          "Settings",
 };
 
+interface VehicleHit {
+  id: string;
+  plateNumber?: string | null;
+  vin: string;
+  brandName?: string | null;
+  modelName?: string | null;
+  year?: number | null;
+  customerName?: string | null;
+}
+interface CustomerHit {
+  id: string;
+  fullName: string;
+  phone?: string | null;
+  city?: string | null;
+}
+
+interface SearchDropdownProps {
+  inputEl: React.ReactNode;
+  showDropdown: boolean;
+  isSearching: boolean;
+  debouncedSearch: string;
+  vehicles: VehicleHit[];
+  customers: CustomerHit[];
+  onNavigate: (url: string) => void;
+}
+
+function SearchDropdown({ inputEl, showDropdown, isSearching, debouncedSearch, vehicles, customers, onNavigate }: SearchDropdownProps) {
+  const hasResults = vehicles.length > 0 || customers.length > 0;
+  return (
+    <div className="relative">
+      {inputEl}
+      {showDropdown && (
+        <div className="absolute top-full mt-1 left-0 w-full min-w-[280px] bg-popover border border-border rounded-lg shadow-lg z-50 overflow-hidden">
+          {isSearching ? (
+            <div className="py-6 text-center text-sm text-muted-foreground">Searching…</div>
+          ) : !hasResults ? (
+            <div className="py-6 text-center text-sm text-muted-foreground">
+              {debouncedSearch.length >= 2 ? `No results for "${debouncedSearch}"` : "Keep typing…"}
+            </div>
+          ) : (
+            <ScrollArea className="max-h-72">
+              {vehicles.length > 0 && (
+                <>
+                  <div className="px-3 py-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide bg-muted/40 border-b border-border">Vehicles</div>
+                  {vehicles.map(v => (
+                    <button
+                      key={v.id}
+                      className="w-full text-left px-3 py-2.5 hover:bg-accent transition-colors flex items-center gap-3"
+                      onClick={() => onNavigate(`/vehicles/${v.id}`)}
+                    >
+                      <Car className="w-4 h-4 text-muted-foreground shrink-0" />
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium truncate">{v.plateNumber ?? v.vin}</p>
+                        <p className="text-xs text-muted-foreground truncate">{v.brandName} {v.modelName} {v.year}{v.customerName ? ` · ${v.customerName}` : ""}</p>
+                      </div>
+                    </button>
+                  ))}
+                </>
+              )}
+              {customers.length > 0 && (
+                <>
+                  <div className="px-3 py-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide bg-muted/40 border-b border-border">Customers</div>
+                  {customers.map(c => (
+                    <button
+                      key={c.id}
+                      className="w-full text-left px-3 py-2.5 hover:bg-accent transition-colors flex items-center gap-3"
+                      onClick={() => onNavigate(`/customers/${c.id}`)}
+                    >
+                      <User className="w-4 h-4 text-muted-foreground shrink-0" />
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium truncate">{c.fullName}</p>
+                        <p className="text-xs text-muted-foreground truncate">{[c.phone, c.city].filter(Boolean).join(" · ")}</p>
+                      </div>
+                    </button>
+                  ))}
+                </>
+              )}
+            </ScrollArea>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 interface HeaderProps {
   onMenuClick: () => void;
@@ -53,8 +137,6 @@ export function Header({ onMenuClick }: HeaderProps) {
   useEffect(() => {
     if (mobileSearchOpen) {
       setTimeout(() => mobileInputRef.current?.focus(), 50);
-    } else {
-      setSearchText("");
     }
   }, [mobileSearchOpen]);
 
@@ -75,65 +157,13 @@ export function Header({ onMenuClick }: HeaderProps) {
   const customers   = cResult?.items ?? [];
   const showDropdown = searchOpen && searchText.length >= 2;
   const isSearching  = (vFetching || cFetching) && debouncedSearch.length >= 2;
-  const hasResults   = vehicles.length > 0 || customers.length > 0;
 
-  function SearchDropdown({ inputEl }: { inputEl: React.ReactNode }) {
-    return (
-      <div className="relative">
-        {inputEl}
-        {showDropdown && (
-          <div className="absolute top-full mt-1 left-0 w-full min-w-[280px] bg-popover border border-border rounded-lg shadow-lg z-50 overflow-hidden">
-            {isSearching ? (
-              <div className="py-6 text-center text-sm text-muted-foreground">Searching…</div>
-            ) : !hasResults ? (
-              <div className="py-6 text-center text-sm text-muted-foreground">
-                {debouncedSearch.length >= 2 ? `No results for "${debouncedSearch}"` : "Keep typing…"}
-              </div>
-            ) : (
-              <ScrollArea className="max-h-72">
-                {vehicles.length > 0 && (
-                  <>
-                    <div className="px-3 py-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide bg-muted/40 border-b border-border">Vehicles</div>
-                    {vehicles.map(v => (
-                      <button
-                        key={v.id}
-                        className="w-full text-left px-3 py-2.5 hover:bg-accent transition-colors flex items-center gap-3"
-                        onClick={() => { router.push(`/vehicles/${v.id}`); setSearchText(""); setSearchOpen(false); setMobileSearchOpen(false); }}
-                      >
-                        <Car className="w-4 h-4 text-muted-foreground shrink-0" />
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium truncate">{v.plateNumber ?? v.vin}</p>
-                          <p className="text-xs text-muted-foreground truncate">{v.brandName} {v.modelName} {v.year}{v.customerName ? ` · ${v.customerName}` : ""}</p>
-                        </div>
-                      </button>
-                    ))}
-                  </>
-                )}
-                {customers.length > 0 && (
-                  <>
-                    <div className="px-3 py-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide bg-muted/40 border-b border-border">Customers</div>
-                    {customers.map(c => (
-                      <button
-                        key={c.id}
-                        className="w-full text-left px-3 py-2.5 hover:bg-accent transition-colors flex items-center gap-3"
-                        onClick={() => { router.push(`/customers/${c.id}`); setSearchText(""); setSearchOpen(false); setMobileSearchOpen(false); }}
-                      >
-                        <User className="w-4 h-4 text-muted-foreground shrink-0" />
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium truncate">{c.fullName}</p>
-                          <p className="text-xs text-muted-foreground truncate">{[c.phone, c.city].filter(Boolean).join(" · ")}</p>
-                        </div>
-                      </button>
-                    ))}
-                  </>
-                )}
-              </ScrollArea>
-            )}
-          </div>
-        )}
-      </div>
-    );
-  }
+  const handleNavigate = (url: string) => {
+    router.push(url);
+    setSearchText("");
+    setSearchOpen(false);
+    setMobileSearchOpen(false);
+  };
 
   return (
     <>
@@ -151,19 +181,27 @@ export function Header({ onMenuClick }: HeaderProps) {
         <div className="flex items-center gap-1 sm:gap-2">
           {/* Desktop search */}
           <div className="hidden md:block">
-            <SearchDropdown inputEl={
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none z-10" />
-                <Input
-                  className="w-44 lg:w-56 pl-9 h-8 text-sm bg-muted/50"
-                  placeholder="Search…"
-                  value={searchText}
-                  onChange={e => setSearchText(e.target.value)}
-                  onFocus={() => setSearchOpen(true)}
-                  onBlur={() => setTimeout(() => setSearchOpen(false), 150)}
-                />
-              </div>
-            } />
+            <SearchDropdown
+              showDropdown={showDropdown}
+              isSearching={isSearching}
+              debouncedSearch={debouncedSearch}
+              vehicles={vehicles}
+              customers={customers}
+              onNavigate={handleNavigate}
+              inputEl={
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none z-10" />
+                  <Input
+                    className="w-44 lg:w-56 pl-9 h-8 text-sm bg-muted/50"
+                    placeholder="Search…"
+                    value={searchText}
+                    onChange={e => setSearchText(e.target.value)}
+                    onFocus={() => setSearchOpen(true)}
+                    onBlur={() => setTimeout(() => setSearchOpen(false), 150)}
+                  />
+                </div>
+              }
+            />
           </div>
 
           {/* Mobile search icon */}
@@ -181,21 +219,29 @@ export function Header({ onMenuClick }: HeaderProps) {
       {mobileSearchOpen && (
         <div className="fixed inset-0 z-50 bg-background/95 backdrop-blur-sm flex flex-col md:hidden">
           <div className="flex items-center gap-2 px-4 h-16 border-b border-border shrink-0">
-            <SearchDropdown inputEl={
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none z-10" />
-                <Input
-                  ref={mobileInputRef}
-                  className="w-full pl-9 h-9 text-sm bg-muted/50"
-                  placeholder="Search vehicles, customers…"
-                  value={searchText}
-                  onChange={e => setSearchText(e.target.value)}
-                  onFocus={() => setSearchOpen(true)}
-                  onBlur={() => setTimeout(() => setSearchOpen(false), 150)}
-                />
-              </div>
-            } />
-            <Button variant="ghost" size="icon" onClick={() => setMobileSearchOpen(false)}>
+            <SearchDropdown
+              showDropdown={showDropdown}
+              isSearching={isSearching}
+              debouncedSearch={debouncedSearch}
+              vehicles={vehicles}
+              customers={customers}
+              onNavigate={handleNavigate}
+              inputEl={
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none z-10" />
+                  <Input
+                    ref={mobileInputRef}
+                    className="w-full pl-9 h-9 text-sm bg-muted/50"
+                    placeholder="Search vehicles, customers…"
+                    value={searchText}
+                    onChange={e => setSearchText(e.target.value)}
+                    onFocus={() => setSearchOpen(true)}
+                    onBlur={() => setTimeout(() => setSearchOpen(false), 150)}
+                  />
+                </div>
+              }
+            />
+            <Button variant="ghost" size="icon" onClick={() => { setMobileSearchOpen(false); setSearchText(""); }}>
               <X className="w-5 h-5" />
             </Button>
           </div>

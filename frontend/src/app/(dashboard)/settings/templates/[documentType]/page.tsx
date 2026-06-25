@@ -5,9 +5,9 @@ import { useParams, useRouter } from "next/navigation";
 import { Rnd } from "react-rnd";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  ArrowLeft, Save, Plus, Trash2, Eye, EyeOff, Grid3X3,
+  ArrowLeft, Save, Trash2, Eye, EyeOff, Grid3X3,
   Bold, Italic, AlignLeft, AlignCenter, AlignRight, Type,
-  Minus, Table2, Star, RotateCcw, Copy, Download,
+  Minus, Table2, RotateCcw, Copy, Download,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -253,6 +253,7 @@ export default function TemplateEditorPage() {
     if (!templates) return;
     const def = templates.find(t => t.isDefault) ?? templates[0];
     if (!def) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setTemplateId(def.id);
     setTemplateName(def.name);
     setIsDefault(def.isDefault);
@@ -284,7 +285,7 @@ export default function TemplateEditorPage() {
   const updateField = useCallback((id: string, patch: Partial<TemplateField>) => {
     setFields(prev => prev.map(f => f.id === id ? { ...f, ...patch } : f));
     setDirty(true);
-  }, []);
+  }, [setFields, setDirty]);
 
   const addField = (def: FieldDef) => {
     const canvas = canvasRef.current;
