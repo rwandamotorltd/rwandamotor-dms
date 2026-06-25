@@ -542,6 +542,9 @@ export const jobCardsApi = {
 
   deleteMany: (ids: string[]) =>
     api.delete<ApiResponse<number>>('/jobcards', { data: ids }).then(r => r.data),
+
+  deleteAll: (params?: { search?: string; status?: JobCardStatus; serviceType?: ServiceType }) =>
+    api.delete<ApiResponse<number>>('/jobcards/all', { params }).then(r => r.data),
 };
 
 // ============================================================

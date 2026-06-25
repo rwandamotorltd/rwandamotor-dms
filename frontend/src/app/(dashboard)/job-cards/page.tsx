@@ -846,6 +846,7 @@ function JobCardsContent() {
   const [convertTarget, setConvertTarget] = useState<JobCardListItem | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleteAllConfirmOpen, setDeleteAllConfirmOpen] = useState(false);
 
   const params = useMemo(() => ({
     search: search || undefined,
@@ -878,6 +879,21 @@ function JobCardsContent() {
       queryClient.invalidateQueries({ queryKey: ["job-cards"] });
     },
     onError: () => toast.error("Delete failed"),
+  });
+
+  const deleteAllMutation = useMutation({
+    mutationFn: () => jobCardsApi.deleteAll({
+      search: search || undefined,
+      status: statusFilter || undefined,
+      serviceType: serviceTypeFilter || undefined,
+    }),
+    onSuccess: (res) => {
+      toast.success(`${res.data} job card(s) deleted`);
+      setSelectedIds(new Set());
+      setDeleteAllConfirmOpen(false);
+      queryClient.invalidateQueries({ queryKey: ["job-cards"] });
+    },
+    onError: () => toast.error("Delete all failed"),
   });
 
   const items = data?.items ?? [];
@@ -916,6 +932,16 @@ function JobCardsContent() {
             >
               <Trash2 className="w-4 h-4 mr-1.5" />
               Delete {selectedIds.size} selected
+            </Button>
+          )}
+          {isAdmin && (data?.totalCount ?? 0) > 0 && (
+            <Button
+              variant="outline" size="sm"
+              className="border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
+              onClick={() => setDeleteAllConfirmOpen(true)}
+            >
+              <Trash2 className="w-4 h-4 mr-1.5" />
+              Delete All{search || statusFilter || serviceTypeFilter ? " (filtered)" : ""}
             </Button>
           )}
           {canCreate && (
@@ -1202,6 +1228,51 @@ function JobCardsContent() {
                 >
                   <Trash2 className="w-4 h-4 mr-2" />
                   {bulkDeleteMutation.isPending ? "Deleting…" : "Yes, Delete"}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete All confirmation dialog */}
+      {deleteAllConfirmOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setDeleteAllConfirmOpen(false)} />
+          <div className="relative bg-card border border-border rounded-xl shadow-2xl w-full max-w-md mx-4 animate-in fade-in-0 zoom-in-95 duration-150">
+            <div className="p-6 space-y-4">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-full bg-destructive/10 flex items-center justify-center shrink-0">
+                  <Trash2 className="w-6 h-6 text-destructive" />
+                </div>
+                <div>
+                  <h2 className="text-base font-semibold">Delete all job cards?</h2>
+                  <p className="text-sm text-muted-foreground">
+                    {search || statusFilter || serviceTypeFilter
+                      ? "Deletes all records matching the current filters."
+                      : `This will delete all ${data?.totalCount ?? "?"} job cards.`}
+                    {" "}This cannot be undone.
+                  </p>
+                </div>
+              </div>
+              {(search || statusFilter || serviceTypeFilter) && (
+                <div className="rounded-md bg-muted/60 border px-3 py-2 text-xs text-muted-foreground space-y-0.5">
+                  {search && <p>Search: <span className="font-medium text-foreground">&quot;{search}&quot;</span></p>}
+                  {statusFilter && <p>Status: <span className="font-medium text-foreground">{statusFilter}</span></p>}
+                  {serviceTypeFilter && <p>Service type: <span className="font-medium text-foreground">{serviceTypeLabel(serviceTypeFilter)}</span></p>}
+                </div>
+              )}
+              <div className="flex items-center justify-end gap-3 pt-1">
+                <Button variant="outline" onClick={() => setDeleteAllConfirmOpen(false)} disabled={deleteAllMutation.isPending}>
+                  Cancel
+                </Button>
+                <Button
+                  variant="destructive"
+                  disabled={deleteAllMutation.isPending}
+                  onClick={() => deleteAllMutation.mutate()}
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  {deleteAllMutation.isPending ? "Deleting…" : "Yes, Delete All"}
                 </Button>
               </div>
             </div>

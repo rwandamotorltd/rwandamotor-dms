@@ -105,6 +105,20 @@ public class JobCardsController : ControllerBase
     }
 
     // ──────────────────────────────────────────────────────────────
+    // DELETE ALL (Admin only — respects active filters)
+    // ──────────────────────────────────────────────────────────────
+    [HttpDelete("all")]
+    [Authorize(Policy = "Admin")]
+    public async Task<IActionResult> DeleteAll(
+        [FromQuery] string? search,
+        [FromQuery] JobCardStatus? status,
+        [FromQuery] ServiceType? serviceType)
+    {
+        var count = await _mediator.Send(new DeleteAllJobCardsCommand(search, status, serviceType));
+        return Ok(ApiResponse<int>.Ok(count, $"{count} job card(s) deleted"));
+    }
+
+    // ──────────────────────────────────────────────────────────────
     // SEQUENCE MANAGEMENT (Admin only)
     // ──────────────────────────────────────────────────────────────
     [HttpPut("sequence")]
