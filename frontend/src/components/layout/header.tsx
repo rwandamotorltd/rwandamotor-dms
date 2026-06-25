@@ -17,7 +17,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { vehiclesApi, customersApi, notificationsApi, type NotificationItem } from "@/lib/api";
+import { vehiclesApi, customersApi, notificationsApi, type NotificationItem, type NotificationsResult } from "@/lib/api";
 import { useAuth } from "@/contexts/auth-context";
 
 const BREADCRUMBS: Record<string, string> = {
@@ -201,14 +201,21 @@ export function Header({ onMenuClick }: HeaderProps) {
   const { data: notifData } = useQuery({
     queryKey: ["notifications"],
     queryFn:  notificationsApi.get,
-    staleTime: 30_000,
+    staleTime: 0,
+    refetchOnWindowFocus: true,
     refetchInterval: 60_000,
   });
-  const unreadCount  = notifData?.unreadCount ?? 0;
+  const unreadCount   = notifData?.unreadCount ?? 0;
   const notifications = notifData?.items ?? [];
 
   const markReadMutation = useMutation({
     mutationFn: notificationsApi.markRead,
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: ["notifications"] });
+      queryClient.setQueryData<NotificationsResult>(["notifications"], old =>
+        old ? { ...old, unreadCount: 0, items: old.items.map(n => ({ ...n, isRead: true })) } : old
+      );
+    },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["notifications"] }),
   });
 
