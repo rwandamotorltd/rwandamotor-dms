@@ -241,6 +241,7 @@ function VehiclesContent() {
     mutationFn: (ids: string[]) => vehiclesApi.deleteMany(ids),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["vehicles"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-kpis"] });
       setRowSelection({});
       setShowDeleteConfirm(false);
       setDeleteAllRecords(false);
@@ -255,6 +256,7 @@ function VehiclesContent() {
     }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["vehicles"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-kpis"] });
       setRowSelection({});
       setShowDeleteConfirm(false);
       setDeleteAllRecords(false);

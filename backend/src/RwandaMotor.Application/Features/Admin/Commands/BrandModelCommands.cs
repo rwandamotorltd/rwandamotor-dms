@@ -131,3 +131,30 @@ public class DeleteVehicleModelCommandHandler : IRequestHandler<DeleteVehicleMod
 
 public record BulkImportCatalogueResultDto(int BrandsCreated, int BrandsSkipped, int ModelsCreated, int ModelsSkipped);
 public record BulkImportCatalogueCommand(byte[] FileBytes, string FileName) : IRequest<BulkImportCatalogueResultDto>;
+
+// ── Catalogue preview (handler lives in Infrastructure) ───────────────────────
+
+public record CataloguePreviewRowDto(
+    int RowNumber,
+    string BrandName,
+    string ModelName,
+    string? BrandCode,
+    string? ModelCode,
+    string? Segment,
+    bool IsNewBrand,
+    bool IsNewModel,
+    bool HasError,
+    string? Error
+);
+
+public record CataloguePreviewResultDto(
+    int TotalRows,
+    int NewBrands,
+    int NewModels,
+    int ExistingBrands,
+    int ExistingModels,
+    int ErrorRows,
+    List<CataloguePreviewRowDto> Rows
+);
+
+public record PreviewCatalogueImportCommand(byte[] FileBytes, string FileName) : IRequest<CataloguePreviewResultDto>;

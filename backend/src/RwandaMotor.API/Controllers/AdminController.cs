@@ -126,6 +126,20 @@ public class AdminController : ControllerBase
         return ok ? Ok(ApiResponse<bool>.Ok(true)) : NotFound(ApiResponse<bool>.Fail("Model not found"));
     }
 
+    [HttpPost("catalogue/preview")]
+    [Consumes("multipart/form-data")]
+    public async Task<IActionResult> PreviewCatalogue([FromForm] IFormFile file)
+    {
+        if (file == null || file.Length == 0)
+            return BadRequest(ApiResponse<CataloguePreviewResultDto>.Fail("No file uploaded"));
+
+        using var ms = new MemoryStream();
+        await file.CopyToAsync(ms);
+
+        var result = await _mediator.Send(new PreviewCatalogueImportCommand(ms.ToArray(), file.FileName));
+        return Ok(ApiResponse<CataloguePreviewResultDto>.Ok(result));
+    }
+
     [HttpPost("catalogue/import")]
     [Consumes("multipart/form-data")]
     public async Task<IActionResult> ImportCatalogue([FromForm] IFormFile file)

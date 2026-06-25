@@ -877,6 +877,7 @@ function JobCardsContent() {
       setSelectedIds(new Set());
       setDeleteConfirmOpen(false);
       queryClient.invalidateQueries({ queryKey: ["job-cards"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-kpis"] });
     },
     onError: () => toast.error("Delete failed"),
   });
@@ -892,6 +893,7 @@ function JobCardsContent() {
       setSelectedIds(new Set());
       setDeleteAllConfirmOpen(false);
       queryClient.invalidateQueries({ queryKey: ["job-cards"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-kpis"] });
     },
     onError: () => toast.error("Delete all failed"),
   });

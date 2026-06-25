@@ -896,6 +896,143 @@ public class ProcessImportCommandHandler
         (d.TryGetValue(key, out var v) ? v : "").Trim();
 }
 
+// --- Catalogue Preview Handler -----------------------------------------------
+
+public class PreviewCatalogueImportCommandHandler
+    : IRequestHandler<PreviewCatalogueImportCommand, CataloguePreviewResultDto>
+{
+    private readonly IApplicationDbContext _db;
+
+    public PreviewCatalogueImportCommandHandler(IApplicationDbContext db) => _db = db;
+
+    public async Task<CataloguePreviewResultDto> Handle(PreviewCatalogueImportCommand cmd, CancellationToken ct)
+    {
+        List<Dictionary<string, string>> rows;
+        try
+        {
+            rows = cmd.FileName.EndsWith(".csv", StringComparison.OrdinalIgnoreCase)
+                ? ParseCsv(cmd.FileBytes)
+                : ParseExcel(cmd.FileBytes);
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException($"Could not read file: {ex.Message}");
+        }
+
+        var existingBrands = await _db.Brands
+            .Include(b => b.Models)
+            .Where(b => !b.IsDeleted)
+            .ToListAsync(ct);
+
+        var previewRows = new List<CataloguePreviewRowDto>();
+        var seenBrands = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        int newBrands = 0, newModels = 0, existBrands = 0, existModels = 0, errorRows = 0;
+
+        for (int i = 0; i < rows.Count; i++)
+        {
+            var row = rows[i];
+            var brandName = Get(row, "BrandName");
+            var modelName = Get(row, "ModelName");
+            var brandCode = Get(row, "BrandCode");
+            var modelCode = Get(row, "ModelCode");
+            var segment   = Get(row, "ModelSegment");
+
+            if (string.IsNullOrWhiteSpace(brandName))
+            {
+                previewRows.Add(new CataloguePreviewRowDto(
+                    i + 1, brandName, modelName, brandCode, modelCode, segment,
+                    false, false, true, "BrandName is required"));
+                errorRows++;
+                continue;
+            }
+
+            if (string.IsNullOrWhiteSpace(modelName))
+            {
+                previewRows.Add(new CataloguePreviewRowDto(
+                    i + 1, brandName, modelName, brandCode, modelCode, segment,
+                    false, false, true, "ModelName is required"));
+                errorRows++;
+                continue;
+            }
+
+            var existingBrand = existingBrands.FirstOrDefault(b =>
+                b.Name.Equals(brandName, StringComparison.OrdinalIgnoreCase));
+            bool isNewBrand = existingBrand == null && !seenBrands.Contains(brandName);
+            if (isNewBrand) { seenBrands.Add(brandName); newBrands++; }
+            else if (existingBrand != null && !seenBrands.Contains(brandName)) { existBrands++; seenBrands.Add(brandName); }
+
+            var modelSource = existingBrand?.Models
+                ?? previewRows.Where(r => r.BrandName.Equals(brandName, StringComparison.OrdinalIgnoreCase) && !r.IsNewModel)
+                              .Select(_ => (object?)null).ToList() as IEnumerable<object>;
+            bool isNewModel;
+            if (existingBrand != null)
+                isNewModel = !existingBrand.Models.Any(m => m.Name.Equals(modelName, StringComparison.OrdinalIgnoreCase));
+            else
+                isNewModel = !previewRows.Any(r =>
+                    r.BrandName.Equals(brandName, StringComparison.OrdinalIgnoreCase) &&
+                    r.ModelName.Equals(modelName, StringComparison.OrdinalIgnoreCase));
+
+            if (isNewModel) newModels++;
+            else existModels++;
+
+            previewRows.Add(new CataloguePreviewRowDto(
+                i + 1, brandName, modelName,
+                string.IsNullOrWhiteSpace(brandCode) ? null : brandCode,
+                string.IsNullOrWhiteSpace(modelCode) ? null : modelCode,
+                string.IsNullOrWhiteSpace(segment) ? null : segment,
+                isNewBrand, isNewModel, false, null));
+        }
+
+        return new CataloguePreviewResultDto(
+            rows.Count, newBrands, newModels, existBrands, existModels, errorRows, previewRows);
+    }
+
+    private static List<Dictionary<string, string>> ParseCsv(byte[] bytes)
+    {
+        using var ms     = new MemoryStream(bytes);
+        using var reader = new StreamReader(ms, Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
+        using var csv    = new CsvHelper.CsvReader(reader, new CsvHelper.Configuration.CsvConfiguration(System.Globalization.CultureInfo.InvariantCulture)
+        {
+            HasHeaderRecord = true, MissingFieldFound = null, BadDataFound = null,
+            TrimOptions = CsvHelper.Configuration.TrimOptions.Trim,
+        });
+        csv.Read(); csv.ReadHeader();
+        var headers = csv.HeaderRecord ?? [];
+        var rows    = new List<Dictionary<string, string>>();
+        while (csv.Read())
+        {
+            var row = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var h in headers) row[h] = csv.GetField(h) ?? "";
+            rows.Add(row);
+        }
+        return rows;
+    }
+
+    private static List<Dictionary<string, string>> ParseExcel(byte[] bytes)
+    {
+        System.Text.Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
+        using var ms     = new MemoryStream(bytes);
+        using var exlReader = ExcelDataReader.ExcelReaderFactory.CreateReader(ms);
+        var ds = exlReader.AsDataSet(new ExcelDataReader.ExcelDataSetConfiguration
+        {
+            ConfigureDataTable = _ => new ExcelDataReader.ExcelDataTableConfiguration { UseHeaderRow = true }
+        });
+        var table = ds.Tables[0];
+        var rows  = new List<Dictionary<string, string>>();
+        foreach (System.Data.DataRow r in table.Rows)
+        {
+            var dict = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (System.Data.DataColumn c in table.Columns)
+                dict[c.ColumnName] = r[c]?.ToString()?.Trim() ?? "";
+            rows.Add(dict);
+        }
+        return rows;
+    }
+
+    private static string Get(Dictionary<string, string> d, string key) =>
+        (d.TryGetValue(key, out var v) ? v : "").Trim();
+}
+
 // --- Bulk Catalogue Import Handler -------------------------------------------
 
 public class BulkImportCatalogueCommandHandler

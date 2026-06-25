@@ -405,6 +405,7 @@ export default function CustomersPage() {
     mutationFn: (ids: string[]) => customersApi.deleteMany(ids),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["customers"] });
+      qc.invalidateQueries({ queryKey: ["dashboard-kpis"] });
       setRowSelection({});
       setShowDeleteConfirm(false);
       setDeleteAllRecords(false);
@@ -424,6 +425,7 @@ export default function CustomersPage() {
     }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["customers"] });
+      qc.invalidateQueries({ queryKey: ["dashboard-kpis"] });
       setRowSelection({});
       setShowDeleteConfirm(false);
       setDeleteAllRecords(false);

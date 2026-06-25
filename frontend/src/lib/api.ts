@@ -376,13 +376,16 @@ export const catalogueApi = {
   deleteModel: (id: string) =>
     api.delete<ApiResponse<boolean>>(`/admin/catalogue/models/${id}`).then(r => r.data),
 
+  preview: (file: File): Promise<CataloguePreviewResult> => {
+    const form = new FormData();
+    form.append('file', file);
+    return api.post<ApiResponse<CataloguePreviewResult>>('/admin/catalogue/preview', form).then(r => r.data.data!);
+  },
+
   bulkImport: (file: File): Promise<BulkImportCatalogueResult> => {
     const form = new FormData();
     form.append('file', file);
-    // Do NOT set Content-Type manually — Axios must auto-set it with the multipart boundary
-    return api.post<ApiResponse<BulkImportCatalogueResult>>(
-      '/admin/catalogue/import', form,
-    ).then(r => r.data.data!);
+    return api.post<ApiResponse<BulkImportCatalogueResult>>('/admin/catalogue/import', form).then(r => r.data.data!);
   },
 };
 
@@ -391,6 +394,29 @@ export interface BulkImportCatalogueResult {
   brandsSkipped: number;
   modelsCreated: number;
   modelsSkipped: number;
+}
+
+export interface CataloguePreviewRow {
+  rowNumber: number;
+  brandName: string;
+  modelName: string;
+  brandCode: string | null;
+  modelCode: string | null;
+  segment: string | null;
+  isNewBrand: boolean;
+  isNewModel: boolean;
+  hasError: boolean;
+  error: string | null;
+}
+
+export interface CataloguePreviewResult {
+  totalRows: number;
+  newBrands: number;
+  newModels: number;
+  existingBrands: number;
+  existingModels: number;
+  errorRows: number;
+  rows: CataloguePreviewRow[];
 }
 
 export const adminApi = {

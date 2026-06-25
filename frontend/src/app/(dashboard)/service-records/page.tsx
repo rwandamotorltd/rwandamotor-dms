@@ -320,6 +320,7 @@ export default function ServiceRecordsPage() {
     mutationFn: (ids: string[]) => serviceRecordsApi.deleteMany(ids),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["service-records"] });
+      qc.invalidateQueries({ queryKey: ["dashboard-kpis"] });
       setSelectedIds(new Set());
       setShowDeleteConfirm(false);
       setDeleteAllRecords(false);
@@ -335,6 +336,7 @@ export default function ServiceRecordsPage() {
     }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["service-records"] });
+      qc.invalidateQueries({ queryKey: ["dashboard-kpis"] });
       setSelectedIds(new Set());
       setShowDeleteConfirm(false);
       setDeleteAllRecords(false);

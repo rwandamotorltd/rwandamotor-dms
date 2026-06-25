@@ -16,6 +16,7 @@ import {
   type UserItem, type CreateUserPayload, type UpdateUserPayload,
   type PermissionGroupItem, type CreatePermissionGroupPayload,
   type CatalogueBrandDto, type CatalogueModelDto, type BulkImportCatalogueResult,
+  type CataloguePreviewResult, type CataloguePreviewRow,
   type RoleItem,
 } from "@/lib/api";
 import { DOCUMENT_TYPE_LABELS } from "@/types/templates";
@@ -1332,6 +1333,9 @@ interface ModelForm  { name: string; code: string; segment: string; }
 function CatalogueTab() {
   const qc = useQueryClient();
   const [importing, setImporting]        = useState(false);
+  const [previewing, setPreviewing]      = useState(false);
+  const [previewData, setPreviewData]    = useState<CataloguePreviewResult | null>(null);
+  const [pendingFile, setPendingFile]    = useState<File | null>(null);
   const fileInputRef                     = useRef<HTMLInputElement>(null);
   const [expandedBrand, setExpanded]     = useState<string | null>(null);
   const [editingBrand,  setEditBrand]    = useState<CatalogueBrandDto | null>(null);
@@ -1356,21 +1360,38 @@ function CatalogueTab() {
   const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    setPreviewing(true);
+    try {
+      const result = await catalogueApi.preview(file);
+      setPendingFile(file);
+      setPreviewData(result);
+    } catch (e: unknown) {
+      const msg = (e as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      toast.error(msg ?? "Could not read file — check format (CSV/Excel) and try again");
+    } finally {
+      setPreviewing(false);
+    }
+  };
+
+  const confirmImport = async () => {
+    if (!pendingFile) return;
     setImporting(true);
     try {
-      const r: BulkImportCatalogueResult = await catalogueApi.bulkImport(file);
+      const r: BulkImportCatalogueResult = await catalogueApi.bulkImport(pendingFile);
       const parts: string[] = [];
       if (r.brandsCreated)  parts.push(`${r.brandsCreated} brand${r.brandsCreated !== 1 ? "s" : ""} created`);
       if (r.modelsCreated)  parts.push(`${r.modelsCreated} model${r.modelsCreated !== 1 ? "s" : ""} created`);
       if (!parts.length)    parts.push("nothing new to import");
       toast.success(`Import complete — ${parts.join(", ")}`);
       invalidate();
+      setPreviewData(null);
+      setPendingFile(null);
     } catch (e: unknown) {
       const msg = (e as { response?: { data?: { message?: string } } })?.response?.data?.message;
-      toast.error(msg ?? "Import failed — check the file format and try again");
+      toast.error(msg ?? "Import failed");
     } finally {
       setImporting(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
 
@@ -1466,11 +1487,11 @@ function CatalogueTab() {
               </a>
               <Button
                 size="sm" variant="outline" className="gap-1.5"
-                disabled={importing}
+                disabled={importing || previewing}
                 onClick={() => fileInputRef.current?.click()}
               >
                 <Upload className="w-3.5 h-3.5" />
-                {importing ? "Importing…" : "Import CSV"}
+                {previewing ? "Reading…" : importing ? "Importing…" : "Import CSV"}
               </Button>
               <input
                 ref={fileInputRef}
@@ -1663,6 +1684,134 @@ function CatalogueTab() {
       </Card>
 
       <ServiceTypesCard />
+
+      {/* ── Catalogue Import Preview Dialog ─────────────────────────────── */}
+      {previewData && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => { setPreviewData(null); setPendingFile(null); }} />
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="relative bg-card border border-border rounded-xl shadow-2xl w-full max-w-3xl max-h-[85vh] flex flex-col"
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
+              <div>
+                <h2 className="text-base font-semibold">Import Preview</h2>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Review what will be imported before confirming
+                </p>
+              </div>
+              <button onClick={() => { setPreviewData(null); setPendingFile(null); }}
+                className="text-muted-foreground hover:text-foreground transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Summary chips */}
+            <div className="flex flex-wrap gap-2 px-5 py-3 border-b border-border shrink-0 bg-muted/30">
+              <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium bg-muted text-muted-foreground">
+                {previewData.totalRows} rows total
+              </span>
+              {previewData.newBrands > 0 && (
+                <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400">
+                  +{previewData.newBrands} new brand{previewData.newBrands !== 1 ? "s" : ""}
+                </span>
+              )}
+              {previewData.newModels > 0 && (
+                <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400">
+                  +{previewData.newModels} new model{previewData.newModels !== 1 ? "s" : ""}
+                </span>
+              )}
+              {(previewData.existingBrands > 0 || previewData.existingModels > 0) && (
+                <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400">
+                  {previewData.existingBrands + previewData.existingModels} already exist (will skip)
+                </span>
+              )}
+              {previewData.errorRows > 0 && (
+                <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium bg-destructive/10 text-destructive">
+                  {previewData.errorRows} error{previewData.errorRows !== 1 ? "s" : ""}
+                </span>
+              )}
+            </div>
+
+            {/* Table */}
+            <div className="flex-1 overflow-y-auto">
+              <table className="w-full text-xs">
+                <thead className="sticky top-0 bg-card border-b border-border">
+                  <tr>
+                    <th className="text-left px-3 py-2 font-medium text-muted-foreground w-10">#</th>
+                    <th className="text-left px-3 py-2 font-medium text-muted-foreground">Brand</th>
+                    <th className="text-left px-3 py-2 font-medium text-muted-foreground">Model</th>
+                    <th className="text-left px-3 py-2 font-medium text-muted-foreground hidden sm:table-cell">Segment</th>
+                    <th className="text-left px-3 py-2 font-medium text-muted-foreground">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/50">
+                  {previewData.rows.map((row: CataloguePreviewRow) => (
+                    <tr key={row.rowNumber}
+                      className={row.hasError ? "bg-destructive/5" : row.isNewBrand || row.isNewModel ? "bg-emerald-500/5" : ""}
+                    >
+                      <td className="px-3 py-2 text-muted-foreground">{row.rowNumber}</td>
+                      <td className="px-3 py-2">
+                        <span className="font-medium">{row.brandName || <span className="text-destructive italic">missing</span>}</span>
+                        {row.isNewBrand && (
+                          <span className="ml-1.5 text-[10px] font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-900/30 px-1 rounded">new</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2">
+                        <span>{row.modelName || <span className="text-destructive italic">missing</span>}</span>
+                        {row.isNewModel && (
+                          <span className="ml-1.5 text-[10px] font-medium text-blue-600 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/30 px-1 rounded">new</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2 text-muted-foreground hidden sm:table-cell">{row.segment ?? "—"}</td>
+                      <td className="px-3 py-2">
+                        {row.hasError ? (
+                          <span className="text-destructive text-[11px]">{row.error}</span>
+                        ) : row.isNewBrand || row.isNewModel ? (
+                          <span className="text-emerald-600 dark:text-emerald-400 text-[11px]">Will import</span>
+                        ) : (
+                          <span className="text-amber-600 dark:text-amber-400 text-[11px]">Already exists</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-between px-5 py-4 border-t border-border shrink-0">
+              {previewData.errorRows > 0 && (
+                <p className="text-xs text-destructive">
+                  {previewData.errorRows} row{previewData.errorRows !== 1 ? "s" : ""} with errors will be skipped
+                </p>
+              )}
+              {previewData.errorRows === 0 && previewData.newBrands === 0 && previewData.newModels === 0 && (
+                <p className="text-xs text-muted-foreground">Nothing new to import — all items already exist</p>
+              )}
+              {previewData.errorRows === 0 && (previewData.newBrands > 0 || previewData.newModels > 0) && (
+                <span className="text-xs text-muted-foreground" />
+              )}
+              <div className="flex gap-2 ml-auto">
+                <Button variant="outline" size="sm" onClick={() => { setPreviewData(null); setPendingFile(null); }}>
+                  Cancel
+                </Button>
+                <Button
+                  size="sm"
+                  disabled={importing || (previewData.newBrands === 0 && previewData.newModels === 0)}
+                  onClick={confirmImport}
+                  className="gradient-primary text-white"
+                >
+                  <Upload className="w-3.5 h-3.5 mr-1.5" />
+                  {importing ? "Importing…" : `Import ${previewData.newBrands + previewData.newModels} item${(previewData.newBrands + previewData.newModels) !== 1 ? "s" : ""}`}
+                </Button>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 }
