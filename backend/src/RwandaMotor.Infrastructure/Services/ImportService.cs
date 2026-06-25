@@ -1069,12 +1069,16 @@ public class BulkImportCatalogueCommandHandler
 
         int brandsCreated = 0, brandsSkipped = 0, modelsCreated = 0, modelsSkipped = 0;
 
-        // Load ALL brand codes including soft-deleted to avoid IX_Brands_Code violations
-        // (soft-deleted rows still occupy the unique index on the Code column)
-        var usedBrandCodes = (await _db.Brands
-            .Select(b => b.Code)
-            .ToListAsync(ct))
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        // Bypass global soft-delete filter to see ALL brand codes including deleted rows.
+        // EF Core's HasQueryFilter(e => !e.IsDeleted) is applied to every _db.Brands query;
+        // without IgnoreQueryFilters() the result is identical to the in-memory brands list
+        // and soft-deleted codes silently bypass our uniqueness check, causing IX_Brands_Code
+        // violations at SaveChanges time.
+        var dbCtx = _db as Microsoft.EntityFrameworkCore.DbContext;
+        var usedBrandCodes = dbCtx != null
+            ? (await dbCtx.Set<Brand>().IgnoreQueryFilters().Select(b => b.Code).ToListAsync(ct))
+                  .ToHashSet(StringComparer.OrdinalIgnoreCase)
+            : brands.Select(b => b.Code).ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         // Pass 1: brands
         bool anyNew = false;
