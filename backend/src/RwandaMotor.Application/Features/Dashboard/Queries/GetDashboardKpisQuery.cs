@@ -34,10 +34,16 @@ public class GetDashboardKpisQueryHandler : IRequestHandler<GetDashboardKpisQuer
         var recovered = await _db.Vehicles.CountAsync(v => !v.IsDeleted && v.RetentionStatus == RetentionStatus.Recovered, ct);
 
         var totalCustomers = await _db.Customers.CountAsync(c => !c.IsDeleted, ct);
-        var activeFollowUps = await _db.FollowUps.CountAsync(f => !f.IsDeleted && f.Status == FollowUpStatus.Pending, ct);
 
+        // Only count follow-ups whose vehicle still exists (not soft-deleted)
+        var activeFollowUps = await _db.FollowUps
+            .CountAsync(f => !f.IsDeleted && f.Status == FollowUpStatus.Pending
+                             && !f.Vehicle.IsDeleted, ct);
+
+        // Only count service records whose vehicle still exists (not soft-deleted)
         var monthlyServices = await _db.ServiceRecords
-            .CountAsync(s => !s.IsDeleted && s.ServiceDate >= monthStart, ct);
+            .CountAsync(s => !s.IsDeleted && s.ServiceDate >= monthStart
+                             && !s.Vehicle.IsDeleted, ct);
 
         var openJobCards = await _db.JobCards
             .CountAsync(j => !j.IsDeleted && j.Status == JobCardStatus.Open, ct);
