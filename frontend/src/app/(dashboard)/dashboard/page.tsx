@@ -139,7 +139,6 @@ export default function DashboardPage() {
                   <span className="text-4xl font-bold tracking-tight text-foreground">
                     {formatPercentage(r.value)}
                   </span>
-                  <span className="text-sm text-muted-foreground mb-1">%</span>
                 </div>
                 <div className="mt-3 h-1.5 rounded-full bg-muted overflow-hidden">
                   <div className="h-full gradient-primary rounded-full" style={{ width: `${Math.min(r.value, 100)}%` }} />
