@@ -131,7 +131,11 @@ function AddVehicleDialog({ open, onClose, onCreated }: {
         onClose();
       }
     },
-    onError: () => toast.error("Failed to add vehicle"),
+    onError: (err: unknown) => {
+      const msg = (err as { response?: { data?: { message?: string; errors?: string[] } } })?.response?.data;
+      const text = msg?.errors?.join(", ") ?? msg?.message ?? "Failed to add vehicle";
+      toast.error(text);
+    },
   });
 
   const customerMutation = useMutation({

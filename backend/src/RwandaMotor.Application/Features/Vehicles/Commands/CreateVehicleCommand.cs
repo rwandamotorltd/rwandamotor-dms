@@ -1,5 +1,7 @@
 using FluentValidation;
+using FluentValidation.Results;
 using MediatR;
+using Microsoft.EntityFrameworkCore;
 using RwandaMotor.Application.Common.Interfaces;
 using RwandaMotor.Domain.Entities;
 
@@ -53,9 +55,51 @@ public class CreateVehicleCommandHandler : IRequestHandler<CreateVehicleCommand,
 
     public async Task<Guid> Handle(CreateVehicleCommand cmd, CancellationToken ct)
     {
+        var normalizedVin = cmd.VIN.Trim().ToUpper();
+
+        // Reject if an active vehicle already has this VIN.
+        if (await _db.Vehicles.AnyAsync(v => v.VIN == normalizedVin, ct))
+            throw new ValidationException(new[] { new ValidationFailure("VIN", $"A vehicle with VIN '{normalizedVin}' already exists.") });
+
+        // If the VIN belongs to a soft-deleted vehicle, restore that record so its
+        // full service history remains linked to the same ID.
+        var deleted = await _db.Vehicles
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(v => v.VIN == normalizedVin && v.IsDeleted, ct);
+
+        if (deleted != null)
+        {
+            deleted.IsDeleted    = false;
+            deleted.DeletedAt    = null;
+            deleted.DeletedBy    = null;
+            deleted.PlateNumber  = cmd.PlateNumber?.Trim().ToUpper();
+            deleted.BrandId      = cmd.BrandId;
+            deleted.ModelId      = cmd.ModelId;
+            deleted.Year         = cmd.Year;
+            deleted.Color        = cmd.Color;
+            deleted.FuelType     = cmd.FuelType;
+            deleted.Transmission = cmd.Transmission;
+            deleted.CustomerId   = cmd.CustomerId;
+            deleted.SaleDate     = cmd.SaleDate;
+            deleted.SalePrice    = cmd.SalePrice;
+            deleted.IsSoldByDealership = cmd.IsSoldByDealership;
+            deleted.CurrentMileage     = cmd.CurrentMileage;
+            deleted.WarrantyStartDate  = cmd.WarrantyStartDate;
+            deleted.WarrantyEndDate    = cmd.WarrantyEndDate;
+            deleted.WarrantyKmLimit    = cmd.WarrantyKmLimit;
+            deleted.ServicePolicyId    = cmd.ServicePolicyId;
+            deleted.Notes              = cmd.Notes;
+            deleted.RetentionStatus    = cmd.IsSoldByDealership
+                ? Domain.Enums.RetentionStatus.Active
+                : Domain.Enums.RetentionStatus.External;
+            deleted.UpdatedAt = DateTime.UtcNow;
+            await _db.SaveChangesAsync(ct);
+            return deleted.Id;
+        }
+
         var vehicle = new Vehicle
         {
-            VIN = cmd.VIN.Trim().ToUpper(),
+            VIN = normalizedVin,
             PlateNumber = cmd.PlateNumber?.Trim().ToUpper(),
             BrandId = cmd.BrandId,
             ModelId = cmd.ModelId,
