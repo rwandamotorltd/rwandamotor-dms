@@ -121,8 +121,10 @@ public class ValidateImportFileCommandHandler
                 return (false, false, "BrandName is required");
             if (!row.TryGetValue("ModelName", out var model) || string.IsNullOrWhiteSpace(model))
                 return (false, false, "ModelName is required");
-            if (!row.TryGetValue("Year", out var yearStr) || !int.TryParse(yearStr, out var year) || year < 1990)
-                return (false, false, "Year must be a valid number >= 1990");
+            // Year is optional — if provided it must be a plausible integer
+            if (row.TryGetValue("Year", out var yearStr) && !string.IsNullOrWhiteSpace(yearStr)
+                && (!int.TryParse(yearStr, out var yr) || yr < 1900 || yr > 2100))
+                return (false, false, "Year must be a valid number between 1900 and 2100");
 
             vin = vin.Trim().ToUpperInvariant();
             if (vin.Length > 17) return (false, false, $"VIN '{vin}' exceeds 17 characters");
@@ -378,13 +380,6 @@ public class ProcessImportCommandHandler
                     continue;
                 }
 
-                // Skip rows with no customer — user said they will complete later
-                if (string.IsNullOrWhiteSpace(customerName))
-                {
-                    logRow.ErrorMessage = "CustomerName empty — skipped";
-                    continue;
-                }
-
                 var brand = brands.FirstOrDefault(b =>
                                 b.Name.Equals(brandName, StringComparison.OrdinalIgnoreCase))
                             ?? brands.FirstOrDefault(b =>
@@ -397,11 +392,13 @@ public class ProcessImportCommandHandler
                                 m.Name.Contains(modelName, StringComparison.OrdinalIgnoreCase))
                             ?? throw new Exception($"Model '{modelName}' could not be resolved under '{brand.Name}' (auto-create failed).");
 
-                if (!customerMap.TryGetValue(customerName, out var customer))
-                    throw new Exception($"Customer '{customerName}' could not be resolved.");
+                // CustomerName is optional — vehicle is imported with no customer if blank
+                Customer? customer = !string.IsNullOrWhiteSpace(customerName)
+                    && customerMap.TryGetValue(customerName, out var resolved)
+                    ? resolved : null;
 
-                if (!int.TryParse(yearStr, out var year))
-                    throw new Exception($"Year '{yearStr}' is not a valid integer.");
+                // Year is optional — default to 0 if not provided or unparseable
+                var year = int.TryParse(yearStr, out var parsedYear) ? parsedYear : 0;
 
                 DateTime? saleDate = DateTime.TryParse(saleDateStr, out var sd) ? sd : null;
 
@@ -414,6 +411,18 @@ public class ProcessImportCommandHandler
                         plate = norm;
                     // else: duplicate plate — still import the vehicle, just without a plate
                 }
+
+                // Optional fields — silently ignored when absent or unparseable
+                var engineNumber = Get(data, "EngineNumber");
+                var fuelType     = Get(data, "FuelType");
+                var transmission = Get(data, "Transmission");
+                var notes        = Get(data, "Notes");
+                int? currentMileage = int.TryParse(Get(data, "CurrentMileage"), out var cm) && cm >= 0 ? cm : null;
+                decimal? salePrice  = decimal.TryParse(Get(data, "SalePrice"), System.Globalization.NumberStyles.Any,
+                                          System.Globalization.CultureInfo.InvariantCulture, out var sp) && sp >= 0 ? sp : null;
+                DateTime? warrantyStart = DateTime.TryParse(Get(data, "WarrantyStartDate"), out var ws) ? ws : null;
+                DateTime? warrantyEnd   = DateTime.TryParse(Get(data, "WarrantyEndDate"),   out var we) ? we : null;
+                int? warrantyKm = int.TryParse(Get(data, "WarrantyKmLimit"), out var wk) && wk >= 0 ? wk : null;
 
                 // Truncate VIN to 17 chars (already validated, but belt-and-braces)
                 var safeVin   = vin.Length > 17 ? vin[..17] : vin;
@@ -428,7 +437,16 @@ public class ProcessImportCommandHandler
                     ModelId            = model.Id,
                     Year               = year,
                     Color              = safeColor,
-                    CustomerId         = customer.Id,
+                    EngineNumber       = string.IsNullOrWhiteSpace(engineNumber) ? null : engineNumber.Trim(),
+                    FuelType           = string.IsNullOrWhiteSpace(fuelType) ? null : fuelType.Trim(),
+                    Transmission       = string.IsNullOrWhiteSpace(transmission) ? null : transmission.Trim(),
+                    Notes              = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim(),
+                    CurrentMileage     = currentMileage,
+                    SalePrice          = salePrice,
+                    WarrantyStartDate  = warrantyStart,
+                    WarrantyEndDate    = warrantyEnd,
+                    WarrantyKmLimit    = warrantyKm,
+                    CustomerId         = customer?.Id,
                     SaleDate           = saleDate,
                     IsSoldByDealership = true,
                     RetentionStatus    = RetentionStatus.Active,
@@ -818,6 +836,10 @@ public class ProcessImportCommandHandler
         List<Brand> brands,
         CancellationToken ct)
     {
+        // Seed used-codes from ALL active brands to prevent IX_Brands_Code collisions
+        var usedBrandCodes = brands.Select(b => b.Code)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
         // Pass 1 — brands
         bool anyNew = false;
         var brandNames = allData
@@ -829,21 +851,17 @@ public class ProcessImportCommandHandler
         foreach (var brandName in brandNames)
         {
             var existing = brands.FirstOrDefault(b =>
-                b.Name.Equals(brandName, StringComparison.OrdinalIgnoreCase) ||
-                b.Name.Contains(brandName, StringComparison.OrdinalIgnoreCase));
+                b.Name.Equals(brandName, StringComparison.OrdinalIgnoreCase));
 
             if (existing == null)
             {
-                var brand = new Brand
-                {
-                    Name     = brandName,
-                    Code     = AutoCode(brandName),
-                    IsActive = true,
-                };
+                var code = UniqueCode(AutoCode(brandName), usedBrandCodes);
+                usedBrandCodes.Add(code);
+                var brand = new Brand { Name = brandName, Code = code, IsActive = true };
                 _db.Brands.Add(brand);
                 brands.Add(brand);
                 anyNew = true;
-                _log.LogInformation("Auto-created brand '{Brand}' during vehicle import", brandName);
+                _log.LogInformation("Auto-created brand '{Brand}' code '{Code}' during vehicle import", brandName, code);
             }
         }
         if (anyNew) { await _db.SaveChangesAsync(ct); anyNew = false; }
@@ -858,23 +876,18 @@ public class ProcessImportCommandHandler
         foreach (var (brandName, modelName) in modelCombos)
         {
             var brand = brands.FirstOrDefault(b =>
-                b.Name.Equals(brandName, StringComparison.OrdinalIgnoreCase) ||
-                b.Name.Contains(brandName, StringComparison.OrdinalIgnoreCase));
+                b.Name.Equals(brandName, StringComparison.OrdinalIgnoreCase));
             if (brand == null) continue;
 
             var existingModel = brand.Models.FirstOrDefault(m =>
-                m.Name.Equals(modelName, StringComparison.OrdinalIgnoreCase) ||
-                m.Name.Contains(modelName, StringComparison.OrdinalIgnoreCase));
+                m.Name.Equals(modelName, StringComparison.OrdinalIgnoreCase));
 
             if (existingModel == null)
             {
-                var model = new VehicleModel
-                {
-                    BrandId  = brand.Id,
-                    Name     = modelName,
-                    Code     = AutoCode(modelName),
-                    IsActive = true,
-                };
+                var usedModelCodes = brand.Models.Select(m => m.Code)
+                    .ToHashSet(StringComparer.OrdinalIgnoreCase);
+                var code = UniqueCode(AutoCode(modelName), usedModelCodes);
+                var model = new VehicleModel { BrandId = brand.Id, Name = modelName, Code = code, IsActive = true };
                 _db.VehicleModels.Add(model);
                 brand.Models.Add(model);
                 anyNew = true;
@@ -890,6 +903,16 @@ public class ProcessImportCommandHandler
         return letters.Length > 0
             ? new string(letters).ToUpperInvariant()
             : name[..Math.Min(3, name.Length)].ToUpperInvariant();
+    }
+
+    private static string UniqueCode(string baseCode, HashSet<string> used)
+    {
+        if (!used.Contains(baseCode)) return baseCode;
+        for (int i = 2; ; i++)
+        {
+            var c = baseCode + i;
+            if (!used.Contains(c)) return c;
+        }
     }
 
     private static string Get(Dictionary<string, string> d, string key) =>
