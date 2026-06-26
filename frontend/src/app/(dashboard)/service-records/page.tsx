@@ -498,7 +498,7 @@ export default function ServiceRecordsPage() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input className="pl-9" placeholder="Search VIN, plate, invoice..." value={search} onChange={e => handleSearch(e.target.value)} />
         </div>
-        <Select value={serviceType} onValueChange={(v: string | null) => setServiceType((v ?? "all") as ServiceType | "all")}>
+        <Select value={serviceType} onValueChange={(v: string | null) => { setServiceType((v ?? "all") as ServiceType | "all"); setPagination(p => ({ ...p, pageIndex: 0 })); }}>
           <SelectTrigger className="w-48">
             <SelectValue placeholder="Service Type" />
           </SelectTrigger>
@@ -509,9 +509,9 @@ export default function ServiceRecordsPage() {
         </Select>
         <div className="flex items-center gap-2">
           <Calendar className="w-4 h-4 text-muted-foreground" />
-          <Input type="date" className="w-36 text-sm" value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
+          <Input type="date" className="w-36 text-sm" value={dateFrom} onChange={e => { setDateFrom(e.target.value); setPagination(p => ({ ...p, pageIndex: 0 })); }} />
           <span className="text-muted-foreground text-sm">to</span>
-          <Input type="date" className="w-36 text-sm" value={dateTo} onChange={e => setDateTo(e.target.value)} />
+          <Input type="date" className="w-36 text-sm" value={dateTo} onChange={e => { setDateTo(e.target.value); setPagination(p => ({ ...p, pageIndex: 0 })); }} />
         </div>
         {canDelete && (selectedIds.size > 0 || deleteAllRecords) && (
           <Button

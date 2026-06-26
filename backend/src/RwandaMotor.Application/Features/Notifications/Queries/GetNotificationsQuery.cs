@@ -23,7 +23,10 @@ public class GetNotificationsQueryHandler : IRequestHandler<GetNotificationsQuer
         var userId = _currentUser.UserId;
 
         var baseQuery = _db.Notifications
-            .Where(n => !n.IsDeleted && (n.TargetUserId == null || n.TargetUserId == userId));
+            .Where(n => !n.IsDeleted && (n.TargetUserId == null || n.TargetUserId == userId))
+            .Where(n => n.VehicleId == null || _db.Vehicles.Any(v => v.Id == n.VehicleId))
+            .Where(n => n.FollowUpId == null || _db.FollowUps.Any(f => f.Id == n.FollowUpId))
+            .Where(n => n.AppointmentId == null || _db.Appointments.Any(a => a.Id == n.AppointmentId));
 
         var unreadCount = await baseQuery.CountAsync(n => !n.IsRead, ct);
 

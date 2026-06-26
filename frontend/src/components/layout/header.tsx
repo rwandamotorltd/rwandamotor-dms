@@ -291,7 +291,7 @@ export function Header({ onMenuClick }: HeaderProps) {
             </Button>
 
             {notifOpen && (
-              <div className="absolute right-0 top-full mt-1 w-80 bg-popover border border-border rounded-lg shadow-lg z-50 overflow-hidden">
+              <div className="fixed right-4 top-[65px] w-80 bg-popover border border-border rounded-lg shadow-lg z-[200] overflow-hidden">
                 <div className="px-4 py-2.5 border-b border-border flex items-center justify-between">
                   <span className="text-sm font-semibold">Notifications</span>
                   <button className="text-xs text-muted-foreground hover:text-foreground" onClick={() => setNotifOpen(false)}>
