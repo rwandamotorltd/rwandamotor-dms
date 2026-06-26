@@ -9,7 +9,7 @@ public class VehicleConfiguration : IEntityTypeConfiguration<Vehicle>
     public void Configure(EntityTypeBuilder<Vehicle> builder)
     {
         builder.HasKey(v => v.Id);
-        builder.Property(v => v.VIN).IsRequired().HasMaxLength(17);
+        builder.Property(v => v.VIN).IsRequired().HasMaxLength(50);
         builder.HasIndex(v => v.VIN).IsUnique();
         builder.Property(v => v.PlateNumber).HasMaxLength(20);
         builder.HasIndex(v => v.PlateNumber);

@@ -127,7 +127,6 @@ public class ValidateImportFileCommandHandler
                 return (false, false, "Year must be a valid number between 1900 and 2100");
 
             vin = vin.Trim().ToUpperInvariant();
-            if (vin.Length > 17) return (false, false, $"VIN '{vin}' exceeds 17 characters");
             if (existingVins.Contains(vin)) return (true, true, null);
             if (!vinsSeen.Add(vin))         return (true, true, null);
             return (true, false, null);
@@ -424,8 +423,7 @@ public class ProcessImportCommandHandler
                 DateTime? warrantyEnd   = DateTime.TryParse(Get(data, "WarrantyEndDate"),   out var we) ? we : null;
                 int? warrantyKm = int.TryParse(Get(data, "WarrantyKmLimit"), out var wk) && wk >= 0 ? wk : null;
 
-                // Truncate VIN to 17 chars (already validated, but belt-and-braces)
-                var safeVin   = vin.Length > 17 ? vin[..17] : vin;
+                var safeVin   = vin;
                 var safeColor = string.IsNullOrWhiteSpace(color) ? null
                               : (color.Trim().Length > 100 ? color.Trim()[..100] : color.Trim());
 
@@ -787,7 +785,7 @@ public class ProcessImportCommandHandler
 
         var newVehicles = unknownVins.Select(vin => new Vehicle
         {
-            VIN                = vin.Length > 17 ? vin[..17] : vin,
+            VIN                = vin,
             IsSoldByDealership = false,
             RetentionStatus    = RetentionStatus.External,
             Year               = 0,

@@ -32,7 +32,7 @@ public class CreateVehicleCommandValidator : AbstractValidator<CreateVehicleComm
 {
     public CreateVehicleCommandValidator()
     {
-        RuleFor(x => x.VIN).NotEmpty().MaximumLength(17).MinimumLength(5);
+        RuleFor(x => x.VIN).NotEmpty().MaximumLength(50);
         RuleFor(x => x.BrandId).NotEmpty();
         RuleFor(x => x.ModelId).NotEmpty();
         RuleFor(x => x.Year).InclusiveBetween(1990, DateTime.UtcNow.Year + 1);

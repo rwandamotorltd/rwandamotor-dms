@@ -1623,8 +1623,8 @@ namespace RwandaMotor.Infrastructure.Migrations
 
                     b.Property<string>("VIN")
                         .IsRequired()
-                        .HasMaxLength(17)
-                        .HasColumnType("character varying(17)");
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
 
                     b.Property<DateTime?>("WarrantyEndDate")
                         .HasColumnType("timestamp without time zone");
