@@ -7,7 +7,7 @@ import {
   Settings, Hash, AlertTriangle, Users, ShieldCheck,
   Plus, Pencil, Trash2, X, Eye, EyeOff, KeyRound, Building2, Save,
   ChevronDown, ChevronRight, Database, Car, Wrench, Upload, Download,
-  FileText, ExternalLink,
+  FileText, ExternalLink, Loader2,
 } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
 import { useRouter } from "next/navigation";
@@ -2084,6 +2084,102 @@ function RolesTab() {
   );
 }
 
+// ─── Data / Danger Zone Tab ───────────────────────────────────────────────────
+
+function DataTab() {
+  const [confirm, setConfirm] = useState("");
+  const [loading, setLoading] = useState(false);
+  const CONFIRM_PHRASE = "DELETE ALL DATA";
+
+  const handlePurge = async () => {
+    if (confirm !== CONFIRM_PHRASE) return;
+    setLoading(true);
+    try {
+      await adminApi.purgeData();
+      toast.success("All operational data has been purged. The system is ready for a fresh import.");
+      setConfirm("");
+    } catch (err: unknown) {
+      const d = (err as { response?: { data?: { message?: string } } })?.response?.data;
+      toast.error(d?.message ?? "Purge failed — check server logs.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6 max-w-2xl">
+      <div>
+        <h3 className="font-semibold text-sm">Data Management</h3>
+        <p className="text-xs text-muted-foreground mt-0.5">Manage the operational data stored in this system.</p>
+      </div>
+
+      {/* What is kept */}
+      <Card>
+        <CardContent className="pt-4 space-y-2">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Preserved after purge</p>
+          <div className="flex flex-wrap gap-1.5">
+            {["Users & passwords", "Company settings", "Brands & models (catalogue)", "Service policies",
+              "Technicians", "Workshop bays", "Permission groups", "Roles", "Document templates"].map(item => (
+              <span key={item} className="px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 text-xs text-emerald-700 dark:text-emerald-400">
+                {item}
+              </span>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Danger zone */}
+      <div className="rounded-xl border-2 border-red-200 dark:border-red-900 bg-red-50/50 dark:bg-red-950/20 p-5 space-y-4">
+        <div className="flex items-start gap-3">
+          <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
+          <div>
+            <p className="font-semibold text-red-700 dark:text-red-400">Purge All Operational Data</p>
+            <p className="text-xs text-red-600 dark:text-red-500 mt-1">
+              This permanently deletes all vehicles, customers, service records, job cards, sales history,
+              appointments, follow-ups, notifications, and import logs. This action cannot be undone.
+            </p>
+          </div>
+        </div>
+
+        <div className="rounded-lg bg-red-100/50 dark:bg-red-950/30 p-3 text-xs text-red-700 dark:text-red-400 space-y-1">
+          <p className="font-semibold">Will be permanently deleted:</p>
+          <div className="flex flex-wrap gap-1 mt-1">
+            {["Vehicles", "Customers", "Service records", "Job cards", "Sales history",
+              "Follow-ups", "Appointments", "Notifications", "Import logs", "Audit logs"].map(item => (
+              <span key={item} className="px-1.5 py-0.5 rounded bg-red-200/60 dark:bg-red-900/50 text-red-700 dark:text-red-400">
+                {item}
+              </span>
+            ))}
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <label className="text-xs font-medium text-red-700 dark:text-red-400">
+            Type <span className="font-mono font-bold">{CONFIRM_PHRASE}</span> to enable the button
+          </label>
+          <input
+            className="w-full rounded-lg border border-red-300 dark:border-red-800 bg-white dark:bg-red-950/20 px-3 py-2 text-sm font-mono placeholder-red-300 dark:placeholder-red-800 focus:outline-none focus:ring-2 focus:ring-red-400"
+            placeholder={CONFIRM_PHRASE}
+            value={confirm}
+            onChange={e => setConfirm(e.target.value)}
+            disabled={loading}
+          />
+        </div>
+
+        <Button
+          variant="destructive"
+          disabled={confirm !== CONFIRM_PHRASE || loading}
+          onClick={handlePurge}
+          className="gap-2"
+        >
+          {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+          {loading ? "Purging…" : "Purge All Data"}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 export default function SettingsPage() {
   const { user } = useAuth();
   const router = useRouter();
@@ -2122,6 +2218,7 @@ export default function SettingsPage() {
           <TabsTrigger value="catalogue" className="gap-1.5 text-xs sm:text-sm"><Database className="w-3.5 h-3.5" /><span>Catalogue</span></TabsTrigger>
           <TabsTrigger value="templates" className="gap-1.5 text-xs sm:text-sm"><FileText className="w-3.5 h-3.5" /><span>Templates</span></TabsTrigger>
           <TabsTrigger value="roles" className="gap-1.5 text-xs sm:text-sm"><KeyRound className="w-3.5 h-3.5" /><span>Roles</span></TabsTrigger>
+          <TabsTrigger value="data" className="gap-1.5 text-xs sm:text-sm text-red-600 dark:text-red-400 data-[state=active]:text-red-700"><AlertTriangle className="w-3.5 h-3.5" /><span>Data</span></TabsTrigger>
         </TabsList>
 
         <TabsContent value="users">
@@ -2150,6 +2247,10 @@ export default function SettingsPage() {
 
         <TabsContent value="roles">
           <RolesTab />
+        </TabsContent>
+
+        <TabsContent value="data">
+          <DataTab />
         </TabsContent>
       </Tabs>
     </div>

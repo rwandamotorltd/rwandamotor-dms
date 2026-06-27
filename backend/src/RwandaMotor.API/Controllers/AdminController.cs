@@ -248,6 +248,32 @@ public class AdminController : ControllerBase
         await _db.SaveChangesAsync();
         return Ok(ApiResponse<bool>.Ok(true));
     }
+
+    // ── Data Purge ────────────────────────────────────────────────────────────
+
+    [HttpPost("purge-data")]
+    public async Task<IActionResult> PurgeData(CancellationToken ct)
+    {
+        // Hard-delete all operational/transactional data in FK-safe order.
+        // Preserved: Users, CompanySettings, ServicePolicies, Brands, VehicleModels,
+        //            Technicians, WorkshopBays, PermissionGroups, AppRoles, DocumentTemplates.
+        await _db.ServiceParts.IgnoreQueryFilters().ExecuteDeleteAsync(ct);
+        await _db.ImportLogRows.IgnoreQueryFilters().ExecuteDeleteAsync(ct);
+        await _db.ServiceRecords.IgnoreQueryFilters().ExecuteDeleteAsync(ct);
+        await _db.SalesHistories.IgnoreQueryFilters().ExecuteDeleteAsync(ct);
+        await _db.FollowUpInteractions.IgnoreQueryFilters().ExecuteDeleteAsync(ct);
+        await _db.FollowUps.IgnoreQueryFilters().ExecuteDeleteAsync(ct);
+        await _db.Appointments.IgnoreQueryFilters().ExecuteDeleteAsync(ct);
+        await _db.Notifications.IgnoreQueryFilters().ExecuteDeleteAsync(ct);
+        await _db.JobCards.IgnoreQueryFilters().ExecuteDeleteAsync(ct);
+        await _db.ImportLogs.IgnoreQueryFilters().ExecuteDeleteAsync(ct);
+        await _db.AuditLogs.IgnoreQueryFilters().ExecuteDeleteAsync(ct);
+        await _db.Vehicles.IgnoreQueryFilters().ExecuteDeleteAsync(ct);
+        await _db.Customers.IgnoreQueryFilters().ExecuteDeleteAsync(ct);
+        await _db.JobCardSequences.IgnoreQueryFilters().ExecuteDeleteAsync(ct);
+
+        return Ok(ApiResponse<bool>.Ok(true, "All operational data has been purged."));
+    }
 }
 
 public record ResetPasswordRequest(string NewPassword);

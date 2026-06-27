@@ -431,6 +431,9 @@ export const adminApi = {
 
   resetPassword: (userId: string, newPassword: string) =>
     api.post<ApiResponse<boolean>>('/admin/users/' + userId + '/reset-password', { newPassword }).then(r => r.data),
+
+  purgeData: () =>
+    api.post<ApiResponse<boolean>>('/admin/purge-data').then(r => r.data),
 };
 
 // ============================================================
