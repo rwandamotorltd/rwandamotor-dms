@@ -545,13 +545,23 @@ export default function ImportPage() {
               </div>
               <div className="rounded-lg bg-amber-50 dark:bg-amber-950/50 p-4 text-center">
                 <p className="text-2xl font-bold text-amber-600">{importResult.duplicates}</p>
-                <p className="text-xs text-muted-foreground">Skipped</p>
+                <p className="text-xs text-muted-foreground">Already in system</p>
               </div>
               <div className="rounded-lg bg-red-50 dark:bg-red-950/50 p-4 text-center">
                 <p className="text-2xl font-bold text-red-600">{importResult.errors}</p>
                 <p className="text-xs text-muted-foreground">Errors</p>
               </div>
             </div>
+            {importResult.duplicates > 0 && importResult.imported === 0 && importResult.errors === 0 && (
+              <p className="text-sm text-amber-700 dark:text-amber-400 text-center max-w-sm">
+                All vehicles in this file already exist in the system. To re-import, delete the existing vehicles first and import again.
+              </p>
+            )}
+            {importResult.duplicates > 0 && (importResult.imported > 0 || importResult.errors > 0) && (
+              <p className="text-xs text-muted-foreground text-center max-w-sm">
+                {importResult.duplicates} vehicle{importResult.duplicates !== 1 ? "s" : ""} already existed in the system and were skipped.
+              </p>
+            )}
             {importResult.errorDetails && importResult.errorDetails.length > 0 && (
               <div className="w-full">
                 <ErrorTable

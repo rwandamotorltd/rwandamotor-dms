@@ -312,12 +312,22 @@ public class ProcessImportCommandHandler
             .ToListAsync(ct))
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-        // Re-check plate numbers to avoid unique constraint violations
+        // Re-check plate numbers to avoid value-too-long errors (column max 20)
         var existingPlates = (await _db.Vehicles
             .Where(v => !v.IsDeleted && v.PlateNumber != null)
             .Select(v => v.PlateNumber!)
             .ToListAsync(ct))
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        // Load soft-deleted vehicles for VINs in this file — we restore them instead of inserting new rows
+        var allVinsInFile = allData
+            .Select(d => Get(d, "VIN").ToUpperInvariant())
+            .Where(v => !string.IsNullOrWhiteSpace(v))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var softDeletedByVin = await _db.Vehicles
+            .IgnoreQueryFilters()
+            .Where(v => v.IsDeleted && allVinsInFile.Contains(v.VIN))
+            .ToDictionaryAsync(v => v.VIN, StringComparer.OrdinalIgnoreCase, ct);
 
         // Intra-batch dedup sets
         var vinsInBatch   = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -353,8 +363,9 @@ public class ProcessImportCommandHandler
         // Auto-create any missing brands/models so the import doesn't fail on unknown catalogue entries
         await EnsureBrandsAndModels(allData, brands, ct);
 
-        // Build vehicle entities
-        var vehiclesToAdd = new List<Vehicle>();
+        // Build vehicle entities — new INSERTs and soft-delete restores (UPDATEs)
+        var vehiclesToAdd     = new List<Vehicle>();
+        var vehiclesToRestore = new List<Vehicle>();
 
         for (int i = 0; i < allData.Count; i++)
         {
@@ -372,8 +383,15 @@ public class ProcessImportCommandHandler
                 var saleDateStr  = Get(data, "SaleDate");
                 var yearStr      = Get(data, "Year");
 
-                // Skip if already in DB or already queued in this batch
-                if (existingVins.Contains(vin) || !vinsInBatch.Add(vin))
+                // Skip intra-batch duplicate VINs
+                if (!vinsInBatch.Add(vin))
+                {
+                    logRow.IsDuplicate = true;
+                    continue;
+                }
+
+                // Skip already-active (non-deleted) vehicles in the DB
+                if (existingVins.Contains(vin))
                 {
                     logRow.IsDuplicate = true;
                     continue;
@@ -401,14 +419,14 @@ public class ProcessImportCommandHandler
 
                 DateTime? saleDate = DateTime.TryParse(saleDateStr, out var sd) ? sd : null;
 
-                // Deduplicate plate numbers — if duplicate in DB or batch, import without plate
+                // Deduplicate plate numbers — truncate to column max (20) and skip if duplicate
                 string? plate = null;
                 if (!string.IsNullOrWhiteSpace(plateNumber))
                 {
                     var norm = plateNumber.Trim().ToUpperInvariant();
-                    if (!existingPlates.Contains(norm) && platesInBatch.Add(norm))
-                        plate = norm;
-                    // else: duplicate plate — still import the vehicle, just without a plate
+                    var safePlate = norm.Length > 20 ? norm[..20] : norm;
+                    if (!existingPlates.Contains(safePlate) && platesInBatch.Add(safePlate))
+                        plate = safePlate;
                 }
 
                 // Optional fields — silently ignored when absent or unparseable
@@ -423,13 +441,42 @@ public class ProcessImportCommandHandler
                 DateTime? warrantyEnd   = DateTime.TryParse(Get(data, "WarrantyEndDate"),   out var we) ? we : null;
                 int? warrantyKm = int.TryParse(Get(data, "WarrantyKmLimit"), out var wk) && wk >= 0 ? wk : null;
 
-                var safeVin   = vin;
                 var safeColor = string.IsNullOrWhiteSpace(color) ? null
                               : (color.Trim().Length > 100 ? color.Trim()[..100] : color.Trim());
 
+                // If VIN was previously soft-deleted, restore that record (preserves service history)
+                if (softDeletedByVin.TryGetValue(vin, out var deletedVehicle))
+                {
+                    deletedVehicle.IsDeleted        = false;
+                    deletedVehicle.DeletedAt        = null;
+                    deletedVehicle.DeletedBy        = null;
+                    deletedVehicle.PlateNumber      = plate;
+                    deletedVehicle.BrandId          = brand.Id;
+                    deletedVehicle.ModelId          = model.Id;
+                    deletedVehicle.Year             = year;
+                    deletedVehicle.Color            = safeColor;
+                    deletedVehicle.EngineNumber     = string.IsNullOrWhiteSpace(engineNumber) ? null : engineNumber.Trim();
+                    deletedVehicle.FuelType         = string.IsNullOrWhiteSpace(fuelType) ? null : fuelType.Trim();
+                    deletedVehicle.Transmission     = string.IsNullOrWhiteSpace(transmission) ? null : transmission.Trim();
+                    deletedVehicle.Notes            = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim();
+                    deletedVehicle.CurrentMileage   = currentMileage;
+                    deletedVehicle.SalePrice        = salePrice;
+                    deletedVehicle.WarrantyStartDate = warrantyStart;
+                    deletedVehicle.WarrantyEndDate   = warrantyEnd;
+                    deletedVehicle.WarrantyKmLimit   = warrantyKm;
+                    deletedVehicle.CustomerId        = customer?.Id;
+                    deletedVehicle.SaleDate          = saleDate;
+                    deletedVehicle.IsSoldByDealership = true;
+                    deletedVehicle.RetentionStatus   = RetentionStatus.Active;
+                    deletedVehicle.UpdatedAt         = DateTime.UtcNow;
+                    vehiclesToRestore.Add(deletedVehicle);
+                    logRow.IsImported = true;
+                    continue;
+                }
+
                 vehiclesToAdd.Add(new Vehicle
                 {
-                    VIN                = safeVin,
+                    VIN                = vin,
                     PlateNumber        = plate,
                     BrandId            = brand.Id,
                     ModelId            = model.Id,
@@ -462,6 +509,16 @@ public class ProcessImportCommandHandler
 
         var savedVehicles = new List<Vehicle>();
 
+        // Save restored soft-deleted vehicles (UPDATEs — EF Core tracks them from IgnoreQueryFilters load)
+        if (vehiclesToRestore.Count > 0)
+        {
+            await _db.SaveChangesAsync(ct);
+            savedVehicles.AddRange(vehiclesToRestore);
+            imported += vehiclesToRestore.Count;
+            _log.LogInformation("Restored {Count} soft-deleted vehicles during import", vehiclesToRestore.Count);
+        }
+
+        // Save brand-new vehicles (INSERTs) with batch + row-by-row fallback
         if (vehiclesToAdd.Count > 0)
         {
             try
@@ -472,8 +529,10 @@ public class ProcessImportCommandHandler
             }
             catch (Exception batchEx)
             {
-                // Batch save failed — retry row-by-row so good rows still get imported
+                // Batch save failed — surface the error and retry row-by-row so good rows still get imported
                 _log.LogWarning(batchEx, "Batch vehicle save failed, retrying row-by-row");
+                var batchMsg = batchEx.InnerException?.Message ?? batchEx.Message;
+                errors.Add(new ImportRowErrorDto(0, "Batch", $"Batch save failed: {batchMsg}"));
 
                 // Cast to DbContext to access ChangeTracker (IApplicationDbContext doesn't expose it)
                 var dbCtx = _db as Microsoft.EntityFrameworkCore.DbContext;
@@ -487,7 +546,7 @@ public class ProcessImportCommandHandler
                         if (e != null) e.State = EntityState.Detached;
                     }
 
-                imported = 0;
+                imported -= vehiclesToAdd.Count; // remove the pre-counted new-vehicle entries
                 foreach (var vehicle in vehiclesToAdd)
                 {
                     try
