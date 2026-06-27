@@ -37,7 +37,7 @@ public class CreateVehicleCommandValidator : AbstractValidator<CreateVehicleComm
         RuleFor(x => x.VIN).NotEmpty().MaximumLength(50);
         RuleFor(x => x.BrandId).NotEmpty();
         RuleFor(x => x.ModelId).NotEmpty();
-        RuleFor(x => x.Year).InclusiveBetween(1990, DateTime.UtcNow.Year + 1);
+        RuleFor(x => x.Year).InclusiveBetween(1900, DateTime.UtcNow.Year + 1);
         RuleFor(x => x.CurrentMileage).GreaterThanOrEqualTo(0).When(x => x.CurrentMileage.HasValue);
     }
 }

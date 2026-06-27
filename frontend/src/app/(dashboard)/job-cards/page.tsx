@@ -183,8 +183,8 @@ function AddVehicleDialog({ open, onClose, onCreated }: {
     if (!brandId)     return toast.error("Brand is required");
     if (!modelId)     return toast.error("Model is required");
     const yearNum = parseInt(year);
-    if (isNaN(yearNum) || yearNum < 1990 || yearNum > new Date().getFullYear() + 1)
-      return toast.error("Invalid year (1990 – " + (new Date().getFullYear() + 1) + ")");
+    if (isNaN(yearNum) || yearNum < 1900 || yearNum > new Date().getFullYear() + 1)
+      return toast.error(`Year must be between 1900 and ${new Date().getFullYear() + 1}`);
 
     vehicleMutation.mutate({
       vin: vin.trim().toUpperCase(),
@@ -251,7 +251,7 @@ function AddVehicleDialog({ open, onClose, onCreated }: {
           <div className="grid grid-cols-3 gap-3">
             <div className="space-y-1">
               <Label>Year <span className="text-red-500">*</span></Label>
-              <Input type="number" min={1990} max={new Date().getFullYear() + 1} value={year} onChange={e => setYear(e.target.value)} />
+              <Input type="number" min={1900} max={new Date().getFullYear() + 1} value={year} onChange={e => setYear(e.target.value)} />
             </div>
             <div className="space-y-1">
               <Label>Color</Label>

@@ -12,10 +12,11 @@ import {
 import {
   Search, Filter, Car, ChevronLeft, ChevronRight,
   Pencil, Check, X, Layers, CheckSquare, SquareDashed,
-  Save, AlertTriangle, Trash2, Download
+  Save, AlertTriangle, Trash2, Download, Plus, UserPlus
 } from "lucide-react";
-import { vehiclesApi, type UpdateVehiclePayload, type BulkUpdatePayload } from "@/lib/api";
+import { vehiclesApi, brandsApi, customersApi, type UpdateVehiclePayload, type BulkUpdatePayload } from "@/lib/api";
 import type { VehicleListItem, RetentionStatus } from "@/types";
+import { toast } from "sonner";
 import { RetentionBadge } from "@/components/shared/retention-badge";
 import { cn, formatDate, formatMileage } from "@/lib/utils";
 import { useAuth } from "@/contexts/auth-context";
@@ -27,6 +28,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Textarea } from "@/components/ui/textarea";
 
 // ─── Constants ─────────────────────────────────────────────────
 const RETENTION_STATUSES: { value: RetentionStatus; label: string }[] = [
@@ -93,6 +96,311 @@ function DeleteConfirmDialog({
         </div>
       </motion.div>
     </div>
+  );
+}
+
+// ─── Shared helpers ─────────────────────────────────────────────
+const FUEL_TYPES = ["Petrol", "Diesel", "Electric", "Hybrid", "LPG"];
+const TRANSMISSIONS = ["Manual", "Automatic", "CVT", "DSG"];
+
+function apiError(err: unknown, fallback: string) {
+  const d = (err as { response?: { data?: { message?: string; errors?: string[] } } })?.response?.data;
+  return d?.errors?.join(", ") ?? d?.message ?? fallback;
+}
+
+// ─── Create Vehicle Dialog ───────────────────────────────────────
+function CreateVehicleDialog({ open, onClose, onCreated }: {
+  open: boolean;
+  onClose: () => void;
+  onCreated: () => void;
+}) {
+  const queryClient = useQueryClient();
+  const [vin, setVin] = useState("");
+  const [plateNumber, setPlateNumber] = useState("");
+  const [brandId, setBrandId] = useState("");
+  const [modelId, setModelId] = useState("");
+  const [year, setYear] = useState(String(new Date().getFullYear()));
+  const [color, setColor] = useState("");
+  const [fuelType, setFuelType] = useState("");
+  const [transmission, setTransmission] = useState("");
+  const [currentMileage, setCurrentMileage] = useState("");
+  const [notes, setNotes] = useState("");
+  const [isSoldByDealership, setIsSoldByDealership] = useState(false);
+
+  const [customerSearch, setCustomerSearch] = useState("");
+  const [debouncedCSearch, setDebouncedCSearch] = useState("");
+  const [showCDropdown, setShowCDropdown] = useState(false);
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
+  const [selectedCustomerName, setSelectedCustomerName] = useState<string | null>(null);
+  const [selectedCustomerPhone, setSelectedCustomerPhone] = useState<string | null>(null);
+
+  const [showNewCustomer, setShowNewCustomer] = useState(false);
+  const [newCustName, setNewCustName] = useState("");
+  const [newCustPhone, setNewCustPhone] = useState("");
+  const [newCustEmail, setNewCustEmail] = useState("");
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedCSearch(customerSearch), 300);
+    return () => clearTimeout(t);
+  }, [customerSearch]);
+
+  useEffect(() => {
+    if (!open) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setVin(""); setPlateNumber(""); setBrandId(""); setModelId("");
+      setYear(String(new Date().getFullYear()));
+      setColor(""); setFuelType(""); setTransmission(""); setCurrentMileage(""); setNotes("");
+      setIsSoldByDealership(false);
+      setCustomerSearch(""); setDebouncedCSearch(""); setShowCDropdown(false);
+      setSelectedCustomerId(null); setSelectedCustomerName(null); setSelectedCustomerPhone(null);
+      setShowNewCustomer(false); setNewCustName(""); setNewCustPhone(""); setNewCustEmail("");
+    }
+  }, [open]);
+
+  const { data: brands } = useQuery({ queryKey: ["brands"], queryFn: () => brandsApi.list() });
+  const selectedBrand = brands?.find(b => b.id === brandId);
+  const models = selectedBrand?.models ?? [];
+
+  const { data: customerResults } = useQuery({
+    queryKey: ["customers-quick", debouncedCSearch],
+    queryFn: () => customersApi.list({ search: debouncedCSearch, pageSize: 8 }),
+    enabled: debouncedCSearch.length >= 2 && !selectedCustomerId,
+  });
+
+  const vehicleMutation = useMutation({
+    mutationFn: (payload: Record<string, unknown>) => vehiclesApi.create(payload),
+    onSuccess: (res) => {
+      if (res.success) {
+        queryClient.invalidateQueries({ queryKey: ["vehicles"] });
+        toast.success("Vehicle added successfully");
+        onCreated();
+        onClose();
+      }
+    },
+    onError: (err: unknown) => toast.error(apiError(err, "Failed to add vehicle")),
+  });
+
+  const customerMutation = useMutation({
+    mutationFn: (payload: Record<string, unknown>) => customersApi.create(payload),
+    onSuccess: (res) => {
+      if (res.success && res.data) {
+        setSelectedCustomerId(res.data);
+        setSelectedCustomerName(newCustName.trim());
+        setSelectedCustomerPhone(newCustPhone.trim() || null);
+        setShowNewCustomer(false);
+        setNewCustName(""); setNewCustPhone(""); setNewCustEmail("");
+        toast.success("Customer created");
+      }
+    },
+    onError: (err: unknown) => toast.error(apiError(err, "Failed to create customer")),
+  });
+
+  const handleSubmit = () => {
+    if (!vin.trim())  return toast.error("VIN is required");
+    if (!brandId)     return toast.error("Brand is required");
+    if (!modelId)     return toast.error("Model is required");
+    const yearNum = parseInt(year);
+    if (isNaN(yearNum) || yearNum < 1900 || yearNum > new Date().getFullYear() + 1)
+      return toast.error(`Year must be between 1900 and ${new Date().getFullYear() + 1}`);
+
+    vehicleMutation.mutate({
+      vin: vin.trim().toUpperCase(),
+      plateNumber: plateNumber.trim() || null,
+      brandId, modelId, year: yearNum,
+      color: color || null,
+      fuelType: fuelType || null,
+      transmission: transmission || null,
+      currentMileage: currentMileage ? parseInt(currentMileage) : null,
+      notes: notes.trim() || null,
+      isSoldByDealership,
+      customerId: selectedCustomerId ?? undefined,
+    });
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={o => !o && onClose()}>
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Plus className="w-4 h-4" /> Add New Vehicle
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label>VIN <span className="text-red-500">*</span></Label>
+              <Input value={vin} onChange={e => setVin(e.target.value)} placeholder="JTDKARFUX…" className="uppercase font-mono" />
+            </div>
+            <div className="space-y-1">
+              <Label>Plate Number</Label>
+              <Input value={plateNumber} onChange={e => setPlateNumber(e.target.value)} placeholder="RAA 123A" />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label>Brand <span className="text-red-500">*</span></Label>
+              <Select value={brandId} onValueChange={v => { setBrandId(v ?? ""); setModelId(""); }}>
+                <SelectTrigger className="w-full">
+                  <span className={`flex flex-1 text-left${!brandId ? " text-muted-foreground" : ""}`}>
+                    {brandId ? (brands?.find(b => b.id === brandId)?.name ?? "…") : "Select brand"}
+                  </span>
+                </SelectTrigger>
+                <SelectContent>
+                  {brands?.map(b => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label>Model <span className="text-red-500">*</span></Label>
+              <Select value={modelId} onValueChange={v => setModelId(v ?? "")} disabled={!brandId || models.length === 0}>
+                <SelectTrigger className="w-full">
+                  <span className={`flex flex-1 text-left${!modelId ? " text-muted-foreground" : ""}`}>
+                    {modelId ? (models.find(m => m.id === modelId)?.name ?? "…") : (!brandId ? "Select brand first" : "Select model")}
+                  </span>
+                </SelectTrigger>
+                <SelectContent>
+                  {models.map(m => <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-3">
+            <div className="space-y-1">
+              <Label>Year <span className="text-red-500">*</span></Label>
+              <Input type="number" min={1900} max={new Date().getFullYear() + 1} value={year} onChange={e => setYear(e.target.value)} />
+            </div>
+            <div className="space-y-1">
+              <Label>Color</Label>
+              <Input value={color} onChange={e => setColor(e.target.value)} placeholder="White" />
+            </div>
+            <div className="space-y-1">
+              <Label>Mileage (km)</Label>
+              <Input type="number" min={0} value={currentMileage} onChange={e => setCurrentMileage(e.target.value)} placeholder="0" />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label>Fuel Type</Label>
+              <Select value={fuelType} onValueChange={v => setFuelType(v ?? "")}>
+                <SelectTrigger className="w-full">
+                  <span className={`flex flex-1 text-left${!fuelType ? " text-muted-foreground" : ""}`}>{fuelType || "Select…"}</span>
+                </SelectTrigger>
+                <SelectContent>{FUEL_TYPES.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label>Transmission</Label>
+              <Select value={transmission} onValueChange={v => setTransmission(v ?? "")}>
+                <SelectTrigger className="w-full">
+                  <span className={`flex flex-1 text-left${!transmission ? " text-muted-foreground" : ""}`}>{transmission || "Select…"}</span>
+                </SelectTrigger>
+                <SelectContent>{TRANSMISSIONS.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Customer */}
+          <div className="space-y-1.5">
+            <Label>Customer <span className="text-xs text-muted-foreground font-normal">(optional)</span></Label>
+            {selectedCustomerId ? (
+              <div className="flex items-center gap-2 rounded-md border border-emerald-500/30 bg-emerald-500/5 px-3 py-2 text-sm">
+                <div className="flex-1 min-w-0">
+                  <span className="font-medium">{selectedCustomerName}</span>
+                  {selectedCustomerPhone && <span className="text-muted-foreground ml-2 text-xs">{selectedCustomerPhone}</span>}
+                </div>
+                <button type="button" onClick={() => { setSelectedCustomerId(null); setSelectedCustomerName(null); setSelectedCustomerPhone(null); }} className="text-muted-foreground hover:text-foreground">
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ) : (
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <Input
+                    placeholder="Search by name or phone…"
+                    value={customerSearch}
+                    onChange={e => { setCustomerSearch(e.target.value); setShowCDropdown(true); }}
+                    onFocus={() => setShowCDropdown(true)}
+                    onBlur={() => setTimeout(() => setShowCDropdown(false), 150)}
+                  />
+                  {showCDropdown && debouncedCSearch.length >= 2 && (
+                    <div className="absolute z-50 top-full left-0 right-0 mt-1 border rounded-md bg-popover shadow-lg max-h-44 overflow-y-auto">
+                      {!customerResults && <div className="px-3 py-2 text-sm text-muted-foreground">Searching…</div>}
+                      {customerResults?.items.length === 0 && (
+                        <div className="px-3 py-2 text-sm text-muted-foreground">
+                          No customer found.{" "}
+                          <button type="button" className="text-primary underline" onMouseDown={() => { setShowCDropdown(false); setShowNewCustomer(true); setNewCustName(customerSearch.trim()); }}>
+                            Create &quot;{customerSearch.trim()}&quot;
+                          </button>
+                        </div>
+                      )}
+                      {customerResults?.items.map(c => (
+                        <button key={c.id} type="button" className="w-full text-left px-3 py-2 hover:bg-muted text-sm border-b last:border-b-0"
+                          onMouseDown={() => { setSelectedCustomerId(c.id); setSelectedCustomerName(c.fullName); setSelectedCustomerPhone(c.phone ?? null); setCustomerSearch(""); setShowCDropdown(false); }}>
+                          <span className="font-medium">{c.fullName}</span>
+                          {c.phone && <span className="text-muted-foreground ml-2 text-xs">{c.phone}</span>}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <Button type="button" variant="outline" size="icon" title="Add new customer" onClick={() => setShowNewCustomer(v => !v)}>
+                  <UserPlus className="w-4 h-4" />
+                </Button>
+              </div>
+            )}
+            {showNewCustomer && !selectedCustomerId && (
+              <div className="rounded-md border border-dashed p-3 space-y-3 bg-muted/30">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">New Customer</p>
+                <div className="space-y-1">
+                  <Label className="text-xs">Full Name <span className="text-red-500">*</span></Label>
+                  <Input value={newCustName} onChange={e => setNewCustName(e.target.value)} placeholder="Jean Paul Sem" autoFocus />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Phone</Label>
+                    <Input value={newCustPhone} onChange={e => setNewCustPhone(e.target.value)} placeholder="+250 788 000 000" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Email</Label>
+                    <Input type="email" value={newCustEmail} onChange={e => setNewCustEmail(e.target.value)} placeholder="email@example.com" />
+                  </div>
+                </div>
+                <div className="flex justify-end gap-2">
+                  <Button type="button" variant="ghost" size="sm" onClick={() => setShowNewCustomer(false)}>Cancel</Button>
+                  <Button type="button" size="sm" disabled={!newCustName.trim() || customerMutation.isPending}
+                    onClick={() => customerMutation.mutate({ fullName: newCustName.trim(), phone: newCustPhone.trim() || null, email: newCustEmail.trim() || null, category: "Retail" })}>
+                    {customerMutation.isPending ? "Creating…" : "Create & Assign"}
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Notes */}
+          <div className="space-y-1">
+            <Label>Notes</Label>
+            <Textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Any additional notes…" rows={2} className="resize-none" />
+          </div>
+
+          {/* Dealership flag */}
+          <div className="flex items-center gap-2">
+            <Checkbox id="cv-sold-by-dealer" checked={isSoldByDealership} onCheckedChange={c => setIsSoldByDealership(!!c)} />
+            <label htmlFor="cv-sold-by-dealer" className="text-sm cursor-pointer">Sold by RwandaMotor (Dealership Fleet)</label>
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2 border-t">
+            <Button variant="outline" onClick={onClose}>Cancel</Button>
+            <Button onClick={handleSubmit} disabled={vehicleMutation.isPending}>
+              {vehicleMutation.isPending ? "Adding…" : "Add Vehicle"}
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -183,6 +491,9 @@ function VehiclesContent() {
   // Export state
   const [exporting, setExporting] = useState(false);
 
+  // Create vehicle
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
+
   useEffect(() => {
     const s = searchParams.get("status") as RetentionStatus | null;
     const sold = searchParams.get("isSoldByDealership") as "true" | "false" | null;
@@ -223,7 +534,8 @@ function VehiclesContent() {
   // Mutations
   const updateMutation = useMutation({
     mutationFn: (payload: UpdateVehiclePayload) => vehiclesApi.update(payload),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["vehicles"] }); setEditingCell(null); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["vehicles"] }); setEditingCell(null); toast.success("Vehicle updated"); },
+    onError: (err: unknown) => toast.error(apiError(err, "Failed to update vehicle")),
   });
 
   const bulkMutation = useMutation({
@@ -233,19 +545,22 @@ function VehiclesContent() {
       setBulkDialogOpen(false);
       setRowSelection({});
       setBulkForm({ retentionStatus: "", notesAppend: "" });
-      alert(`${res.data ?? 0} vehicle(s) updated successfully`);
+      toast.success(`${res.data ?? 0} vehicle(s) updated`);
     },
+    onError: (err: unknown) => toast.error(apiError(err, "Bulk update failed")),
   });
 
   const deleteMutation = useMutation({
     mutationFn: (ids: string[]) => vehiclesApi.deleteMany(ids),
-    onSuccess: () => {
+    onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ["vehicles"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard-kpis"] });
       setRowSelection({});
       setShowDeleteConfirm(false);
       setDeleteAllRecords(false);
+      toast.success(`${res.data ?? 0} vehicle(s) deleted`);
     },
+    onError: (err: unknown) => toast.error(apiError(err, "Delete failed")),
   });
 
   const deleteAllMutation = useMutation({
@@ -254,13 +569,15 @@ function VehiclesContent() {
       retentionStatus: statusFilter !== "all" ? statusFilter : undefined,
       isSoldByDealership: isSold === "all" ? undefined : isSold === "true",
     }),
-    onSuccess: () => {
+    onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ["vehicles"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard-kpis"] });
       setRowSelection({});
       setShowDeleteConfirm(false);
       setDeleteAllRecords(false);
+      toast.success(`${res.data ?? 0} vehicle(s) deleted`);
     },
+    onError: (err: unknown) => toast.error(apiError(err, "Delete failed")),
   });
 
   // Export — fetches all matching records and downloads as CSV
@@ -528,6 +845,11 @@ function VehiclesContent() {
             {bulkMode ? "Exit Bulk" : "Bulk Edit"}
           </Button>
         )}
+        {canEditVehicles && (
+          <Button size="sm" onClick={() => setShowCreateDialog(true)} className="gap-2 shrink-0">
+            <Plus className="w-4 h-4" /> Add Vehicle
+          </Button>
+        )}
       </motion.div>
 
       {/* Bulk action bar */}
@@ -752,6 +1074,13 @@ function VehiclesContent() {
           deleting={deleteMutation.isPending || deleteAllMutation.isPending}
         />
       )}
+
+      {/* Create Vehicle */}
+      <CreateVehicleDialog
+        open={showCreateDialog}
+        onClose={() => setShowCreateDialog(false)}
+        onCreated={() => queryClient.invalidateQueries({ queryKey: ["vehicles"] })}
+      />
     </div>
   );
 }
