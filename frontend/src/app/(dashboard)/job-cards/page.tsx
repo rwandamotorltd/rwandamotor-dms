@@ -10,7 +10,7 @@ import type { JobCardListItem, JobCardStatus, ServiceType, FuelLevel, VehicleLis
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
@@ -845,6 +845,7 @@ function JobCardsContent() {
   });
   const [serviceTypeFilter, setServiceTypeFilter] = useState<ServiceType | "">("");
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
   const [createOpen, setCreateOpen] = useState(false);
   const [shareTarget, setShareTarget] = useState<JobCardListItem | null>(null);
   const [convertTarget, setConvertTarget] = useState<JobCardListItem | null>(null);
@@ -857,8 +858,8 @@ function JobCardsContent() {
     status: statusFilter || undefined,
     serviceType: serviceTypeFilter || undefined,
     pageNumber: page,
-    pageSize: 25,
-  }), [search, statusFilter, serviceTypeFilter, page]);
+    pageSize,
+  }), [search, statusFilter, serviceTypeFilter, page, pageSize]);
 
   const { data, isLoading } = useQuery({
     queryKey: ["job-cards", params],
@@ -1118,12 +1119,25 @@ function JobCardsContent() {
           </div>
 
           {/* Pagination */}
-          {data && data.totalPages > 1 && (
+          {data && data.totalPages >= 1 && (
             <div className="flex items-center justify-between px-4 py-3 border-t">
               <span className="text-sm text-muted-foreground">
-                {(page - 1) * 25 + 1}–{Math.min(page * 25, data.totalCount)} of {data.totalCount}
+                {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, data.totalCount)} of {data.totalCount}
               </span>
-              <div className="flex gap-2">
+              <div className="flex items-center gap-2">
+                <Select
+                  value={String(pageSize)}
+                  onValueChange={v => { setPageSize(Number(v)); setPage(1); }}
+                >
+                  <SelectTrigger className="h-8 w-[110px] text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {[25, 50, 100, 250, 500].map(n => (
+                      <SelectItem key={n} value={String(n)}>{n} / page</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 <Button
                   variant="outline" size="sm"
                   disabled={!data.hasPreviousPage}

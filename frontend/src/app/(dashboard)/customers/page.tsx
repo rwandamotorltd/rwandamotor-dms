@@ -801,8 +801,23 @@ export default function CustomersPage() {
       {/* Pagination */}
       {data && (
         <div className="flex items-center justify-between">
-          <p className="text-sm text-muted-foreground">Page {pagination.pageIndex + 1} of {data.totalPages}</p>
+          <p className="text-sm text-muted-foreground">
+            Page {pagination.pageIndex + 1} of {data.totalPages} · {totalCount} total
+          </p>
           <div className="flex items-center gap-2">
+            <Select
+              value={String(pagination.pageSize)}
+              onValueChange={v => setPagination({ pageIndex: 0, pageSize: Number(v) })}
+            >
+              <SelectTrigger className="h-8 w-[110px] text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {[25, 50, 100, 250, 500].map(n => (
+                  <SelectItem key={n} value={String(n)}>{n} / page</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <Button variant="outline" size="sm" onClick={() => table.previousPage()} disabled={!table.getCanPreviousPage()}>
               <ChevronLeft className="w-4 h-4" />
             </Button>
