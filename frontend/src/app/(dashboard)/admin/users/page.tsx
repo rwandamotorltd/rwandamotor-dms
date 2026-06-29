@@ -406,9 +406,10 @@ function DeleteConfirm({ title, description, onConfirm, onClose, deleting }: Del
 // ─── User Detail Row (expandable) ─────────────────────────────
 
 function UserRow({
-  u, onEdit, onReset, onDelete,
+  u, isSelf, onEdit, onReset, onDelete,
 }: {
   u: UserItem;
+  isSelf: boolean;
   onEdit: () => void;
   onReset: () => void;
   onDelete: () => void;
@@ -427,7 +428,10 @@ function UserRow({
               {u.fullName.slice(0, 2)}
             </div>
             <div>
-              <p className="font-medium text-sm text-foreground leading-tight">{u.fullName}</p>
+              <p className="font-medium text-sm text-foreground leading-tight">
+                {u.fullName}
+                {isSelf && <span className="ml-1.5 text-[10px] text-muted-foreground font-normal">(you)</span>}
+              </p>
               <p className="text-xs text-muted-foreground">{u.email}</p>
             </div>
           </div>
@@ -464,13 +468,19 @@ function UserRow({
               <KeyRound className="w-4 h-4" />
             </button>
             <button onClick={onEdit}
-              className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors" title="Edit user">
+              className="p-1.5 rounded-md text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors" title="Edit user">
               <Pencil className="w-4 h-4" />
             </button>
-            <button onClick={onDelete}
-              className="p-1.5 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors" title="Delete user">
-              <Trash2 className="w-4 h-4" />
-            </button>
+            {isSelf ? (
+              <span className="p-1.5 rounded-md text-muted-foreground/30 cursor-not-allowed" title="Cannot delete your own account">
+                <Trash2 className="w-4 h-4" />
+              </span>
+            ) : (
+              <button onClick={onDelete}
+                className="p-1.5 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors" title="Delete user">
+                <Trash2 className="w-4 h-4" />
+              </button>
+            )}
             {expanded ? <ChevronUp className="w-4 h-4 text-muted-foreground ml-1" /> : <ChevronDown className="w-4 h-4 text-muted-foreground ml-1" />}
           </div>
         </TableCell>
@@ -808,6 +818,7 @@ export default function AdminUsersPage() {
                       <UserRow
                         key={u.id}
                         u={u}
+                        isSelf={u.id === user?.userId}
                         onEdit={() => openEditUser(u)}
                         onReset={() => { setResetUser(u); setResetError(null); }}
                         onDelete={() => setDeletingUser(u)}
