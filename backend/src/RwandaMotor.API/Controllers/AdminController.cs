@@ -22,12 +22,15 @@ public class AdminController : ControllerBase
     private readonly IMediator _mediator;
     private readonly IApplicationDbContext _db;
     private readonly UserManager<ApplicationUser> _userManager;
+    private readonly RoleManager<IdentityRole> _roleManager;
 
-    public AdminController(IMediator mediator, IApplicationDbContext db, UserManager<ApplicationUser> userManager)
+    public AdminController(IMediator mediator, IApplicationDbContext db,
+        UserManager<ApplicationUser> userManager, RoleManager<IdentityRole> roleManager)
     {
         _mediator = mediator;
         _db = db;
         _userManager = userManager;
+        _roleManager = roleManager;
     }
 
     [HttpGet("users")]
@@ -214,6 +217,11 @@ public class AdminController : ControllerBase
             };
             _db.AppRoles.Add(role);
             await _db.SaveChangesAsync();
+
+            // Mirror into ASP.NET Identity so UserManager.AddToRoleAsync can resolve it
+            if (!await _roleManager.RoleExistsAsync(nameTrimmed))
+                await _roleManager.CreateAsync(new IdentityRole(nameTrimmed));
+
             return Ok(ApiResponse<RoleDto>.Ok(new RoleDto(role.Id, role.Name, role.DisplayName, role.Description, false, 0)));
         }
         catch (Exception ex)
@@ -246,6 +254,11 @@ public class AdminController : ControllerBase
 
         _db.AppRoles.Remove(role);
         await _db.SaveChangesAsync();
+
+        // Remove from Identity as well
+        var identityRole = await _roleManager.FindByNameAsync(role.Name);
+        if (identityRole != null) await _roleManager.DeleteAsync(identityRole);
+
         return Ok(ApiResponse<bool>.Ok(true));
     }
 

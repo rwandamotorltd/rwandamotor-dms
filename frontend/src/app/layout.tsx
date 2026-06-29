@@ -33,7 +33,20 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <QueryProvider>
             <AuthProvider>
               {children}
-              <Toaster richColors position="top-right" />
+              <Toaster
+                position="bottom-right"
+                richColors
+                closeButton
+                duration={4000}
+                toastOptions={{
+                  classNames: {
+                    toast: "!rounded-xl !border !border-border !shadow-xl !text-sm !font-medium",
+                    title: "!font-semibold",
+                    description: "!text-muted-foreground !text-xs",
+                    closeButton: "!border-border hover:!bg-muted",
+                  },
+                }}
+              />
               <PwaInstallPrompt />
             </AuthProvider>
           </QueryProvider>

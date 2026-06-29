@@ -43,10 +43,19 @@ public class ApplicationDbSeeder
 
     private async Task SeedRoles()
     {
-        string[] roles = ["Admin", "TechnicalDirector", "CRMOfficer", "CRE"];
-        foreach (var role in roles)
+        string[] builtIn = ["Admin", "TechnicalDirector", "CRMOfficer", "CRE"];
+        foreach (var role in builtIn)
             if (!await _roleManager.RoleExistsAsync(role))
                 await _roleManager.CreateAsync(new IdentityRole(role));
+
+        // Backfill any custom AppRoles that were created before Identity mirroring was added
+        var customAppRoles = await _db.AppRoles
+            .Where(r => !r.IsBuiltIn)
+            .Select(r => r.Name)
+            .ToListAsync();
+        foreach (var name in customAppRoles)
+            if (!await _roleManager.RoleExistsAsync(name))
+                await _roleManager.CreateAsync(new IdentityRole(name));
     }
 
     private async Task SeedAppRoles()
