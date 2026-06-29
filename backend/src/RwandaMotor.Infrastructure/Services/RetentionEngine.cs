@@ -77,9 +77,9 @@ public class RetentionEngine : IRetentionEngine
         var now = asOf ?? DateTime.UtcNow;
         var (periodStart, _) = GetPeriodBounds(period, now);
 
-        // Eligible: vehicles sold by dealership before the period end
+        // Eligible: vehicles sold by dealership; no SaleDate = always eligible
         var eligibleIds = await _db.Vehicles
-            .Where(v => !v.IsDeleted && v.IsSoldByDealership && v.SaleDate <= now)
+            .Where(v => !v.IsDeleted && v.IsSoldByDealership && (v.SaleDate == null || v.SaleDate <= now))
             .Select(v => v.Id)
             .ToListAsync(ct);
 
@@ -93,10 +93,11 @@ public class RetentionEngine : IRetentionEngine
             .Distinct()
             .CountAsync(ct);
 
-        var lost = await _db.Vehicles.CountAsync(v => !v.IsDeleted && v.IsSoldByDealership && v.RetentionStatus == RetentionStatus.Lost, ct);
-        var dueSoon = await _db.Vehicles.CountAsync(v => !v.IsDeleted && v.IsSoldByDealership && v.RetentionStatus == RetentionStatus.DueSoon, ct);
-        var overdue = await _db.Vehicles.CountAsync(v => !v.IsDeleted && v.IsSoldByDealership && v.RetentionStatus == RetentionStatus.Overdue, ct);
-        var recovered = await _db.Vehicles.CountAsync(v => !v.IsDeleted && v.IsSoldByDealership && v.RetentionStatus == RetentionStatus.Recovered, ct);
+        // Scope status counts to the eligible set — prevents showing non-zero Lost/DueSoon when Eligible=0
+        var lost      = eligibleIds.Count == 0 ? 0 : await _db.Vehicles.CountAsync(v => !v.IsDeleted && eligibleIds.Contains(v.Id) && v.RetentionStatus == RetentionStatus.Lost, ct);
+        var dueSoon   = eligibleIds.Count == 0 ? 0 : await _db.Vehicles.CountAsync(v => !v.IsDeleted && eligibleIds.Contains(v.Id) && v.RetentionStatus == RetentionStatus.DueSoon, ct);
+        var overdue   = eligibleIds.Count == 0 ? 0 : await _db.Vehicles.CountAsync(v => !v.IsDeleted && eligibleIds.Contains(v.Id) && v.RetentionStatus == RetentionStatus.Overdue, ct);
+        var recovered = eligibleIds.Count == 0 ? 0 : await _db.Vehicles.CountAsync(v => !v.IsDeleted && eligibleIds.Contains(v.Id) && v.RetentionStatus == RetentionStatus.Recovered, ct);
 
         var rate = eligible > 0 ? Math.Round((decimal)returned / eligible * 100, 2) : 0;
 
@@ -115,7 +116,7 @@ public class RetentionEngine : IRetentionEngine
             var label = monthStart.ToString("MMM yyyy");
 
             var eligibleIds = await _db.Vehicles
-                .Where(v => !v.IsDeleted && v.IsSoldByDealership && v.SaleDate <= monthEnd)
+                .Where(v => !v.IsDeleted && v.IsSoldByDealership && (v.SaleDate == null || v.SaleDate <= monthEnd))
                 .Select(v => v.Id).ToListAsync(ct);
 
             var returned = eligibleIds.Count > 0
@@ -143,7 +144,7 @@ public class RetentionEngine : IRetentionEngine
         foreach (var brand in brands)
         {
             var eligibleIds = await _db.Vehicles
-                .Where(v => !v.IsDeleted && v.IsSoldByDealership && v.BrandId == brand.Id && v.SaleDate <= to)
+                .Where(v => !v.IsDeleted && v.IsSoldByDealership && v.BrandId == brand.Id && (v.SaleDate == null || v.SaleDate <= to))
                 .Select(v => v.Id).ToListAsync(ct);
 
             if (eligibleIds.Count == 0) continue;
@@ -167,13 +168,13 @@ public class RetentionEngine : IRetentionEngine
         var cohortVehicles = await _db.Vehicles
             .Include(v => v.ServiceRecords)
             .Where(v => !v.IsDeleted && v.IsSoldByDealership
-                     && v.SaleDate.HasValue
-                     && v.SaleDate.Value.Year == cohortYear)
+                     && ((v.SaleDate.HasValue && v.SaleDate.Value.Year == cohortYear)
+                         || (!v.SaleDate.HasValue && v.CreatedAt.Year == cohortYear)))
             .ToListAsync(ct);
 
-        // Group by quarter of sale
+        // Group by quarter — use SaleDate if available, fall back to CreatedAt
         var quarters = cohortVehicles
-            .GroupBy(v => $"Q{(v.SaleDate!.Value.Month - 1) / 3 + 1} {cohortYear}")
+            .GroupBy(v => { var a = v.SaleDate ?? v.CreatedAt; return $"Q{(a.Month - 1) / 3 + 1} {cohortYear}"; })
             .OrderBy(g => g.Key)
             .Select(g =>
             {
@@ -181,10 +182,14 @@ public class RetentionEngine : IRetentionEngine
                 var n = vehicles.Count;
                 double CalcRate(int checkMonths) =>
                     n == 0 ? 0 : Math.Round(
-                        (double)vehicles.Count(v => v.ServiceRecords.Any(sr =>
-                            !sr.IsDeleted &&
-                            sr.ServiceDate >= v.SaleDate &&
-                            sr.ServiceDate <= v.SaleDate!.Value.AddMonths(checkMonths))) / n * 100, 2);
+                        (double)vehicles.Count(v =>
+                        {
+                            var anchor = v.SaleDate ?? v.CreatedAt;
+                            return v.ServiceRecords.Any(sr =>
+                                !sr.IsDeleted &&
+                                sr.ServiceDate >= anchor &&
+                                sr.ServiceDate <= anchor.AddMonths(checkMonths));
+                        }) / n * 100, 2);
 
                 return new CohortRetentionDto(
                     CohortLabel: g.Key,
