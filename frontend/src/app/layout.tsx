@@ -6,7 +6,6 @@ import { QueryProvider } from "@/components/providers/query-provider";
 import { AuthProvider } from "@/contexts/auth-context";
 import { Toaster } from "sonner";
 import { PwaInstallPrompt } from "@/components/pwa/install-prompt";
-import { OrientationLock } from "@/components/pwa/orientation-lock";
 
 const geistSans = Geist({ variable: "--font-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
@@ -36,7 +35,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               {children}
               <Toaster richColors position="top-right" />
               <PwaInstallPrompt />
-              <OrientationLock />
             </AuthProvider>
           </QueryProvider>
         </ThemeProvider>
