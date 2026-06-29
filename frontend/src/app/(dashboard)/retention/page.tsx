@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import {
-  ComposedChart, AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid,
+  AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, Cell,
 } from "recharts";
 import {
@@ -373,10 +373,13 @@ export default function RetentionPage() {
   const cohortYears = Array.from({ length: 6 }, (_, i) => currentCalendarYear - i);
 
   if (isLoading) return <RetentionSkeleton />;
-  if (!data) return null;
+  if (!data || !data.yearly || !data.quarterly) return null;
+
+  // sixMonth was added in a backend update; fall back to monthly for older deployments
+  const sixMonthData = data.sixMonth ?? data.monthly;
 
   const periodCards = [
-    { label: "6-Month Retention",   key: "sixMonth" as const,  data: data.sixMonth,  color: "#6366f1" },
+    { label: "6-Month Retention",   key: "sixMonth" as const,  data: sixMonthData,   color: "#6366f1" },
     { label: "12-Month Retention",  key: "yearly" as const,    data: data.yearly,    color: "#10b981" },
     { label: "Quarterly Retention", key: "quarterly" as const, data: data.quarterly, color: "#0ea5e9" },
   ];
@@ -479,7 +482,7 @@ export default function RetentionPage() {
               </div>
             ) : (
               <ResponsiveContainer width="100%" height={280}>
-                <ComposedChart data={data.trend} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+                <AreaChart data={data.trend} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
                   <defs>
                     <linearGradient id="retGrad" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%"  stopColor="#6366f1" stopOpacity={0.3} />
@@ -488,15 +491,12 @@ export default function RetentionPage() {
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="currentColor" strokeOpacity={0.08} />
                   <XAxis dataKey="label" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
-                  <YAxis yAxisId="left" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} domain={[0, 100]} tickFormatter={v => `${v}%`} />
-                  <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
+                  <YAxis tick={{ fontSize: 11 }} tickLine={false} axisLine={false} domain={[0, 100]} tickFormatter={v => `${v}%`} />
                   <Tooltip contentStyle={{ borderRadius: "8px", border: "1px solid var(--border)", background: "var(--card)" }}
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    formatter={(v: any, n: any) => [n === "retentionRate" ? `${Number(v).toFixed(1)}%` : v, n === "retentionRate" ? "Retention %" : String(n)] as any}
+                    formatter={(v: unknown) => [`${Number(v).toFixed(1)}%`, "Retention %"]}
                   />
-                  <Area yAxisId="left" type="monotone" dataKey="retentionRate" stroke="#6366f1" strokeWidth={2.5} fill="url(#retGrad)" dot={{ r: 3, fill: "#6366f1", strokeWidth: 0 }} />
-                  <Bar yAxisId="right" dataKey="eligible" fill="#6366f1" fillOpacity={0.1} radius={[2, 2, 0, 0]} />
-                </ComposedChart>
+                  <Area type="monotone" dataKey="retentionRate" stroke="#6366f1" strokeWidth={2.5} fill="url(#retGrad)" dot={{ r: 3, fill: "#6366f1", strokeWidth: 0 }} />
+                </AreaChart>
               </ResponsiveContainer>
             )}
           </CardContent>
