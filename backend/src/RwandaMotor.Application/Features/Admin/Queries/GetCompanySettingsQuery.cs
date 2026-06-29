@@ -21,7 +21,8 @@ public record CompanySettingsDto(
     string? FooterDisclaimer,
     string? EmailJobCardMessage,
     string? EmailDeliveryNoteMessage,
-    string? ServiceTypesConfig
+    string? ServiceTypesConfig,
+    string PwaOrientation
 );
 
 public class GetCompanySettingsQueryHandler : IRequestHandler<GetCompanySettingsQuery, CompanySettingsDto>
@@ -50,7 +51,8 @@ public class GetCompanySettingsQueryHandler : IRequestHandler<GetCompanySettings
             settings.FooterDisclaimer,
             settings.EmailJobCardMessage,
             settings.EmailDeliveryNoteMessage,
-            settings.ServiceTypesConfig
+            settings.ServiceTypesConfig,
+            settings.PwaOrientation
         );
     }
 }

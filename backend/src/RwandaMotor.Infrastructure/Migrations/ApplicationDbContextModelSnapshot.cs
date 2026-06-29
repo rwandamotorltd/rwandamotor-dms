@@ -490,6 +490,11 @@ namespace RwandaMotor.Infrastructure.Migrations
                     b.Property<string>("Phone")
                         .HasColumnType("text");
 
+                    b.Property<string>("PwaOrientation")
+                        .IsRequired()
+                        .HasDefaultValue("portrait")
+                        .HasColumnType("text");
+
                     b.Property<string>("ServiceTypesConfig")
                         .HasColumnType("text");
 

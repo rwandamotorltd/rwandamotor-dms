@@ -41,5 +41,8 @@ public class CompanySettings
     // Null = system defaults apply. Admin-managed via Settings -> Catalogue.
     public string? ServiceTypesConfig { get; set; }
 
+    // PWA orientation: "portrait" | "landscape" | "any"
+    public string PwaOrientation { get; set; } = "portrait";
+
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 }

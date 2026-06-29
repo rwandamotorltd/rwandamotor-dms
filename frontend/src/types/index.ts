@@ -413,6 +413,7 @@ export interface CompanySettings {
   emailJobCardMessage: string | null;
   emailDeliveryNoteMessage: string | null;
   serviceTypesConfig: string | null;
+  pwaOrientation: "portrait" | "landscape" | "any";
 }
 
 export interface ServiceTypeItem {

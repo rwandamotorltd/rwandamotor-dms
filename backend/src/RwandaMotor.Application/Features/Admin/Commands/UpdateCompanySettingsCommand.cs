@@ -19,7 +19,8 @@ public record UpdateCompanySettingsCommand(
     string? FooterDisclaimer,
     string? EmailJobCardMessage,
     string? EmailDeliveryNoteMessage,
-    string? ServiceTypesConfig
+    string? ServiceTypesConfig,
+    string PwaOrientation = "portrait"
 ) : IRequest<bool>;
 
 public class UpdateCompanySettingsCommandHandler : IRequestHandler<UpdateCompanySettingsCommand, bool>
@@ -53,6 +54,7 @@ public class UpdateCompanySettingsCommandHandler : IRequestHandler<UpdateCompany
         settings.EmailJobCardMessage       = request.EmailJobCardMessage;
         settings.EmailDeliveryNoteMessage  = request.EmailDeliveryNoteMessage;
         settings.ServiceTypesConfig        = request.ServiceTypesConfig;
+        settings.PwaOrientation            = request.PwaOrientation;
         settings.UpdatedAt                 = DateTime.UtcNow;
 
         await _db.SaveChangesAsync(ct);

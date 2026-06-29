@@ -935,6 +935,7 @@ const EMPTY_COMPANY: CompanySettings = {
   emailJobCardMessage: DEFAULT_JC_MSG,
   emailDeliveryNoteMessage: DEFAULT_DN_MSG,
   serviceTypesConfig: null,
+  pwaOrientation: "portrait",
 };
 
 function CompanyTab() {
@@ -1133,6 +1134,56 @@ function CompanyTab() {
               Sent when a job card is converted to a delivery note.
             </p>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* PWA Orientation */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">PWA Screen Orientation</CardTitle>
+          <CardDescription>
+            Controls how the app behaves when installed as a PWA on mobile devices.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {(["portrait", "landscape", "any"] as const).map(opt => {
+              const labels: Record<string, string> = {
+                portrait: "Portrait only",
+                landscape: "Landscape only",
+                any: "Allow rotation",
+              };
+              const descs: Record<string, string> = {
+                portrait: "Locked to vertical — recommended for phones",
+                landscape: "Locked to horizontal — suited for tablets",
+                any: "Follows device rotation freely",
+              };
+              return (
+                <label
+                  key={opt}
+                  className={`flex flex-col gap-1.5 rounded-lg border p-3 cursor-pointer transition-colors ${
+                    form.pwaOrientation === opt
+                      ? "border-primary bg-primary/5"
+                      : "border-border hover:border-muted-foreground"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    className="sr-only"
+                    name="pwaOrientation"
+                    value={opt}
+                    checked={form.pwaOrientation === opt}
+                    onChange={() => patch({ pwaOrientation: opt })}
+                  />
+                  <span className="text-sm font-medium">{labels[opt]}</span>
+                  <span className="text-xs text-muted-foreground">{descs[opt]}</span>
+                </label>
+              );
+            })}
+          </div>
+          <p className="text-xs text-muted-foreground mt-3">
+            Takes effect immediately in PWA mode (Android). iOS and desktop browsers ignore orientation locks.
+          </p>
         </CardContent>
       </Card>
 
