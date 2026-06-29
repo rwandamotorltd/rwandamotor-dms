@@ -1,6 +1,6 @@
 # Rwandamotor DMS — Project Reference
 
-> **Last updated:** 2026-06-29 (session 5)
+> **Last updated:** 2026-06-29 (session 6)
 > **Status:** Production (backend self-hosted + frontend Vercel)
 
 ---
@@ -600,7 +600,7 @@ Migrations run **automatically on startup** via `db.Database.MigrateAsync()`.
 | `PartialUniqueIndexSoftDelete` | 2026-06-25 | Converts `IX_Brands_Code` and `IX_VehicleModels_BrandId_Code` to partial indexes (`WHERE IsDeleted = false`) — fixes 23505 on re-import after brand deletion |
 | `WideVinColumn` | 2026-06-26 | Removes VIN length restriction — accepts any length |
 | `PartialUniqueVin` | 2026-06-26 | Partial unique index on `IX_Vehicles_VIN WHERE IsDeleted = false` |
-| `AddPwaOrientation` | 2026-06-29 | `CompanySettings.PwaOrientation` — controls PWA manifest orientation, default `"portrait"` |
+| `AddPwaOrientation` | 2026-06-29 | `CompanySettings.PwaOrientation` — controls PWA manifest orientation, default `"portrait"` (column kept, feature reverted to follow-device) |
 
 > Startup also runs an idempotent SQL patch (in `Program.cs`) that adds any missing columns to `CompanySettings` (`EmailJobCardMessage`, `EmailDeliveryNoteMessage`, `ServiceTypesConfig`). Safe to run repeatedly — uses `IF NOT EXISTS`.
 
@@ -612,7 +612,7 @@ Migrations run **automatically on startup** via `db.Database.MigrateAsync()`.
 |---|---|---|
 | `/dashboard` | `dashboard/page.tsx` | KPI cards (active/due/overdue/lost vehicles, retention rates, job cards, sales); retention trend chart; brand retention grid |
 | `/vehicles` | `vehicles/page.tsx` | Paginated vehicle list; filters: retention status, brand, warranty, search |
-| `/vehicles/[id]` | `vehicles/[id]/page.tsx` | Vehicle 360: service timeline, follow-up history, job cards, technician history, next service |
+| `/vehicles/[id]` | `vehicles/[id]/page.tsx` | Vehicle 360: service timeline, follow-up history, job cards, technician history, next service. **Edit Vehicle** (Brand/Model/Year + all specs). **Transfer Ownership** (customer search dialog, supports remove) |
 | `/customers` | `customers/page.tsx` | Customer directory; filter by category, search |
 | `/customers/[id]` | `customers/[id]/page.tsx` | Customer 360: all vehicles, service history, job cards, follow-ups |
 | `/service-records` | `service-records/page.tsx` | Service record list; filter by date, vehicle, technician, service type |
@@ -875,4 +875,6 @@ git push origin main:preview --force
 | 13 | **Vehicle import fix** | ✅ Done | Soft-deleted VINs now restored on re-import; batch errors surfaced; plate truncation fixed; UI explains "already in system" (session 5, 2026-06-27) |
 | 14 | **Admin data purge** | ✅ Done | `POST /api/admin/purge-data` wipes all operational data; Settings → Data tab with "DELETE ALL DATA" confirmation guard (session 5, 2026-06-27) |
 | 15 | **Per-page size selector on all list views** | ✅ Done | Vehicles, Customers, Service Records, Job Cards — "N / page" dropdown (25/50/100/250/500); total record count shown (session 5, 2026-06-27) |
-| 16 | **PWA screen orientation** | ✅ Done | Settings → Company → PWA Screen Orientation: Portrait / Landscape / Allow rotation; dynamic manifest + `OrientationLock` runtime component (session 5, 2026-06-29) |
+| 16 | **PWA screen orientation** | ✅ Done | Manifest `orientation: "any"` — app follows device auto-rotation. Earlier admin-lock feature reverted per user preference (session 5-6, 2026-06-29) |
+| 17 | **Edit vehicle Brand / Model / Year** | ✅ Done | "Edit Vehicle" modal on 360 page now includes Brand selector → cascading Model selector + Year. `UpdateVehicleCommand` extended with `BrandId`, `ModelId`, `Year` (session 6, 2026-06-29) |
+| 18 | **Transfer Vehicle Ownership** | ✅ Done | "Transfer Ownership" button on 360 page opens search dialog (≥2 chars → live results). Reassigns `CustomerId`; supports removing owner. Same update endpoint with `CustomerId` / `ClearCustomer` (session 6, 2026-06-29) |
