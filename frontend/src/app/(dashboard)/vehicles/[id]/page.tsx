@@ -9,7 +9,7 @@ import {
   CheckCircle2, Calendar, Gauge, Bell,
   Phone, Mail, Star, Pencil, X, FileText, Users, Search
 } from "lucide-react";
-import { vehiclesApi, servicePoliciesApi, brandsApi, customersApi, type UpdateVehiclePayload, type BrandDto } from "@/lib/api";
+import { vehiclesApi, servicePoliciesApi, catalogueApi, customersApi, type UpdateVehiclePayload, type CatalogueBrandDto } from "@/lib/api";
 import { useAuth } from "@/contexts/auth-context";
 import { RetentionBadge } from "@/components/shared/retention-badge";
 import { KpiCard } from "@/components/shared/kpi-card";
@@ -71,7 +71,7 @@ interface EditFormState {
 interface EditModalProps {
   form: EditFormState;
   policies: ServicePolicy[];
-  brands: BrandDto[];
+  brands: CatalogueBrandDto[];
   brandsLoading: boolean;
   onChange: (patch: Partial<EditFormState>) => void;
   onSave: () => void;
@@ -490,8 +490,8 @@ export default function Vehicle360Page({ params }: { params: Promise<{ id: strin
   });
 
   const { data: brands = [], isLoading: brandsLoading } = useQuery({
-    queryKey: ["brands"],
-    queryFn: () => brandsApi.list(),
+    queryKey: ["catalogue-brands"],
+    queryFn: () => catalogueApi.getBrands(),
     enabled: canEdit,
     staleTime: 10 * 60 * 1000,
   });
