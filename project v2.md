@@ -1,6 +1,6 @@
 # Rwandamotor DMS — Project Reference
 
-> **Last updated:** 2026-06-29 (session 6)
+> **Last updated:** 2026-06-29 (session 7)
 > **Status:** Production (backend self-hosted + frontend Vercel)
 
 ---
@@ -849,6 +849,8 @@ git push origin main:preview --force
 | PDI job card close | Creates SalesHistory + WelcomeCall follow-up + Notification automatically |
 | **23505 on catalogue re-import after brand deletion** | `IX_Brands_Code` is a partial unique index (`WHERE IsDeleted = false`). When adding a new unique index on a soft-delete entity, always use `migrationBuilder.Sql()` with `WHERE "IsDeleted" = false` — never `CreateIndex(unique: true)` |
 | **EF Core global filter silently excludes deleted rows** | All `_db.Brands` etc. are filtered by `!IsDeleted`. To include deleted rows, cast `_db` to `DbContext` and call `.IgnoreQueryFilters()` on the `Set<T>()` |
+| **Vehicle edit brand/model showing raw UUID** | Root causes: (1) `GetBrandsQuery` filtered `IsActive` — inactive brands used on vehicles were excluded. Fixed: removed `IsActive` filter. (2) Vehicle edit was using `catalogueApi.getBrands()` (`/admin/catalogue/brands`, Admin-only) — non-Admin users got 401 → empty array. Fixed: back to `brandsApi.list()` (`/vehicles/brands`, any authenticated user). (3) Shadcn Select shows raw value string when no matching SelectItem — added fallback display of `vehicle.brandName`/`modelName`. |
+| **UpdateVehicle 403 for custom-role users** | `PUT /api/vehicles/{id}` had `[Authorize(Roles = "Admin,TechnicalDirector")]` — blocked users with custom roles who had `vehicles.edit` permission. Changed to `[Authorize]` (any authenticated user); frontend `canEdit` guard is the access control. |
 | **KPI shows stale counts after vehicle deletion** | `CountAsync` on child entities must add `&& !f.Vehicle.IsDeleted`. List pages join through non-deleted vehicles implicitly; KPI queries must replicate that join. |
 | **React Compiler: nested component in component** | Extract to module level with explicit props interface. `react-hooks/static-components` fails CI. |
 | **React Compiler: ternary-as-statement** | `s.has(id) ? s.delete(id) : s.add(id)` → use `if/else`. |
