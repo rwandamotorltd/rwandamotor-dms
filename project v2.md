@@ -1,6 +1,6 @@
 # Rwandamotor DMS — Project Reference
 
-> **Last updated:** 2026-06-21 (session 3)
+> **Last updated:** 2026-06-29 (session 5)
 > **Status:** Production (backend self-hosted + frontend Vercel)
 
 ---
@@ -18,6 +18,7 @@ Custom-built **Dealer Management System (DMS)** for **Rwandamotor Ltd** — a mu
 - Reports (monthly follow-up PDF/Excel)
 - Role-based permission system (RBAC with per-user and group overrides)
 - Bulk CSV import (customers, vehicles, service records, job cards)
+- Catalogue import (brands + vehicle models via CSV/Excel with preview dialog)
 - Activity/audit log
 - Sales history (auto-created on PDI job card close)
 
@@ -167,10 +168,10 @@ rwandamotor-dms/
 │       │       ├── import/             # Bulk CSV import with progress
 │       │       ├── sales/              # PDI sales history
 │       │       ├── activity/           # Audit log
-│       │       ├── settings/           # Company settings + catalogue
+│       │       ├── settings/           # Company settings + catalogue (with import preview dialog)
 │       │       └── admin/              # Users + Technicians (Admin only)
 │       ├── components/
-│       │   ├── layout/header.tsx       # Notification bell + user menu
+│       │   ├── layout/header.tsx       # Global search + user menu (SearchDropdown at module level)
 │       │   ├── layout/sidebar.tsx      # Collapsible sidebar, permission-filtered
 │       │   ├── providers/              # QueryProvider, ThemeProvider
 │       │   ├── shared/                 # KpiCard, RetentionBadge
@@ -221,7 +222,7 @@ string?  UpdatedBy
 | `ServicePolicy` | BrandId (nullable), ModelId (nullable), Name, IntervalKm, IntervalMonths, DueSoonLeadDays, DueSoonLeadKm, LostThresholdMonths, IsDefault, IsActive |
 | `Technician` | FullName, Phone, Email, Specialisation, IsActive |
 | `PermissionGroup` | Name, Description, Permissions (jsonb string[]) |
-| `CompanySettings` | **Singleton** PK=`00000000-0000-0000-0000-000000000001`, CompanyName, Address, Phone, Email, TinNumber, Website, JobCardShowHeader, JobCardShowFooter, DeliveryNoteShowHeader, DeliveryNoteShowFooter, FooterDisclaimer, EmailJobCardMessage, EmailDeliveryNoteMessage, **ServiceTypesConfig** (text/JSON — service type label + active config) |
+| `CompanySettings` | **Singleton** PK=`00000000-0000-0000-0000-000000000001`, CompanyName, Address, Phone, Email, TinNumber, Website, JobCardShowHeader, JobCardShowFooter, DeliveryNoteShowHeader, DeliveryNoteShowFooter, FooterDisclaimer, EmailJobCardMessage, EmailDeliveryNoteMessage, **ServiceTypesConfig** (text/JSON — service type label + active config), **PwaOrientation** (`"portrait"` \| `"landscape"` \| `"any"`, default `"portrait"`) |
 | `AuditLog` | UserId, UserEmail, UserName, Action, EntityType, EntityId, EntityLabel, OccurredAt — **immutable, never soft-deleted** |
 | `ImportLog` | FileName, ImportType, Status, TotalRows, ValidRows, ImportedRows, ErrorRows, DuplicateRows, ErrorDetailsJson, StartedAt, CompletedAt, IsRolledBack |
 | `ApplicationUser` | FullName, Role, PermissionGroupId, CustomPermissions (jsonb), IsActive, LastLoginAt, RefreshToken, RefreshTokenExpiry (extends IdentityUser) |
@@ -272,6 +273,7 @@ InteractionOutcome: Reached, NoAnswer, LeftMessage, CallbackScheduled,
 | `ServicePoliciesController` | `/api/servicepolicies` | `[Authorize]` |
 | `AdminController` | `/api/admin` | `Admin` policy |
 | `PermissionGroupsController` | `/api/admin/permission-groups` | `Admin` policy |
+| `PwaController` | `/api/pwa` | Anonymous (no auth) — serves manifest orientation to Next.js |
 
 ### Authorization Policies
 ```csharp
@@ -354,6 +356,20 @@ builder.HasQueryFilter(e => !e.IsDeleted);
 ```
 Never hard-delete — set `IsDeleted = true` with timestamp + actor.
 
+**CRITICAL:** EF Core applies `HasQueryFilter` silently to ALL DbSet queries. To bypass it (e.g., checking for codes across deleted rows during import), use:
+```csharp
+var dbCtx = _db as DbContext;
+dbCtx.Set<Brand>().IgnoreQueryFilters().Select(b => b.Code).ToListAsync(ct);
+```
+
+### Partial Unique Indexes (Soft-Delete Safe)
+Standard `CreateIndex(unique: true)` on a soft-delete entity causes 23505 errors on re-import (deleted rows still hold their key slots). Fix: use raw SQL partial index via migration:
+```csharp
+migrationBuilder.Sql(
+    @"CREATE UNIQUE INDEX ""IX_Brands_Code"" ON ""Brands""(""Code"") WHERE ""IsDeleted"" = false;");
+```
+Applied to `IX_Brands_Code` and `IX_VehicleModels_BrandId_Code` in migration `20260625000001_PartialUniqueIndexSoftDelete`.
+
 ### Audit Log (auto)
 `SaveChangesAsync` in `ApplicationDbContext` auto-creates `AuditLog` entries for all Create/Update/Delete on `BaseEntity` descendants.
 
@@ -368,7 +384,7 @@ All under `RwandaMotor.Application/Features/{Module}/Commands|Queries/`.
 
 ### Job Card Numbering
 ```
-Format: OR-YYYY-NNNNN   e.g. OR-2600001
+Format: OR-YYYY-NNNNN   e.g. OR2600001
 Table:  JobCardSequence (one row per year, auto-incremented in CreateJobCardCommand)
 ```
 
@@ -480,6 +496,19 @@ Format: OR + YY + 5-digit  →  e.g. OR2600001 (year 2026, sequence #1)
 JobCardSequence table: one row per year, CurrentSequence auto-incremented atomically
 ```
 
+### F. KPI Consistency Rule
+**File:** `RwandaMotor.Application/Features/Dashboard/Queries/GetDashboardKpisQuery.cs`
+
+Dashboard KPI counts for child records (FollowUps, ServiceRecords) must always join through their parent Vehicle's `IsDeleted` state:
+```csharp
+// WRONG — counts orphaned records left behind by soft-deleted vehicles:
+.CountAsync(f => !f.IsDeleted && f.Status == FollowUpStatus.Pending)
+
+// CORRECT — consistent with what list pages show:
+.CountAsync(f => !f.IsDeleted && f.Status == FollowUpStatus.Pending && !f.Vehicle.IsDeleted)
+```
+Applied to `activeFollowUps` and `monthlyServices` counts.
+
 ---
 
 ## 11. Background Jobs (Quartz.NET)
@@ -545,7 +574,7 @@ Dashboard:     dashboard.kpi, dashboard.retention, dashboard.jobCardsWidget
 Named sets of permission keys; assigned to users via `ApplicationUser.PermissionGroupId`. Override role defaults. Per-user `CustomPermissions` overrides groups.
 
 **Modules shown in the permission matrix (13 total):**
-Dashboard, Vehicles, Customers, Service Records, Job Cards, Retention, **Follow-ups**, **Appointments**, **Reports**, Import Center, Settings, Sales Records, Activity Log
+Dashboard, Vehicles, Customers, Service Records, Job Cards, Retention, Follow-ups, Appointments, Reports, Import Center, Settings, Sales Records, Activity Log
 
 ---
 
@@ -567,6 +596,11 @@ Migrations run **automatically on startup** via `db.Database.MigrateAsync()`.
 | `AddEmailTemplates` | 2026-06-17 | CompanySettings.EmailJobCardMessage, EmailDeliveryNoteMessage |
 | `AddEmailTemplatesEnsure` | 2026-06-17 | Idempotent patch for email columns |
 | `AddFollowUpInteractionAppointmentNotification` | 2026-06-18 | FollowUpInteraction, Appointment, Notification, SalesHistory tables |
+| `AddServiceTypesConfig` | 2026-06-24 | CompanySettings.ServiceTypesConfig (text JSON column) |
+| `PartialUniqueIndexSoftDelete` | 2026-06-25 | Converts `IX_Brands_Code` and `IX_VehicleModels_BrandId_Code` to partial indexes (`WHERE IsDeleted = false`) — fixes 23505 on re-import after brand deletion |
+| `WideVinColumn` | 2026-06-26 | Removes VIN length restriction — accepts any length |
+| `PartialUniqueVin` | 2026-06-26 | Partial unique index on `IX_Vehicles_VIN WHERE IsDeleted = false` |
+| `AddPwaOrientation` | 2026-06-29 | `CompanySettings.PwaOrientation` — controls PWA manifest orientation, default `"portrait"` |
 
 > Startup also runs an idempotent SQL patch (in `Program.cs`) that adds any missing columns to `CompanySettings` (`EmailJobCardMessage`, `EmailDeliveryNoteMessage`, `ServiceTypesConfig`). Safe to run repeatedly — uses `IF NOT EXISTS`.
 
@@ -593,7 +627,7 @@ Migrations run **automatically on startup** via `db.Database.MigrateAsync()`.
 | `/import` | `import/page.tsx` | CSV upload; choose type; progress tracker; error row download |
 | `/sales` | `sales/page.tsx` | PDI sales history; VIN, customer, delivery note, date |
 | `/activity` | `activity/page.tsx` | Audit log; filter by action, entity, user, date |
-| `/settings` | `settings/page.tsx` | Company info; print header/footer toggles; email templates; brand/model catalogue |
+| `/settings` | `settings/page.tsx` | Company info; print header/footer toggles; email templates; brand/model catalogue with **import preview dialog** |
 | `/admin/users` | `admin/users/page.tsx` | User management: create/edit/toggle; assign roles, permission groups, custom permissions |
 | `/admin/technicians` | `admin/technicians/page.tsx` | Technician CRUD |
 
@@ -645,6 +679,20 @@ function SomePageContent() {
 ```
 Pages using this: `follow-ups/`, `vehicles/`, `job-cards/`, `job-cards/[id]/`.
 
+### TanStack Query — Dashboard KPI Cache Invalidation
+The dashboard KPIs use query key `["dashboard-kpis"]`. Any mutation that affects counts (vehicle/customer/service-record/job-card delete) must invalidate it:
+```typescript
+queryClient.invalidateQueries({ queryKey: ["dashboard-kpis"] });
+```
+The KPI query itself uses `staleTime: 0, refetchOnMount: "always", refetchInterval: 60_000` because the Next.js App Router dashboard layout may persist without a full remount.
+
+### React Compiler Compatibility (ESLint)
+The project uses `eslint-plugin-react-compiler`. Key rules:
+- **`react-hooks/static-components`** — nested component definitions inside a component function are forbidden. Extract them to module level with explicit props interfaces.
+- **`react-hooks/set-state-in-effect`** — `setState` inside `useEffect` without deps or on mount is flagged. For legitimate server-sync patterns, add `// eslint-disable-next-line react-hooks/set-state-in-effect` on the offending line.
+- **`react-hooks/preserve-manual-memoization`** — `useCallback` deps must match what the compiler infers. Use `[setFoo, setBar]` not `[]` for stable state setters.
+- **`@typescript-eslint/no-unused-expressions`** — ternary-as-statement (`s.has(id) ? s.delete(id) : s.add(id)`) is forbidden. Use `if/else`.
+
 ### TypeScript Type Narrowing
 ```typescript
 // WRONG — TS cannot narrow through compound condition:
@@ -658,11 +706,18 @@ value={kpis.someField}   // still "possibly undefined"
 ### Select onValueChange Null Guard
 `Select.onValueChange` returns `string | null`. Always provide a fallback:
 ```typescript
-// WRONG:
-onValueChange={v => setState(v)}       // null not assignable to string state
-
-// RIGHT:
 onValueChange={v => setState(v ?? "defaultValue")}
+```
+
+### Header — SearchDropdown Pattern
+`SearchDropdown` is a **module-level** component (not nested inside `Header`) with explicit props. The search close/navigate path always clears search state:
+```typescript
+const handleNavigate = (url: string) => {
+  router.push(url);
+  setSearchText("");
+  setSearchOpen(false);
+  setMobileSearchOpen(false);
+};
 ```
 
 ### Notification Bell Routing (`header.tsx`)
@@ -690,25 +745,6 @@ Items rendered only when `hasPermission(item.permission)`:
 { href: "/settings",       label: "Settings",        permission: "nav.settings" }
 ```
 
-### Frontend Type: ServiceType
-```typescript
-// types/index.ts
-export type ServiceType =
-  'RoutineMaintenance' | 'OilChange' | 'MajorService' | 'TyreRotation' |
-  'BrakeService' | 'TransmissionService' | 'AirConditioningService' | 'ElectricalDiagnostics' |
-  'BodyRepair' | 'WarrantyRepair' | 'RecallRepair' | 'PDI' | 'EmergencyRepair' | 'Inspection' | 'Other';
-
-export interface ServiceTypeItem {
-  value: string;    // matches ServiceType enum key (or custom key for non-built-in)
-  label: string;    // admin-editable display name
-  isActive: boolean;
-  isBuiltIn: boolean;
-}
-
-// utils.ts — static fallback labels (used for displaying saved records)
-export const SERVICE_TYPE_LABELS: Record<ServiceType, string> = { ... };
-```
-
 ### Dynamic Service Types (hooks/use-service-types.ts)
 Service type labels and visibility are **admin-managed** via `Settings → Catalogue → Service Types`.
 Config stored in `CompanySettings.ServiceTypesConfig` (JSON text).
@@ -716,19 +752,18 @@ Config stored in `CompanySettings.ServiceTypesConfig` (JSON text).
 ```typescript
 // Returns only active types; falls back to DEFAULT_SERVICE_TYPES if config is null
 export function useServiceTypes(): ServiceTypeItem[]
-
-// Parse raw JSON config string
-export function parseServiceTypesConfig(config: string | null): ServiceTypeItem[]
-
-// System defaults (all 15 built-in types, all active)
-export const DEFAULT_SERVICE_TYPES: ServiceTypeItem[]
 ```
 
 **All service-type dropdowns** (job-cards, job-cards/[id], service-records, appointments) use `useServiceTypes()`.
 **Table display** of saved records still uses the static `SERVICE_TYPE_LABELS` from `utils.ts` as fallback.
 
-**Admin workflow:**  
-Settings → Catalogue tab → Service Types card → rename label (pencil icon) → toggle Active/Off → Save Service Types.
+### Catalogue Import Preview Dialog
+Settings → Catalogue tab → "Import CSV/Excel" button opens a **two-step flow**:
+1. **File pick** → `POST /api/company-settings/catalogue/preview` → returns `CataloguePreviewResult` (newBrands, newModels, existingSkipped, errorRows, rows[])
+2. **Preview dialog** — scrollable table with color-coded rows (green = new, red = error, white = skip); summary chips; "Import N items" button disabled when nothing new
+3. **Confirm** → `POST /api/company-settings/catalogue/import` (same file)
+
+`CataloguePreviewRow`: `rowNumber`, `brandCode`, `brandName`, `modelCode`, `modelName`, `isNewBrand`, `isNewModel`, `hasError`, `errorMessage`.
 
 ---
 
@@ -749,10 +784,6 @@ Config precedence: `appsettings.json` → env vars (`EMAIL_HOST`, `EMAIL_USERNAM
 - `POST /api/jobcards/{id}/share` → job card + custom message to customer
 - Delivery note email → on conversion if configured
 - `POST /api/follow-ups/{id}/send-email` → service reminder or satisfaction check
-
-**Template variables in CompanySettings:**
-- `EmailJobCardMessage`: supports `{CustomerName}`
-- `EmailDeliveryNoteMessage`: supports `{CustomerName}`, `{VehicleModel}`
 
 **Current status:** Nightly alert wired. Job card/delivery note email exists in API. SMTP must be configured in `api.env` to activate.
 
@@ -816,10 +847,16 @@ git push origin main:preview --force
 | CompanySettings migration failure | Startup idempotent SQL patch auto-adds missing columns |
 | Vercel preview CORS | All `*.vercel.app` origins automatically allowed |
 | PDI job card close | Creates SalesHistory + WelcomeCall follow-up + Notification automatically |
+| **23505 on catalogue re-import after brand deletion** | `IX_Brands_Code` is a partial unique index (`WHERE IsDeleted = false`). When adding a new unique index on a soft-delete entity, always use `migrationBuilder.Sql()` with `WHERE "IsDeleted" = false` — never `CreateIndex(unique: true)` |
+| **EF Core global filter silently excludes deleted rows** | All `_db.Brands` etc. are filtered by `!IsDeleted`. To include deleted rows, cast `_db` to `DbContext` and call `.IgnoreQueryFilters()` on the `Set<T>()` |
+| **KPI shows stale counts after vehicle deletion** | `CountAsync` on child entities must add `&& !f.Vehicle.IsDeleted`. List pages join through non-deleted vehicles implicitly; KPI queries must replicate that join. |
+| **React Compiler: nested component in component** | Extract to module level with explicit props interface. `react-hooks/static-components` fails CI. |
+| **React Compiler: ternary-as-statement** | `s.has(id) ? s.delete(id) : s.add(id)` → use `if/else`. |
+| **Dashboard KPI not refreshing after delete** | Add `queryClient.invalidateQueries({ queryKey: ["dashboard-kpis"] })` to every `onSuccess` that deletes a vehicle, customer, service record, or job card. |
 
 ---
 
-## 19. Backlog (as of 2026-06-21)
+## 19. Backlog (as of 2026-06-29)
 
 | # | Item | Status | Notes |
 |---|---|---|---|
@@ -830,3 +867,12 @@ git push origin main:preview --force
 | 5 | **Reports module content** | Partial | `/reports` page + `nav.reports` permission exist; only monthly follow-up report implemented; retention/service reports TBD |
 | 6 | **Follow-ups/Appointments/Reports in Permission Groups matrix** | ✅ Done | All three modules added to the `MODULES` array in `settings/page.tsx` (session 3, 2026-06-21) |
 | 7 | **Service Types as admin-managed catalogue** | ✅ Done | `CompanySettings.ServiceTypesConfig` (JSON), admin UI in Settings → Catalogue, `useServiceTypes()` hook drives all dropdowns (session 3, 2026-06-21) |
+| 8 | **Catalogue import preview dialog** | ✅ Done | Two-step flow: preview → confirm. Color-coded rows, summary chips, disabled import button when nothing new (session 4, 2026-06-25) |
+| 9 | **Bulk delete job cards (Admin)** | ✅ Done | Multi-select checkbox + delete-all button for Admin role; KPI invalidation on success (sessions 3-4) |
+| 10 | **Dashboard KPI live refresh on delete** | ✅ Done | All delete/bulk-delete mutations across vehicles, customers, service records, job cards invalidate `["dashboard-kpis"]` (session 4, 2026-06-25) |
+| 11 | **23505 catalogue re-import fix** | ✅ Done | Partial unique indexes on Brands + VehicleModels; `IgnoreQueryFilters()` in import handler (session 4, 2026-06-25) |
+| 12 | **KPI monthly-services / active-follow-ups orphan fix** | ✅ Done | Both counts now join through `!Vehicle.IsDeleted` to exclude orphaned child records (session 4, 2026-06-25) |
+| 13 | **Vehicle import fix** | ✅ Done | Soft-deleted VINs now restored on re-import; batch errors surfaced; plate truncation fixed; UI explains "already in system" (session 5, 2026-06-27) |
+| 14 | **Admin data purge** | ✅ Done | `POST /api/admin/purge-data` wipes all operational data; Settings → Data tab with "DELETE ALL DATA" confirmation guard (session 5, 2026-06-27) |
+| 15 | **Per-page size selector on all list views** | ✅ Done | Vehicles, Customers, Service Records, Job Cards — "N / page" dropdown (25/50/100/250/500); total record count shown (session 5, 2026-06-27) |
+| 16 | **PWA screen orientation** | ✅ Done | Settings → Company → PWA Screen Orientation: Portrait / Landscape / Allow rotation; dynamic manifest + `OrientationLock` runtime component (session 5, 2026-06-29) |
