@@ -72,6 +72,7 @@ interface EditModalProps {
   form: EditFormState;
   policies: ServicePolicy[];
   brands: BrandDto[];
+  brandsLoading: boolean;
   onChange: (patch: Partial<EditFormState>) => void;
   onSave: () => void;
   onClose: () => void;
@@ -79,7 +80,7 @@ interface EditModalProps {
   error: string | null;
 }
 
-function EditVehicleModal({ form, policies, brands, onChange, onSave, onClose, saving, error }: EditModalProps) {
+function EditVehicleModal({ form, policies, brands, brandsLoading, onChange, onSave, onClose, saving, error }: EditModalProps) {
   const selectedBrand = brands.find(b => b.id === form.brandId);
   const modelsForBrand = selectedBrand?.models ?? [];
 
@@ -116,10 +117,15 @@ function EditVehicleModal({ form, policies, brands, onChange, onSave, onClose, s
             <div className="space-y-1.5">
               <Label>Brand</Label>
               <Select
-                value={form.brandId}
+                value={brandsLoading ? "" : form.brandId}
                 onValueChange={v => onChange({ brandId: v ?? "", modelId: "" })}
+                disabled={brandsLoading}
               >
-                <SelectTrigger><SelectValue placeholder="Select brand..." /></SelectTrigger>
+                <SelectTrigger>
+                  {brandsLoading
+                    ? <span className="text-muted-foreground text-sm">Loading…</span>
+                    : <SelectValue placeholder="Select brand..." />}
+                </SelectTrigger>
                 <SelectContent>
                   {brands.map(b => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
                 </SelectContent>
@@ -128,11 +134,15 @@ function EditVehicleModal({ form, policies, brands, onChange, onSave, onClose, s
             <div className="space-y-1.5">
               <Label>Model</Label>
               <Select
-                value={form.modelId}
+                value={brandsLoading ? "" : form.modelId}
                 onValueChange={v => onChange({ modelId: v ?? "" })}
-                disabled={modelsForBrand.length === 0}
+                disabled={brandsLoading || modelsForBrand.length === 0}
               >
-                <SelectTrigger><SelectValue placeholder="Select model..." /></SelectTrigger>
+                <SelectTrigger>
+                  {brandsLoading
+                    ? <span className="text-muted-foreground text-sm">Loading…</span>
+                    : <SelectValue placeholder="Select model..." />}
+                </SelectTrigger>
                 <SelectContent>
                   {modelsForBrand.map(m => <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>)}
                 </SelectContent>
@@ -479,7 +489,7 @@ export default function Vehicle360Page({ params }: { params: Promise<{ id: strin
     enabled: canEdit,
   });
 
-  const { data: brands = [] } = useQuery({
+  const { data: brands = [], isLoading: brandsLoading } = useQuery({
     queryKey: ["brands"],
     queryFn: () => brandsApi.list(),
     enabled: canEdit,
@@ -1046,6 +1056,7 @@ export default function Vehicle360Page({ params }: { params: Promise<{ id: strin
           form={editForm}
           policies={policies}
           brands={brands}
+          brandsLoading={brandsLoading}
           onChange={patch => setEditForm(f => f ? { ...f, ...patch } : f)}
           onSave={handleSave}
           onClose={() => { setShowEdit(false); setEditForm(null); }}
