@@ -512,8 +512,9 @@ export default function Vehicle360Page({ params }: { params: Promise<{ id: strin
       setEditForm(null);
     },
     onError: (err: unknown) => {
-      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
-        ?? (err as { message?: string })?.message ?? "Update failed";
+      const data = (err as { response?: { data?: { message?: string; errors?: string[] } } })?.response?.data;
+      const errors = data?.errors;
+      const msg = errors?.length ? errors.join("; ") : (data?.message ?? (err as { message?: string })?.message ?? "Update failed");
       setEditError(msg);
     },
   });
@@ -537,7 +538,7 @@ export default function Vehicle360Page({ params }: { params: Promise<{ id: strin
     setEditForm({
       brandId: vehicle.brandId ?? "",
       modelId: vehicle.modelId ?? "",
-      year: String(vehicle.year),
+      year: vehicle.year > 0 ? String(vehicle.year) : "",
       plateNumber: vehicle.plateNumber ?? "",
       color: vehicle.color ?? "",
       fuelType: vehicle.fuelType ?? "",
@@ -562,7 +563,7 @@ export default function Vehicle360Page({ params }: { params: Promise<{ id: strin
       id,
       brandId: editForm.brandId || null,
       modelId: editForm.modelId || null,
-      year: editForm.year ? parseInt(editForm.year) : null,
+      year: editForm.year && parseInt(editForm.year) >= 1900 ? parseInt(editForm.year) : null,
       plateNumber: editForm.plateNumber || null,
       color: editForm.color || null,
       fuelType: editForm.fuelType || null,
