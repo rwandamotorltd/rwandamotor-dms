@@ -21,19 +21,21 @@ public class GetRetentionAnalyticsQueryHandler : IRequestHandler<GetRetentionAna
 
         var monthly = await _engine.GetRetentionSummaryAsync(RetentionPeriod.Monthly, now, ct);
         var quarterly = await _engine.GetRetentionSummaryAsync(RetentionPeriod.Quarterly, now, ct);
+        var sixMonth = await _engine.GetRetentionSummaryAsync(RetentionPeriod.SixMonth, now, ct);
         var yearly = await _engine.GetRetentionSummaryAsync(RetentionPeriod.Yearly, now, ct);
         var trend = await _engine.GetRetentionTrendAsync(q.TrendMonths, ct);
         var byBrand = await _engine.GetRetentionByBrandAsync(yearStart, now, ct);
         var cohortYear = q.CohortYear ?? now.Year - 1;
         var cohorts = await _engine.GetCohortRetentionAsync(cohortYear, ct);
 
-        return new RetentionAnalyticsDto(monthly, quarterly, yearly, trend, byBrand, cohorts);
+        return new RetentionAnalyticsDto(monthly, quarterly, sixMonth, yearly, trend, byBrand, cohorts);
     }
 }
 
 public record RetentionAnalyticsDto(
     RetentionSummaryDto Monthly,
     RetentionSummaryDto Quarterly,
+    RetentionSummaryDto SixMonth,
     RetentionSummaryDto Yearly,
     List<RetentionTrendPointDto> Trend,
     List<BrandRetentionDto> ByBrand,

@@ -103,6 +103,7 @@ export interface CohortRetention {
 export interface RetentionAnalytics {
   monthly: RetentionSummary;
   quarterly: RetentionSummary;
+  sixMonth: RetentionSummary;
   yearly: RetentionSummary;
   trend: RetentionTrendPoint[];
   byBrand: BrandRetention[];

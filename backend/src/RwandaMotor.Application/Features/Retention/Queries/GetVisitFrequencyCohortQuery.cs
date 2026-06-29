@@ -25,12 +25,13 @@ public class GetVisitFrequencyCohortQueryHandler
         // together with their model/brand and only the service records
         // that fall within the current calendar year.
         var vehicles = await _db.Vehicles
-            .Where(v => !v.IsDeleted && v.IsSoldByDealership && v.SaleDate.HasValue)
+            .Where(v => !v.IsDeleted && v.IsSoldByDealership)
             .Include(v => v.Model)
                 .ThenInclude(m => m.Brand)
             .Select(v => new
             {
                 v.SaleDate,
+                v.CreatedAt,
                 ModelName = v.Model.Name,
                 BrandName = v.Model.Brand.Name,
                 CurrentYearVisits = v.ServiceRecords
@@ -59,7 +60,7 @@ public class GetVisitFrequencyCohortQueryHandler
 
         // ── year-wise ────────────────────────────────────────────────────────
         var yearWise = vehicles
-            .GroupBy(v => v.SaleDate!.Value.Year)
+            .GroupBy(v => v.SaleDate?.Year ?? v.CreatedAt.Year)
             .OrderBy(g => g.Key)
             .Select(g =>
             {

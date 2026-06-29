@@ -238,6 +238,9 @@ export const retentionApi = {
     visitBucket: string;
   }) =>
     api.get<ApiResponse<CohortVehicle[]>>('/retention/cohort-vehicles', { params }).then(r => r.data.data!),
+
+  evaluate: () =>
+    api.post<ApiResponse<boolean>>('/retention/evaluate').then(r => r.data),
 };
 
 // ============================================================
