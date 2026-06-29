@@ -1,6 +1,6 @@
 # Rwandamotor DMS — Project Reference
 
-> **Last updated:** 2026-06-29 (session 7)
+> **Last updated:** 2026-06-29 (session 8)
 > **Status:** Production (backend self-hosted + frontend Vercel)
 
 ---
@@ -855,6 +855,8 @@ git push origin main:preview --force
 | **React Compiler: nested component in component** | Extract to module level with explicit props interface. `react-hooks/static-components` fails CI. |
 | **React Compiler: ternary-as-statement** | `s.has(id) ? s.delete(id) : s.add(id)` → use `if/else`. |
 | **Dashboard KPI not refreshing after delete** | Add `queryClient.invalidateQueries({ queryKey: ["dashboard-kpis"] })` to every `onSuccess` that deletes a vehicle, customer, service record, or job card. |
+| **Radix UI Select shows UUID instead of label** | `SelectValue` only resolves item display text after the dropdown has been opened once (lazy context registration). Fix: bypass `SelectValue` — render the display string directly inside `SelectTrigger` using a `<span>`, with a fallback from the original `currentXxxName` prop. |
+| **Settings page vs admin/users page — two user tables** | Users are managed in both `/settings` (UsersTab component) and `/admin/users`. They share the same API calls (`adminApi.getUsers`, `adminApi.deleteUser`) but are separate components. Changes to one UI must be mirrored in the other. |
 
 ---
 
@@ -880,3 +882,8 @@ git push origin main:preview --force
 | 16 | **PWA screen orientation** | ✅ Done | Manifest `orientation: "any"` — app follows device auto-rotation. Earlier admin-lock feature reverted per user preference (session 5-6, 2026-06-29) |
 | 17 | **Edit vehicle Brand / Model / Year** | ✅ Done | "Edit Vehicle" modal on 360 page now includes Brand selector → cascading Model selector + Year. `UpdateVehicleCommand` extended with `BrandId`, `ModelId`, `Year` (session 6, 2026-06-29) |
 | 18 | **Transfer Vehicle Ownership** | ✅ Done | "Transfer Ownership" button on 360 page opens search dialog (≥2 chars → live results). Reassigns `CustomerId`; supports removing owner. Same update endpoint with `CustomerId` / `ClearCustomer` (session 6, 2026-06-29) |
+| 19 | **Vehicle edit Brand/Model UUID display fix** | ✅ Done | Three root causes fixed: (1) `GetBrandsQuery` removed `IsActive` filter so vehicles with inactive brands load correctly. (2) Edit page uses `brandsApi.list()` not `catalogueApi.getBrands()` (was Admin-only endpoint). (3) Radix UI `SelectValue` lazy rendering bypassed — brand/model name rendered directly in `SelectTrigger` with `currentBrandName`/`currentModelName` fallback. (session 7, 2026-06-29) |
+| 20 | **Vehicle edit Year=0 validation error** | ✅ Done | `openEdit` guards `year: vehicle.year > 0 ? String(vehicle.year) : ""` so zero-year vehicles don't send `"0"` to FluentValidation's `InclusiveBetween(1900,2100)`. `handleSave` similarly guards `parseInt(year) >= 1900`. (session 7, 2026-06-29) |
+| 21 | **UpdateVehicle 403 for custom-role users** | ✅ Done | `[Authorize(Roles = "Admin,TechnicalDirector")]` on `PUT /api/vehicles/{id}` blocked users with custom roles + `vehicles.edit` permission. Changed to `[Authorize]`; frontend `canEdit` guard is the access control. (session 7, 2026-06-29) |
+| 22 | **Delete user icon — admin/users page** | ✅ Done | `Trash2` icon already existed but missing self-delete guard. Added: faded non-clickable icon when `u.id === currentUser.userId` with tooltip "Cannot delete your own account". "(you)" label on own row. Edit icon uses primary hover colour. (session 8, 2026-06-29) |
+| 23 | **Delete user icon — settings/page (Users tab)** | ✅ Done | Settings > Users tab only had reset-password and edit icons — no delete. Added `Trash2` delete button with same self-delete guard, delete confirmation dialog (destructive styling), and `adminApi.deleteUser` mutation. (session 8, 2026-06-29) |
