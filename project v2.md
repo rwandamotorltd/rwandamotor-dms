@@ -1,6 +1,6 @@
 # Rwandamotor DMS — Project Reference
 
-> **Last updated:** 2026-06-29 (session 8)
+> **Last updated:** 2026-06-29 (session 9)
 > **Status:** Production (backend self-hosted + frontend Vercel)
 
 ---
@@ -857,6 +857,8 @@ git push origin main:preview --force
 | **Dashboard KPI not refreshing after delete** | Add `queryClient.invalidateQueries({ queryKey: ["dashboard-kpis"] })` to every `onSuccess` that deletes a vehicle, customer, service record, or job card. |
 | **Radix UI Select shows UUID instead of label** | `SelectValue` only resolves item display text after the dropdown has been opened once (lazy context registration). Fix: bypass `SelectValue` — render the display string directly inside `SelectTrigger` using a `<span>`, with a fallback from the original `currentXxxName` prop. |
 | **Settings page vs admin/users page — two user tables** | Users are managed in both `/settings` (UsersTab component) and `/admin/users`. They share the same API calls (`adminApi.getUsers`, `adminApi.deleteUser`) but are separate components. Changes to one UI must be mirrored in the other. |
+| **Retention: NULL SaleDate in LINQ comparisons** | `v.SaleDate <= now` returns `false` for NULL in SQL (NULL comparison semantics), silently excluding vehicles without a sale date. Always use `(v.SaleDate == null \|\| v.SaleDate <= now)` for nullable DateTime range queries. Also use `SaleDate ?? CreatedAt` as anchor for cohort analysis. |
+| **RetentionController DI** | `RetentionController` needs both `IMediator` (for MediatR queries) and `IRetentionEngine` (for the evaluate endpoint). Injecting only one will cause a runtime DI error. |
 
 ---
 
@@ -887,3 +889,5 @@ git push origin main:preview --force
 | 21 | **UpdateVehicle 403 for custom-role users** | ✅ Done | `[Authorize(Roles = "Admin,TechnicalDirector")]` on `PUT /api/vehicles/{id}` blocked users with custom roles + `vehicles.edit` permission. Changed to `[Authorize]`; frontend `canEdit` guard is the access control. (session 7, 2026-06-29) |
 | 22 | **Delete user icon — admin/users page** | ✅ Done | `Trash2` icon already existed but missing self-delete guard. Added: faded non-clickable icon when `u.id === currentUser.userId` with tooltip "Cannot delete your own account". "(you)" label on own row. Edit icon uses primary hover colour. (session 8, 2026-06-29) |
 | 23 | **Delete user icon — settings/page (Users tab)** | ✅ Done | Settings > Users tab only had reset-password and edit icons — no delete. Added `Trash2` delete button with same self-delete guard, delete confirmation dialog (destructive styling), and `adminApi.deleteUser` mutation. (session 8, 2026-06-29) |
+| 24 | **Retention real-data fix — SaleDate null exclusion** | ✅ Done | Vehicles without SaleDate were excluded from all retention calculations (`v.SaleDate <= now` returns false for NULL in SQL). Fixed: `(v.SaleDate == null \|\| v.SaleDate <= now)` in `GetRetentionSummaryAsync`, `GetRetentionTrendAsync`, `GetRetentionByBrandAsync`. Cohort analysis now uses `SaleDate ?? CreatedAt` as anchor. Visit frequency cohort also fixed. (session 8–9, 2026-06-29) |
+| 25 | **Retention analytics — professional improvements** | ✅ Done | Period KPI cards redesigned: actual date range, progress bar, per-period stats. Fleet Status section separated with "Evaluate Now" button (Admin/TechnicalDirector) and "Evaluated X ago" timestamp. Cohort year selector dropdown. Empty states for brand chart, trend chart, cohort table. `POST /api/retention/evaluate` endpoint added. (session 9, 2026-06-29) |
