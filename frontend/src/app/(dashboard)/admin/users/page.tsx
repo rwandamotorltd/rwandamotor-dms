@@ -567,8 +567,6 @@ export default function AdminUsersPage() {
   const [editRoleError, setEditRoleError] = useState<string | null>(null);
   const [deletingRole, setDeletingRole] = useState<RoleItem | null>(null);
 
-  if (user && user.role !== "Admin") { router.replace("/dashboard"); return null; }
-
   // ── Queries ───────────────────────────────────────────────────
   const { data: users = [], isLoading: usersLoading } = useQuery({
     queryKey: ["admin-users"],
@@ -702,6 +700,9 @@ export default function AdminUsersPage() {
       setDeletingRole(null);
     },
   });
+
+  // ── Non-admin guard (after all hooks) ────────────────────────
+  if (user && user.role !== "Admin") { router.replace("/dashboard"); return null; }
 
   // ── Handlers ──────────────────────────────────────────────────
   const openCreateUser = () => {
