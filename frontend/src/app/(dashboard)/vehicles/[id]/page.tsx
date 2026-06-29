@@ -9,7 +9,7 @@ import {
   CheckCircle2, Calendar, Gauge, Bell,
   Phone, Mail, Star, Pencil, X, FileText, Users, Search
 } from "lucide-react";
-import { vehiclesApi, servicePoliciesApi, catalogueApi, customersApi, type UpdateVehiclePayload, type CatalogueBrandDto } from "@/lib/api";
+import { vehiclesApi, servicePoliciesApi, brandsApi, customersApi, type UpdateVehiclePayload, type BrandDto } from "@/lib/api";
 import { useAuth } from "@/contexts/auth-context";
 import { RetentionBadge } from "@/components/shared/retention-badge";
 import { KpiCard } from "@/components/shared/kpi-card";
@@ -71,8 +71,10 @@ interface EditFormState {
 interface EditModalProps {
   form: EditFormState;
   policies: ServicePolicy[];
-  brands: CatalogueBrandDto[];
+  brands: BrandDto[];
   brandsLoading: boolean;
+  currentBrandName: string;
+  currentModelName: string;
   onChange: (patch: Partial<EditFormState>) => void;
   onSave: () => void;
   onClose: () => void;
@@ -80,7 +82,7 @@ interface EditModalProps {
   error: string | null;
 }
 
-function EditVehicleModal({ form, policies, brands, brandsLoading, onChange, onSave, onClose, saving, error }: EditModalProps) {
+function EditVehicleModal({ form, policies, brands, brandsLoading, currentBrandName, currentModelName, onChange, onSave, onClose, saving, error }: EditModalProps) {
   const selectedBrand = brands.find(b => b.id === form.brandId);
   const modelsForBrand = selectedBrand?.models ?? [];
 
@@ -117,14 +119,16 @@ function EditVehicleModal({ form, policies, brands, brandsLoading, onChange, onS
             <div className="space-y-1.5">
               <Label>Brand</Label>
               <Select
-                value={brandsLoading ? "" : form.brandId}
+                value={brandsLoading ? "" : (selectedBrand ? form.brandId : "")}
                 onValueChange={v => onChange({ brandId: v ?? "", modelId: "" })}
                 disabled={brandsLoading}
               >
                 <SelectTrigger>
                   {brandsLoading
                     ? <span className="text-muted-foreground text-sm">Loading…</span>
-                    : <SelectValue placeholder="Select brand..." />}
+                    : selectedBrand
+                      ? <SelectValue placeholder="Select brand..." />
+                      : <span className="text-sm">{currentBrandName || "Select brand..."}</span>}
                 </SelectTrigger>
                 <SelectContent>
                   {brands.map(b => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
@@ -134,14 +138,16 @@ function EditVehicleModal({ form, policies, brands, brandsLoading, onChange, onS
             <div className="space-y-1.5">
               <Label>Model</Label>
               <Select
-                value={brandsLoading ? "" : form.modelId}
+                value={brandsLoading ? "" : (modelsForBrand.find(m => m.id === form.modelId) ? form.modelId : "")}
                 onValueChange={v => onChange({ modelId: v ?? "" })}
                 disabled={brandsLoading || modelsForBrand.length === 0}
               >
                 <SelectTrigger>
                   {brandsLoading
                     ? <span className="text-muted-foreground text-sm">Loading…</span>
-                    : <SelectValue placeholder="Select model..." />}
+                    : modelsForBrand.find(m => m.id === form.modelId)
+                      ? <SelectValue placeholder="Select model..." />
+                      : <span className="text-sm">{currentModelName || "Select model..."}</span>}
                 </SelectTrigger>
                 <SelectContent>
                   {modelsForBrand.map(m => <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>)}
@@ -490,8 +496,8 @@ export default function Vehicle360Page({ params }: { params: Promise<{ id: strin
   });
 
   const { data: brands = [], isLoading: brandsLoading } = useQuery({
-    queryKey: ["catalogue-brands"],
-    queryFn: () => catalogueApi.getBrands(),
+    queryKey: ["brands"],
+    queryFn: () => brandsApi.list(),
     enabled: canEdit,
     staleTime: 10 * 60 * 1000,
   });
@@ -1057,6 +1063,8 @@ export default function Vehicle360Page({ params }: { params: Promise<{ id: strin
           policies={policies}
           brands={brands}
           brandsLoading={brandsLoading}
+          currentBrandName={vehicle?.brandName ?? ""}
+          currentModelName={vehicle?.modelName ?? ""}
           onChange={patch => setEditForm(f => f ? { ...f, ...patch } : f)}
           onSave={handleSave}
           onClose={() => { setShowEdit(false); setEditForm(null); }}

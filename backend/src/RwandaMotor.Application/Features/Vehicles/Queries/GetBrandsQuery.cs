@@ -18,13 +18,11 @@ public class GetBrandsQueryHandler : IRequestHandler<GetBrandsQuery, List<BrandD
     public async Task<List<BrandDto>> Handle(GetBrandsQuery q, CancellationToken ct)
     {
         return await _db.Brands
-            .Where(b => b.IsActive)
             .OrderBy(b => b.Name)
             .Select(b => new BrandDto(
                 b.Id,
                 b.Name,
                 b.Models
-                    .Where(m => m.IsActive)
                     .OrderBy(m => m.Name)
                     .Select(m => new VehicleModelDto(m.Id, m.Name))
                     .ToList()

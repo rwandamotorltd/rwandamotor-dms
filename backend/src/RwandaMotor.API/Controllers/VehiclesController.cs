@@ -57,7 +57,7 @@ public class VehiclesController : ControllerBase
     }
 
     [HttpPut("{id}")]
-    [Authorize(Roles = "Admin,TechnicalDirector")]
+    [Authorize]
     public async Task<IActionResult> UpdateVehicle(Guid id, [FromBody] UpdateVehicleCommand command)
     {
         if (id != command.Id)
