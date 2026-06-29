@@ -66,6 +66,14 @@ public class AdminController : ControllerBase
         return Ok(ApiResponse<bool>.Ok(true, "Password reset successfully"));
     }
 
+    [HttpDelete("users/{id}")]
+    public async Task<IActionResult> DeleteUser(string id)
+    {
+        var (success, error) = await _mediator.Send(new DeleteUserCommand(id));
+        if (!success) return BadRequest(ApiResponse<bool>.Fail(error ?? "Failed to delete user"));
+        return Ok(ApiResponse<bool>.Ok(true, "User deleted"));
+    }
+
     [HttpPut("company-settings")]
     public async Task<IActionResult> UpdateCompanySettings([FromBody] UpdateCompanySettingsCommand command)
     {

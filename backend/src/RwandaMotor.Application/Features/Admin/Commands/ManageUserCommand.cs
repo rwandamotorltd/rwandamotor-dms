@@ -7,6 +7,32 @@ using FluentValidation;
 
 namespace RwandaMotor.Application.Features.Admin.Commands;
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+/// <summary>
+/// Ensures the role exists in ASP.NET Identity.
+/// If missing but present in AppRoles, creates it on-the-fly (backfill for
+/// roles created before Identity mirroring was added).
+/// </summary>
+internal static class RoleSync
+{
+    internal static async Task<bool> EnsureExistsAsync(
+        string roleName,
+        RoleManager<IdentityRole> roleManager,
+        IApplicationDbContext db)
+    {
+        if (await roleManager.RoleExistsAsync(roleName))
+            return true;
+
+        // Check AppRoles — if it's a valid custom role, create it in Identity
+        var exists = await db.AppRoles.AnyAsync(r => r.Name == roleName);
+        if (!exists) return false;
+
+        await roleManager.CreateAsync(new IdentityRole(roleName));
+        return true;
+    }
+}
+
 // -- Create User ---------------------------------------------------------------
 
 public record CreateUserCommand(
@@ -22,11 +48,13 @@ public class CreateUserCommandHandler : IRequestHandler<CreateUserCommand, (bool
 {
     private readonly UserManager<ApplicationUser> _users;
     private readonly RoleManager<IdentityRole> _roles;
+    private readonly IApplicationDbContext _db;
 
-    public CreateUserCommandHandler(UserManager<ApplicationUser> users, RoleManager<IdentityRole> roles)
+    public CreateUserCommandHandler(UserManager<ApplicationUser> users, RoleManager<IdentityRole> roles, IApplicationDbContext db)
     {
         _users = users;
         _roles = roles;
+        _db = db;
     }
 
     public async Task<(bool Success, string? Error)> Handle(CreateUserCommand cmd, CancellationToken ct)
@@ -48,7 +76,7 @@ public class CreateUserCommandHandler : IRequestHandler<CreateUserCommand, (bool
         if (!result.Succeeded)
             return (false, string.Join("; ", result.Errors.Select(e => e.Description)));
 
-        if (!await _roles.RoleExistsAsync(cmd.Role))
+        if (!await RoleSync.EnsureExistsAsync(cmd.Role, _roles, _db))
             return (false, $"Role '{cmd.Role}' does not exist.");
 
         await _users.AddToRoleAsync(user, cmd.Role);
@@ -71,11 +99,13 @@ public class UpdateUserCommandHandler : IRequestHandler<UpdateUserCommand, (bool
 {
     private readonly UserManager<ApplicationUser> _users;
     private readonly RoleManager<IdentityRole> _roles;
+    private readonly IApplicationDbContext _db;
 
-    public UpdateUserCommandHandler(UserManager<ApplicationUser> users, RoleManager<IdentityRole> roles)
+    public UpdateUserCommandHandler(UserManager<ApplicationUser> users, RoleManager<IdentityRole> roles, IApplicationDbContext db)
     {
         _users = users;
         _roles = roles;
+        _db = db;
     }
 
     public async Task<(bool Success, string? Error)> Handle(UpdateUserCommand cmd, CancellationToken ct)
@@ -93,7 +123,7 @@ public class UpdateUserCommandHandler : IRequestHandler<UpdateUserCommand, (bool
         var existingRoles = await _users.GetRolesAsync(user);
         await _users.RemoveFromRolesAsync(user, existingRoles);
 
-        if (!await _roles.RoleExistsAsync(cmd.Role))
+        if (!await RoleSync.EnsureExistsAsync(cmd.Role, _roles, _db))
             return (false, $"Role '{cmd.Role}' does not exist.");
 
         await _users.AddToRoleAsync(user, cmd.Role);
@@ -153,8 +183,7 @@ public class DeleteUserCommandHandler : IRequestHandler<DeleteUserCommand, (bool
         var user = await _users.FindByIdAsync(cmd.UserId);
         if (user == null) return (false, "User not found.");
 
-        user.IsActive = false;
-        var result = await _users.UpdateAsync(user);
+        var result = await _users.DeleteAsync(user);
         if (!result.Succeeded)
             return (false, string.Join("; ", result.Errors.Select(e => e.Description)));
 

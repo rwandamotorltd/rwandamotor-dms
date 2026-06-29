@@ -13,6 +13,7 @@ public record UserDto(
     string Role,
     bool IsActive,
     DateTime CreatedAt,
+    DateTime? LastLoginAt,
     Guid? PermissionGroupId,
     string? PermissionGroupName,
     List<string> CustomPermissions
@@ -52,7 +53,8 @@ public class GetUsersQueryHandler : IRequestHandler<GetUsersQuery, List<UserDto>
                 u.Email ?? "",
                 roles.FirstOrDefault() ?? "—",
                 u.IsActive,
-                DateTime.UtcNow,
+                u.CreatedAt,
+                u.LastLoginAt,
                 u.PermissionGroupId,
                 groupName,
                 u.CustomPermissions
