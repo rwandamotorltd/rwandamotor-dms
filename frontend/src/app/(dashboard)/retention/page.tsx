@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import {
-  AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid,
+  ComposedChart, AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, Cell,
 } from "recharts";
 import {
@@ -479,7 +479,7 @@ export default function RetentionPage() {
               </div>
             ) : (
               <ResponsiveContainer width="100%" height={280}>
-                <AreaChart data={data.trend} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+                <ComposedChart data={data.trend} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
                   <defs>
                     <linearGradient id="retGrad" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%"  stopColor="#6366f1" stopOpacity={0.3} />
@@ -496,7 +496,7 @@ export default function RetentionPage() {
                   />
                   <Area yAxisId="left" type="monotone" dataKey="retentionRate" stroke="#6366f1" strokeWidth={2.5} fill="url(#retGrad)" dot={{ r: 3, fill: "#6366f1", strokeWidth: 0 }} />
                   <Bar yAxisId="right" dataKey="eligible" fill="#6366f1" fillOpacity={0.1} radius={[2, 2, 0, 0]} />
-                </AreaChart>
+                </ComposedChart>
               </ResponsiveContainer>
             )}
           </CardContent>
