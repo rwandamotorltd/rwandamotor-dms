@@ -20,7 +20,12 @@ public record UpdateVehicleCommand(
     int? WarrantyKmLimit,
     Guid? ServicePolicyId,
     RetentionStatus? RetentionStatus,
-    string? Notes
+    string? Notes,
+    Guid? BrandId = null,
+    Guid? ModelId = null,
+    int? Year = null,
+    Guid? CustomerId = null,
+    bool ClearCustomer = false
 ) : IRequest<bool>;
 
 public class UpdateVehicleCommandValidator : AbstractValidator<UpdateVehicleCommand>
@@ -31,6 +36,7 @@ public class UpdateVehicleCommandValidator : AbstractValidator<UpdateVehicleComm
         RuleFor(x => x.CurrentMileage).GreaterThanOrEqualTo(0).When(x => x.CurrentMileage.HasValue);
         RuleFor(x => x.PlateNumber).MaximumLength(20).When(x => x.PlateNumber != null);
         RuleFor(x => x.Notes).MaximumLength(2000).When(x => x.Notes != null);
+        RuleFor(x => x.Year).InclusiveBetween(1900, 2100).When(x => x.Year.HasValue);
     }
 }
 
@@ -74,6 +80,18 @@ public class UpdateVehicleCommandHandler : IRequestHandler<UpdateVehicleCommand,
         }
         if (cmd.Notes is not null)
             vehicle.Notes = cmd.Notes.Trim();
+
+        // Identity / ownership fields
+        if (cmd.BrandId.HasValue)
+            vehicle.BrandId = cmd.BrandId.Value;
+        if (cmd.ModelId.HasValue)
+            vehicle.ModelId = cmd.ModelId.Value;
+        if (cmd.Year.HasValue)
+            vehicle.Year = cmd.Year.Value;
+        if (cmd.CustomerId.HasValue)
+            vehicle.CustomerId = cmd.CustomerId.Value;
+        else if (cmd.ClearCustomer)
+            vehicle.CustomerId = null;
 
         await _db.SaveChangesAsync(ct);
         return true;

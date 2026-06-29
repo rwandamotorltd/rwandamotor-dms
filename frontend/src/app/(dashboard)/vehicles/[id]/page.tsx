@@ -1,15 +1,15 @@
 "use client";
 
-import { use, useState } from "react";
+import { use, useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import {
   ArrowLeft, Car, User, Wrench, Shield, Clock,
   CheckCircle2, Calendar, Gauge, Bell,
-  Phone, Mail, Star, Pencil, X, FileText
+  Phone, Mail, Star, Pencil, X, FileText, Users, Search
 } from "lucide-react";
-import { vehiclesApi, servicePoliciesApi, type UpdateVehiclePayload } from "@/lib/api";
+import { vehiclesApi, servicePoliciesApi, brandsApi, customersApi, type UpdateVehiclePayload, type BrandDto } from "@/lib/api";
 import { useAuth } from "@/contexts/auth-context";
 import { RetentionBadge } from "@/components/shared/retention-badge";
 import { KpiCard } from "@/components/shared/kpi-card";
@@ -25,7 +25,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import type { RetentionStatus, ServicePolicy } from "@/types";
+import type { RetentionStatus, ServicePolicy, CustomerListItem } from "@/types";
 
 // ─── Constants ────────────────────────────────────────────────
 
@@ -36,6 +36,9 @@ const RETENTION_STATUSES: RetentionStatus[] = ["Active", "DueSoon", "Overdue", "
 // ─── Edit Modal ───────────────────────────────────────────────────
 
 interface EditFormState {
+  brandId: string;
+  modelId: string;
+  year: string;
   plateNumber: string;
   color: string;
   fuelType: string;
@@ -54,6 +57,7 @@ interface EditFormState {
 interface EditModalProps {
   form: EditFormState;
   policies: ServicePolicy[];
+  brands: BrandDto[];
   onChange: (patch: Partial<EditFormState>) => void;
   onSave: () => void;
   onClose: () => void;
@@ -61,7 +65,10 @@ interface EditModalProps {
   error: string | null;
 }
 
-function EditVehicleModal({ form, policies, onChange, onSave, onClose, saving, error }: EditModalProps) {
+function EditVehicleModal({ form, policies, brands, onChange, onSave, onClose, saving, error }: EditModalProps) {
+  const selectedBrand = brands.find(b => b.id === form.brandId);
+  const modelsForBrand = selectedBrand?.models ?? [];
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
@@ -88,6 +95,49 @@ function EditVehicleModal({ form, policies, onChange, onSave, onClose, saving, e
               {error}
             </div>
           )}
+
+          {/* Identity: Brand + Model + Year */}
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Vehicle Identity</p>
+          <div className="grid grid-cols-3 gap-4">
+            <div className="space-y-1.5">
+              <Label>Brand</Label>
+              <Select
+                value={form.brandId}
+                onValueChange={v => onChange({ brandId: v ?? "", modelId: "" })}
+              >
+                <SelectTrigger><SelectValue placeholder="Select brand..." /></SelectTrigger>
+                <SelectContent>
+                  {brands.map(b => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Model</Label>
+              <Select
+                value={form.modelId}
+                onValueChange={v => onChange({ modelId: v ?? "" })}
+                disabled={modelsForBrand.length === 0}
+              >
+                <SelectTrigger><SelectValue placeholder="Select model..." /></SelectTrigger>
+                <SelectContent>
+                  {modelsForBrand.map(m => <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Year</Label>
+              <Input
+                type="number"
+                value={form.year}
+                onChange={e => onChange({ year: e.target.value })}
+                placeholder="e.g. 2021"
+                min={1900}
+                max={2100}
+              />
+            </div>
+          </div>
+
+          <Separator />
 
           {/* Row 1: Plate + Color */}
           <div className="grid grid-cols-2 gap-4">
@@ -251,6 +301,143 @@ function EditVehicleModal({ form, policies, onChange, onSave, onClose, saving, e
   );
 }
 
+// ─── Transfer Ownership Modal ─────────────────────────────────────
+
+interface TransferModalProps {
+  currentCustomerName: string | null;
+  onTransfer: (customerId: string | null) => void;
+  onClose: () => void;
+  saving: boolean;
+  error: string | null;
+}
+
+function TransferOwnershipModal({ currentCustomerName, onTransfer, onClose, saving, error }: TransferModalProps) {
+  const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [selected, setSelected] = useState<CustomerListItem | null>(null);
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 350);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  const { data, isFetching } = useQuery({
+    queryKey: ["customers", "transfer-search", debouncedSearch],
+    queryFn: () => customersApi.list({ search: debouncedSearch, pageSize: 8 }),
+    enabled: debouncedSearch.length >= 2,
+    staleTime: 30_000,
+  });
+
+  const results = data?.items ?? [];
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="relative bg-card border border-border rounded-xl shadow-2xl w-full max-w-md mx-4"
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between p-5 border-b border-border">
+          <h2 className="text-lg font-semibold flex items-center gap-2">
+            <Users className="w-4 h-4 text-muted-foreground" />
+            Transfer Ownership
+          </h2>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground transition-colors">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="p-5 space-y-4">
+          {error && (
+            <div className="rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm px-3 py-2">
+              {error}
+            </div>
+          )}
+
+          {currentCustomerName && (
+            <p className="text-sm text-muted-foreground">
+              Current owner: <span className="font-medium text-foreground">{currentCustomerName}</span>
+            </p>
+          )}
+
+          {/* Search */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              className="pl-9"
+              placeholder="Search by name or phone..."
+              value={search}
+              onChange={e => { setSearch(e.target.value); setSelected(null); }}
+              autoFocus
+            />
+          </div>
+
+          {/* Results */}
+          <div className="min-h-[120px] max-h-[280px] overflow-y-auto rounded-lg border border-border divide-y divide-border">
+            {debouncedSearch.length < 2 ? (
+              <p className="text-sm text-muted-foreground text-center py-8">Type at least 2 characters to search</p>
+            ) : isFetching ? (
+              <p className="text-sm text-muted-foreground text-center py-8">Searching...</p>
+            ) : results.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-8">No customers found</p>
+            ) : (
+              results.map(c => (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => setSelected(c)}
+                  className={`w-full text-left px-4 py-3 flex items-center justify-between gap-3 transition-colors hover:bg-muted/50 ${
+                    selected?.id === c.id ? "bg-primary/10 border-l-2 border-primary" : ""
+                  }`}
+                >
+                  <div>
+                    <p className="font-medium text-sm">{c.fullName}</p>
+                    <p className="text-xs text-muted-foreground">{c.phone ?? c.email ?? c.category}</p>
+                  </div>
+                  {selected?.id === c.id && (
+                    <CheckCircle2 className="w-4 h-4 text-primary shrink-0" />
+                  )}
+                </button>
+              ))
+            )}
+          </div>
+
+          {selected && (
+            <div className="rounded-lg bg-primary/5 border border-primary/20 px-3 py-2 text-sm">
+              New owner: <span className="font-semibold text-primary">{selected.fullName}</span>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-between gap-3 p-5 border-t border-border">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => onTransfer(null)}
+            disabled={saving}
+            className="text-muted-foreground hover:text-destructive"
+          >
+            Remove owner
+          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={onClose} disabled={saving}>Cancel</Button>
+            <Button
+              onClick={() => selected && onTransfer(selected.id)}
+              disabled={!selected || saving}
+              className="gradient-primary text-white"
+            >
+              {saving ? "Transferring..." : "Transfer"}
+            </Button>
+          </div>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
 // ─── Main Page ──────────────────────────────────────────────────
 
 export default function Vehicle360Page({ params }: { params: Promise<{ id: string }> }) {
@@ -262,6 +449,8 @@ export default function Vehicle360Page({ params }: { params: Promise<{ id: strin
   const [showEdit, setShowEdit] = useState(false);
   const [editForm, setEditForm] = useState<EditFormState | null>(null);
   const [editError, setEditError] = useState<string | null>(null);
+  const [showTransfer, setShowTransfer] = useState(false);
+  const [transferError, setTransferError] = useState<string | null>(null);
 
   const { data: vehicle, isLoading, isError } = useQuery({
     queryKey: ["vehicle-360", id],
@@ -274,12 +463,23 @@ export default function Vehicle360Page({ params }: { params: Promise<{ id: strin
     enabled: canEdit,
   });
 
+  const { data: brands = [] } = useQuery({
+    queryKey: ["brands"],
+    queryFn: () => brandsApi.list(),
+    enabled: canEdit,
+    staleTime: 10 * 60 * 1000,
+  });
+
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ["vehicle-360", id] });
+    qc.invalidateQueries({ queryKey: ["vehicles"] });
+  };
+
   const editMutation = useMutation({
     mutationFn: (payload: UpdateVehiclePayload) => vehiclesApi.update(payload),
     onSuccess: (res) => {
       if (!res.success) { setEditError(res.message ?? "Update failed"); return; }
-      qc.invalidateQueries({ queryKey: ["vehicle-360", id] });
-      qc.invalidateQueries({ queryKey: ["vehicles"] });
+      invalidate();
       setShowEdit(false);
       setEditForm(null);
     },
@@ -290,9 +490,26 @@ export default function Vehicle360Page({ params }: { params: Promise<{ id: strin
     },
   });
 
+  const transferMutation = useMutation({
+    mutationFn: (payload: UpdateVehiclePayload) => vehiclesApi.update(payload),
+    onSuccess: (res) => {
+      if (!res.success) { setTransferError(res.message ?? "Transfer failed"); return; }
+      invalidate();
+      setShowTransfer(false);
+    },
+    onError: (err: unknown) => {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+        ?? (err as { message?: string })?.message ?? "Transfer failed";
+      setTransferError(msg);
+    },
+  });
+
   const openEdit = () => {
     if (!vehicle) return;
     setEditForm({
+      brandId: vehicle.brandId ?? "",
+      modelId: vehicle.modelId ?? "",
+      year: String(vehicle.year),
       plateNumber: vehicle.plateNumber ?? "",
       color: vehicle.color ?? "",
       fuelType: vehicle.fuelType ?? "",
@@ -315,6 +532,9 @@ export default function Vehicle360Page({ params }: { params: Promise<{ id: strin
     if (!editForm) return;
     const payload: UpdateVehiclePayload = {
       id,
+      brandId: editForm.brandId || null,
+      modelId: editForm.modelId || null,
+      year: editForm.year ? parseInt(editForm.year) : null,
       plateNumber: editForm.plateNumber || null,
       color: editForm.color || null,
       fuelType: editForm.fuelType || null,
@@ -330,6 +550,14 @@ export default function Vehicle360Page({ params }: { params: Promise<{ id: strin
       notes: editForm.notes || null,
     };
     editMutation.mutate(payload);
+  };
+
+  const handleTransfer = (customerId: string | null) => {
+    transferMutation.mutate({
+      id,
+      customerId: customerId ?? undefined,
+      clearCustomer: customerId === null,
+    });
   };
 
   if (isLoading) return <Vehicle360Skeleton />;
@@ -381,14 +609,16 @@ export default function Vehicle360Page({ params }: { params: Promise<{ id: strin
           </div>
 
           {canEdit && (
-            <Button
-              onClick={openEdit}
-              variant="outline"
-              className="gap-2 shrink-0"
-            >
-              <Pencil className="w-4 h-4" />
-              Edit Vehicle
-            </Button>
+            <div className="flex gap-2 shrink-0">
+              <Button onClick={() => { setTransferError(null); setShowTransfer(true); }} variant="outline" className="gap-2">
+                <Users className="w-4 h-4" />
+                Transfer Ownership
+              </Button>
+              <Button onClick={openEdit} variant="outline" className="gap-2">
+                <Pencil className="w-4 h-4" />
+                Edit Vehicle
+              </Button>
+            </div>
           )}
         </div>
       </motion.div>
@@ -799,11 +1029,23 @@ export default function Vehicle360Page({ params }: { params: Promise<{ id: strin
         <EditVehicleModal
           form={editForm}
           policies={policies}
+          brands={brands}
           onChange={patch => setEditForm(f => f ? { ...f, ...patch } : f)}
           onSave={handleSave}
           onClose={() => { setShowEdit(false); setEditForm(null); }}
           saving={editMutation.isPending}
           error={editError}
+        />
+      )}
+
+      {/* Transfer Ownership Modal */}
+      {showTransfer && (
+        <TransferOwnershipModal
+          currentCustomerName={vehicle?.customerName ?? null}
+          onTransfer={handleTransfer}
+          onClose={() => setShowTransfer(false)}
+          saving={transferMutation.isPending}
+          error={transferError}
         />
       )}
     </div>

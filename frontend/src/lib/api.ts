@@ -65,6 +65,11 @@ export interface UpdateVehiclePayload {
   servicePolicyId?: string | null;
   retentionStatus?: RetentionStatus | null;
   notes?: string | null;
+  brandId?: string | null;
+  modelId?: string | null;
+  year?: number | null;
+  customerId?: string | null;
+  clearCustomer?: boolean;
 }
 
 export interface BulkUpdatePayload {

@@ -241,7 +241,9 @@ export interface Vehicle360 {
   id: string;
   vin: string;
   plateNumber: string | null;
+  brandId: string | null;
   brandName: string;
+  modelId: string | null;
   modelName: string;
   year: number;
   color: string | null;

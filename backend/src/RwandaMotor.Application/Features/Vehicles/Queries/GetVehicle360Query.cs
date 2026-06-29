@@ -103,7 +103,9 @@ public class GetVehicle360QueryHandler : IRequestHandler<GetVehicle360Query, Veh
             Id: vehicle.Id,
             VIN: vehicle.VIN,
             PlateNumber: vehicle.PlateNumber,
+            BrandId: vehicle.BrandId,
             BrandName: vehicle.Brand?.Name ?? "—",
+            ModelId: vehicle.ModelId,
             ModelName: vehicle.Model?.Name ?? "—",
             Year: vehicle.Year,
             Color: vehicle.Color,
@@ -149,7 +151,7 @@ public class GetVehicle360QueryHandler : IRequestHandler<GetVehicle360Query, Veh
 
 public record Vehicle360Dto(
     Guid Id, string VIN, string? PlateNumber,
-    string BrandName, string ModelName, int Year,
+    Guid? BrandId, string BrandName, Guid? ModelId, string ModelName, int Year,
     string? Color, string? FuelType, string? EngineNumber,
     Guid? CustomerId,
     string? CustomerName, string? CustomerPhone, string? CustomerEmail,
