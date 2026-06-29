@@ -125,7 +125,7 @@ function EditVehicleModal({ form, policies, brands, brandsLoading, currentBrandN
               >
                 <SelectTrigger>
                   <span className="text-sm">
-                    {brandsLoading ? "Loading…" : (selectedBrand?.name ?? currentBrandName || "Select brand…")}
+                    {brandsLoading ? "Loading…" : ((selectedBrand?.name ?? currentBrandName) || "Select brand…")}
                   </span>
                 </SelectTrigger>
                 <SelectContent>
@@ -142,7 +142,7 @@ function EditVehicleModal({ form, policies, brands, brandsLoading, currentBrandN
               >
                 <SelectTrigger>
                   <span className="text-sm">
-                    {brandsLoading ? "Loading…" : (modelsForBrand.find(m => m.id === form.modelId)?.name ?? currentModelName || "Select model…")}
+                    {brandsLoading ? "Loading…" : ((modelsForBrand.find(m => m.id === form.modelId)?.name ?? currentModelName) || "Select model…")}
                   </span>
                 </SelectTrigger>
                 <SelectContent>
