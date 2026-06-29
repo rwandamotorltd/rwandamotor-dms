@@ -13,7 +13,7 @@ import { vehiclesApi, servicePoliciesApi, brandsApi, customersApi, type UpdateVe
 import { useAuth } from "@/contexts/auth-context";
 import { RetentionBadge } from "@/components/shared/retention-badge";
 import { KpiCard } from "@/components/shared/kpi-card";
-import { cn, formatDate, formatCurrency, formatMileage, formatDateDistance, SERVICE_TYPE_LABELS } from "@/lib/utils";
+import { cn, formatDate, formatCurrency, formatMileage, formatDateDistance, SERVICE_TYPE_LABELS, RETENTION_STATUS_CONFIG } from "@/lib/utils";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -29,8 +29,22 @@ import type { RetentionStatus, ServicePolicy, CustomerListItem } from "@/types";
 
 // ─── Constants ────────────────────────────────────────────────
 
-const FUEL_TYPES = ["Petrol", "Diesel", "Electric", "Hybrid", "Other"];
-const TRANSMISSIONS = ["Manual", "Automatic", "CVT", "AMT"];
+const FUEL_TYPES: { value: string; label: string }[] = [
+  { value: "Petrol",   label: "Petrol" },
+  { value: "Diesel",   label: "Diesel" },
+  { value: "Electric", label: "Electric" },
+  { value: "Hybrid",   label: "Hybrid (Petrol/Electric)" },
+  { value: "HybridDiesel", label: "Hybrid (Diesel/Electric)" },
+  { value: "Other",    label: "Other" },
+];
+
+const TRANSMISSIONS: { value: string; label: string }[] = [
+  { value: "Manual",    label: "Manual" },
+  { value: "Automatic", label: "Automatic" },
+  { value: "CVT",       label: "CVT (Continuously Variable)" },
+  { value: "AMT",       label: "AMT (Automated Manual)" },
+];
+
 const RETENTION_STATUSES: RetentionStatus[] = ["Active", "DueSoon", "Overdue", "Lost", "Recovered", "External"];
 
 // ─── Edit Modal ───────────────────────────────────────────────────
@@ -167,7 +181,7 @@ function EditVehicleModal({ form, policies, brands, onChange, onSave, onClose, s
               <Select value={form.fuelType} onValueChange={v => onChange({ fuelType: v ?? "" })}>
                 <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
                 <SelectContent>
-                  {FUEL_TYPES.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}
+                  {FUEL_TYPES.map(f => <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -176,7 +190,7 @@ function EditVehicleModal({ form, policies, brands, onChange, onSave, onClose, s
               <Select value={form.transmission} onValueChange={v => onChange({ transmission: v ?? "" })}>
                 <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
                 <SelectContent>
-                  {TRANSMISSIONS.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                  {TRANSMISSIONS.map(t => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -222,7 +236,9 @@ function EditVehicleModal({ form, policies, brands, onChange, onSave, onClose, s
               <Select value={form.retentionStatus} onValueChange={v => onChange({ retentionStatus: v as RetentionStatus })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {RETENTION_STATUSES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                  {RETENTION_STATUSES.map(s => (
+                    <SelectItem key={s} value={s}>{RETENTION_STATUS_CONFIG[s]?.label ?? s}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
