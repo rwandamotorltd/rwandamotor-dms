@@ -124,11 +124,9 @@ function EditVehicleModal({ form, policies, brands, brandsLoading, currentBrandN
                 disabled={brandsLoading}
               >
                 <SelectTrigger>
-                  {brandsLoading
-                    ? <span className="text-muted-foreground text-sm">Loading…</span>
-                    : selectedBrand
-                      ? <SelectValue placeholder="Select brand..." />
-                      : <span className="text-sm">{currentBrandName || "Select brand..."}</span>}
+                  <span className="text-sm">
+                    {brandsLoading ? "Loading…" : (selectedBrand?.name ?? currentBrandName || "Select brand…")}
+                  </span>
                 </SelectTrigger>
                 <SelectContent>
                   {brands.map(b => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
@@ -143,11 +141,9 @@ function EditVehicleModal({ form, policies, brands, brandsLoading, currentBrandN
                 disabled={brandsLoading || modelsForBrand.length === 0}
               >
                 <SelectTrigger>
-                  {brandsLoading
-                    ? <span className="text-muted-foreground text-sm">Loading…</span>
-                    : modelsForBrand.find(m => m.id === form.modelId)
-                      ? <SelectValue placeholder="Select model..." />
-                      : <span className="text-sm">{currentModelName || "Select model..."}</span>}
+                  <span className="text-sm">
+                    {brandsLoading ? "Loading…" : (modelsForBrand.find(m => m.id === form.modelId)?.name ?? currentModelName || "Select model…")}
+                  </span>
                 </SelectTrigger>
                 <SelectContent>
                   {modelsForBrand.map(m => <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>)}
