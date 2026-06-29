@@ -576,6 +576,7 @@ function PermissionGroupModal({
 
 function UsersTab({ groups }: { groups: PermissionGroupItem[] }) {
   const qc = useQueryClient();
+  const { user: currentUser } = useAuth();
   const { data: roleItems = [] } = useQuery({ queryKey: ["app-roles"], queryFn: () => rolesApi.list() });
   const roleNames = roleItems.length > 0 ? roleItems.map(r => r.name) : ROLES_FALLBACK;
 
@@ -587,6 +588,7 @@ function UsersTab({ groups }: { groups: PermissionGroupItem[] }) {
   const [editError, setEditError] = useState<string | null>(null);
   const [resetUser, setResetUser] = useState<UserItem | null>(null);
   const [resetError, setResetError] = useState<string | null>(null);
+  const [deletingUser, setDeletingUser] = useState<UserItem | null>(null);
 
   const { data: users = [], isLoading } = useQuery({
     queryKey: ["admin-users"],
@@ -626,6 +628,20 @@ function UsersTab({ groups }: { groups: PermissionGroupItem[] }) {
     },
     onError: (e: { response?: { data?: { message?: string } } }) =>
       setResetError(e?.response?.data?.message ?? "Failed to reset password"),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (userId: string) => adminApi.deleteUser(userId),
+    onSuccess: res => {
+      if (!res.success) { toast.error(res.message ?? "Failed to delete user"); return; }
+      qc.invalidateQueries({ queryKey: ["admin-users"] });
+      setDeletingUser(null);
+      toast.success("User deleted");
+    },
+    onError: (e: { response?: { data?: { message?: string } } }) => {
+      toast.error(e?.response?.data?.message ?? "Failed to delete user");
+      setDeletingUser(null);
+    },
   });
 
   const openEdit = (u: UserItem) => {
@@ -699,9 +715,19 @@ function UsersTab({ groups }: { groups: PermissionGroupItem[] }) {
                           <KeyRound className="w-4 h-4" />
                         </button>
                         <button onClick={() => openEdit(u)}
-                          className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors" title="Edit">
+                          className="p-1.5 rounded-md text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors" title="Edit">
                           <Pencil className="w-4 h-4" />
                         </button>
+                        {u.id === currentUser?.userId ? (
+                          <span className="p-1.5 rounded-md text-muted-foreground/30 cursor-not-allowed" title="Cannot delete your own account">
+                            <Trash2 className="w-4 h-4" />
+                          </span>
+                        ) : (
+                          <button onClick={() => setDeletingUser(u)}
+                            className="p-1.5 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors" title="Delete user">
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -730,6 +756,35 @@ function UsersTab({ groups }: { groups: PermissionGroupItem[] }) {
         <ResetPasswordModal user={resetUser}
           onSave={pwd => resetMutation.mutate({ id: resetUser.id, pwd })}
           onClose={() => setResetUser(null)} saving={resetMutation.isPending} error={resetError} />
+      )}
+
+      {deletingUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
+            className="bg-card border border-border rounded-xl shadow-xl w-full max-w-sm p-6 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-destructive/10 flex items-center justify-center shrink-0">
+                <Trash2 className="w-5 h-5 text-destructive" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-foreground">Delete User</h3>
+                <p className="text-sm text-muted-foreground">This action cannot be undone.</p>
+              </div>
+            </div>
+            <p className="text-sm text-foreground">
+              Are you sure you want to delete <span className="font-medium">{deletingUser.fullName}</span>?
+            </p>
+            <div className="flex justify-end gap-3">
+              <Button variant="outline" onClick={() => setDeletingUser(null)} disabled={deleteMutation.isPending}>
+                Cancel
+              </Button>
+              <Button variant="destructive" onClick={() => deleteMutation.mutate(deletingUser.id)}
+                disabled={deleteMutation.isPending}>
+                {deleteMutation.isPending ? "Deleting…" : "Delete"}
+              </Button>
+            </div>
+          </motion.div>
+        </div>
       )}
     </div>
   );
