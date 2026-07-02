@@ -237,7 +237,10 @@ function DeliveryPrintView({ data, settings }: PrintViewProps) {
               <div style={{ fontSize: 10, marginBottom: 4 }}>Date of Delivery: <strong>{deliveryDate}</strong></div>
               <div style={{ fontSize: 10, marginBottom: 4 }}>Job Card Date: {receiptDate}</div>
               <div style={{ borderTop: "1.5px solid #000", paddingTop: 4, marginTop: 10 }}>
-                <div style={{ fontWeight: "bold", fontSize: 10 }}>Released By: {data.closedByName ?? data.receivedByName}</div>
+                <div style={{ fontWeight: "bold", fontSize: 10 }}>Released By: {data.receivedByName}</div>
+                {data.closedByName && (
+                  <div style={{ fontSize: 10, color: "#444" }}>Closed by: {data.closedByName}</div>
+                )}
               </div>
             </td>
           </tr>
