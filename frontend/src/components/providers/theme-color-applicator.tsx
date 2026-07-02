@@ -26,10 +26,12 @@ function hexToHsl(hex: string): string {
 }
 
 export function ThemeColorApplicator() {
+  const hasToken = typeof window !== "undefined" && !!localStorage.getItem("access_token");
   const { data: settings } = useQuery({
     queryKey: ["company-settings"],
     queryFn: () => companySettingsApi.get(),
     staleTime: 1000 * 60 * 5,
+    enabled: hasToken,
   });
 
   useEffect(() => {

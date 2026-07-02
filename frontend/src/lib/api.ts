@@ -17,7 +17,7 @@ function createApiClient(): AxiosInstance {
   client.interceptors.response.use(
     (res) => res,
     (error) => {
-      if (error.response?.status === 401 && typeof window !== 'undefined') {
+      if (error.response?.status === 401 && typeof window !== 'undefined' && window.location.pathname !== '/login') {
         localStorage.removeItem('access_token');
         localStorage.removeItem('auth_user');
         window.location.replace('/login');
