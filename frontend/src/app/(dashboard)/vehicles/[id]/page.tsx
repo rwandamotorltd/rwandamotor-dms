@@ -260,7 +260,13 @@ function EditVehicleModal({ form, policies, brands, brandsLoading, currentBrandN
           <div className="space-y-1.5">
             <Label>Service Policy</Label>
             <Select value={form.servicePolicyId} onValueChange={v => onChange({ servicePolicyId: v ?? "" })}>
-              <SelectTrigger><SelectValue placeholder="Use brand/model default" /></SelectTrigger>
+              <SelectTrigger>
+                <span className="truncate">
+                  {form.servicePolicyId
+                    ? (policies.find(p => p.id === form.servicePolicyId)?.name ?? form.servicePolicyId)
+                    : "Use brand/model default"}
+                </span>
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="">Use brand/model default</SelectItem>
                 {policies.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}

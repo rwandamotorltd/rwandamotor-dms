@@ -186,6 +186,16 @@ using (var scope = app.Services.CreateScope())
                 ) THEN
                     ALTER TABLE ""CompanySettings"" ADD COLUMN ""ServiceTypesConfig"" text;
                 END IF;
+
+                IF NOT EXISTS (
+                    SELECT 1 FROM pg_catalog.pg_attribute a
+                    JOIN pg_catalog.pg_class c ON c.oid = a.attrelid
+                    JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+                    WHERE c.relname = 'CompanySettings' AND n.nspname = 'public'
+                      AND a.attname = 'PwaOrientation' AND a.attnum > 0 AND NOT a.attisdropped
+                ) THEN
+                    ALTER TABLE ""CompanySettings"" ADD COLUMN ""PwaOrientation"" text NOT NULL DEFAULT 'portrait';
+                END IF;
             END $$;");
     }
     catch (Exception ex) { Log.Error(ex, "Schema column patch failed"); }
