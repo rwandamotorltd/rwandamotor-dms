@@ -1,6 +1,6 @@
 # Rwandamotor DMS — Project Reference
 
-> **Last updated:** 2026-06-29 (session 9)
+> **Last updated:** 2026-07-02 (session 11)
 > **Status:** Production (backend self-hosted + frontend Vercel)
 
 ---
@@ -226,15 +226,18 @@ string?  UpdatedBy
 | `AuditLog` | UserId, UserEmail, UserName, Action, EntityType, EntityId, EntityLabel, OccurredAt — **immutable, never soft-deleted** |
 | `ImportLog` | FileName, ImportType, Status, TotalRows, ValidRows, ImportedRows, ErrorRows, DuplicateRows, ErrorDetailsJson, StartedAt, CompletedAt, IsRolledBack |
 | `ApplicationUser` | FullName, Role, PermissionGroupId, CustomPermissions (jsonb), IsActive, LastLoginAt, RefreshToken, RefreshTokenExpiry (extends IdentityUser) |
+| `VehicleColor` | Id, Name, SortOrder — admin-managed list of car colour options (White, Black, Silver…). **Not** a BaseEntity; no soft delete. Seeded with 16 defaults on first startup. |
+| `BrandColor` | Id, Name, HexValue, SortOrder — branding palette colours for the app's primary colour picker. |
 
 ### Enums (serialized as strings in API)
 ```csharp
 RetentionStatus:  Active, DueSoon, Overdue, Lost, Recovered, External
 JobCardStatus:    Open, Closed
 FuelLevel:        Empty, Quarter, Half, ThreeQuarter, Full
-ServiceType:      RoutineMaintenance, OilChange, MajorService, TyreRotation, BrakeService,
-                  TransmissionService, AirConditioningService, ElectricalDiagnostics,
-                  BodyRepair, WarrantyRepair, RecallRepair, PDI, EmergencyRepair, Inspection, Other
+// NOTE: ServiceType is NO LONGER an enum — it is stored as plain string on JobCard and ServiceRecord
+// so custom types created in Settings → Catalogue → Service Types can be assigned to job cards.
+// The legacy enum values (RoutineMaintenance, PDI, etc.) remain valid strings.
+// Appointments still use the enum on the entity level.
 CustomerCategory: Retail, Corporate, Government, NGO, Fleet, VIP, External
 ContactMethod:    Phone, SMS, Email, WhatsApp, InPerson
 FollowUpStatus:   Pending, Contacted, AppointmentBooked, Recovered, Unreachable, Declined, Closed
@@ -271,7 +274,7 @@ InteractionOutcome: Reached, NoAnswer, LeftMessage, CallbackScheduled,
 | `CompanySettingsController` | `/api/company-settings` | `[Authorize]` |
 | `TechniciansController` | `/api/technicians` | `[Authorize]` |
 | `ServicePoliciesController` | `/api/servicepolicies` | `[Authorize]` |
-| `AdminController` | `/api/admin` | `Admin` policy |
+| `AdminController` | `/api/admin` | `Admin` policy (vehicle-colors GET is `AllowAnonymous`) |
 | `PermissionGroupsController` | `/api/admin/permission-groups` | `Admin` policy |
 | `PwaController` | `/api/pwa` | Anonymous (no auth) — serves manifest orientation to Next.js |
 
@@ -314,6 +317,15 @@ GET    /api/appointments                   List (paged, filters: status, technic
 POST   /api/appointments                   Book appointment
 PUT    /api/appointments/{id}              Update status/details
 ```
+
+**AdminController — Vehicle Colors**
+```
+GET    /api/admin/vehicle-colors           List all vehicle colours (AllowAnonymous — needed before login for forms)
+POST   /api/admin/vehicle-colors           Create colour (Admin only)
+PUT    /api/admin/vehicle-colors/{id}      Update colour (Admin only)
+DELETE /api/admin/vehicle-colors/{id}      Delete colour (Admin only)
+```
+Table seeded with 16 defaults (White, Black, Silver, Gray, Dark Gray, Blue, Dark Blue, Red, Orange, Green, Yellow, Beige, Brown, Gold, Maroon, Purple) on first startup via `Program.cs` DDL. Also auto-imports distinct existing `Vehicles."Color"` values.
 
 **RetentionController**
 ```
@@ -859,6 +871,10 @@ git push origin main:preview --force
 | **Settings page vs admin/users page — two user tables** | Users are managed in both `/settings` (UsersTab component) and `/admin/users`. They share the same API calls (`adminApi.getUsers`, `adminApi.deleteUser`) but are separate components. Changes to one UI must be mirrored in the other. |
 | **Retention: NULL SaleDate in LINQ comparisons** | `v.SaleDate <= now` returns `false` for NULL in SQL (NULL comparison semantics), silently excluding vehicles without a sale date. Always use `(v.SaleDate == null \|\| v.SaleDate <= now)` for nullable DateTime range queries. Also use `SaleDate ?? CreatedAt` as anchor for cohort analysis. |
 | **RetentionController DI** | `RetentionController` needs both `IMediator` (for MediatR queries) and `IRetentionEngine` (for the evaluate endpoint). Injecting only one will cause a runtime DI error. |
+| **ThemeColorApplicator login loop** | `ThemeColorApplicator` (mounted in root layout) calls `/api/company-settings` on every page render. Without a token this returns 401 → axios interceptor redirects to `/login` → infinite reload. Fix: (1) add `enabled: !!localStorage.getItem('access_token')` to the query; (2) add `&& window.location.pathname !== '/login'` guard to the 401 interceptor. |
+| **ServiceType: enum vs string migration** | `JobCard.ServiceType` and `ServiceRecord.ServiceType` are plain `string` — NOT the `ServiceType` enum — so custom catalogue types work. The enum still exists in the domain but is no longer used on these two entities. `ConvertToDeliveryNoteCommand` compares with `if (jobCard.ServiceType == "PDI")` (string literal), not `ServiceType.PDI`. DDL migration: `CASE WHEN "ServiceType" = 1 THEN 'RoutineMaintenance' ...` converts legacy integer values to string on startup. |
+| **Invalid hex chars in hardcoded UUID seed** | PostgreSQL `uuid` type requires all hex characters (`[0-9a-f]`). Using `vc000001-...` as a seed UUID caused the entire `DO $$` block to fail and roll back — including the `CREATE TABLE`. Fix: always use `gen_random_uuid()` for seed inserts, never hardcode UUIDs containing non-hex letters. |
+| **User name change not reflected immediately** | When an admin edits their own user record, the JWT in localStorage still holds the old name. Fix: after `adminApi.updateUser()` succeeds, call `refreshUser()` from `useAuth()` (which calls `GET /api/auth/me` and updates the stored token + auth context). |
 
 ---
 
@@ -891,3 +907,7 @@ git push origin main:preview --force
 | 23 | **Delete user icon — settings/page (Users tab)** | ✅ Done | Settings > Users tab only had reset-password and edit icons — no delete. Added `Trash2` delete button with same self-delete guard, delete confirmation dialog (destructive styling), and `adminApi.deleteUser` mutation. (session 8, 2026-06-29) |
 | 24 | **Retention real-data fix — SaleDate null exclusion** | ✅ Done | Vehicles without SaleDate were excluded from all retention calculations (`v.SaleDate <= now` returns false for NULL in SQL). Fixed: `(v.SaleDate == null \|\| v.SaleDate <= now)` in `GetRetentionSummaryAsync`, `GetRetentionTrendAsync`, `GetRetentionByBrandAsync`. Cohort analysis now uses `SaleDate ?? CreatedAt` as anchor. Visit frequency cohort also fixed. (session 8–9, 2026-06-29) |
 | 25 | **Retention analytics — professional improvements** | ✅ Done | Period KPI cards redesigned: actual date range, progress bar, per-period stats. Fleet Status section separated with "Evaluate Now" button (Admin/TechnicalDirector) and "Evaluated X ago" timestamp. Cohort year selector dropdown. Empty states for brand chart, trend chart, cohort table. `POST /api/retention/evaluate` endpoint added. (session 9, 2026-06-29) |
+| 26 | **ServiceType enum → string migration** | ✅ Done | `JobCard.ServiceType` and `ServiceRecord.ServiceType` changed from C# enum (stored as integer) to `string` so custom service types from the catalogue catalogue can be assigned. DDL patch in `Program.cs` converts existing integer values to string names on startup. All commands/queries/DTOs updated. (session 10, 2026-07-02) |
+| 27 | **Login page refresh loop fix** | ✅ Done | `ThemeColorApplicator` (in root layout) fired `/api/company-settings` on every page, including login, causing 401 → redirect loop. Fixed: `enabled: hasToken` guard on the query + `pathname !== '/login'` guard on the 401 interceptor. (session 10, 2026-07-02) |
+| 28 | **Vehicle Color CRUD dropdown** | ✅ Done | New `VehicleColor` entity + `GET/POST/PUT/DELETE /api/admin/vehicle-colors`. Create/Edit vehicle forms use dropdown from `vehicleColorsApi` instead of free-text input. Settings → Colors tab shows Vehicle Colors CRUD (brand color palette removed — not needed). 16 default colors seeded on first startup via `Program.cs` DDL using `gen_random_uuid()`. (sessions 10-11, 2026-07-02) |
+| 29 | **User profile name update — immediate effect** | ✅ Done | When an admin edits their own user record, `refreshUser()` is called after `updateMutation` succeeds. This calls `GET /api/auth/me`, updates the stored JWT, and refreshes the auth context so the new name is visible immediately without requiring a re-login. (session 10, 2026-07-02) |
