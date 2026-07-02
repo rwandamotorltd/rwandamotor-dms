@@ -9,7 +9,7 @@ namespace RwandaMotor.Application.Features.JobCards.Queries;
 public record GetJobCardsQuery(
     string? Search,
     JobCardStatus? Status,
-    ServiceType? ServiceType,
+    string? ServiceType,
     DateTime? DateFrom,
     DateTime? DateTo,
     int PageNumber = 1,
@@ -30,8 +30,8 @@ public class GetJobCardsQueryHandler : IRequestHandler<GetJobCardsQuery, Paginat
 
         if (q.Status.HasValue)
             query = query.Where(j => j.Status == q.Status.Value);
-        if (q.ServiceType.HasValue)
-            query = query.Where(j => j.ServiceType == q.ServiceType.Value);
+        if (!string.IsNullOrWhiteSpace(q.ServiceType))
+            query = query.Where(j => j.ServiceType == q.ServiceType);
         if (q.DateFrom.HasValue)
             query = query.Where(j => j.CreatedAt >= q.DateFrom.Value);
         if (q.DateTo.HasValue)
@@ -84,7 +84,7 @@ public record JobCardListItemDto(
     int Year,
     string? CustomerName,
     string? CustomerPhone,
-    ServiceType ServiceType,
+    string ServiceType,
     JobCardStatus Status,
     FuelLevel FuelLevel,
     int Mileage,

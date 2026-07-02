@@ -11,7 +11,7 @@ public record CreateJobCardCommand(
     Guid VehicleId,
     Guid? CustomerId,
     Guid? TechnicianId,
-    ServiceType ServiceType,
+    string ServiceType,
     FuelLevel FuelLevel,
     int Mileage,
     string? Notes,
@@ -181,7 +181,7 @@ file static class JobCardCreatedEmailBuilder
              + $"<tr><td style='{TDL}'>Vehicle</td><td style='{TD}'>{E($"{brand} {model}")} ({jc.Year})</td></tr>"
              + $"<tr><td style='{TDL}'>VIN</td><td style='{TD}'>{E(jc.VIN)}</td></tr>"
              + $"<tr><td style='{TDL}'>Plate Number</td><td style='{TD}'>{E(jc.PlateNumber)}</td></tr>"
-             + $"<tr><td style='{TDL}'>Service</td><td style='{TD}'>{E(jc.ServiceType.ToString())}</td></tr>"
+             + $"<tr><td style='{TDL}'>Service</td><td style='{TD}'>{E(jc.ServiceType)}</td></tr>"
              + $"<tr><td style='{TDL}'>Mileage In</td><td style='{TD}'>{jc.Mileage:N0} km</td></tr>"
              + $"<tr><td style='{TDL}'>Received By</td><td style='{TD}'>{E(advisor)}</td></tr>"
              + "</table>"

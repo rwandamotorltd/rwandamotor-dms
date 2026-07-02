@@ -1,7 +1,6 @@
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using RwandaMotor.Application.Common.Interfaces;
-using RwandaMotor.Domain.Enums;
 
 namespace RwandaMotor.Application.Features.ServiceRecords.Commands;
 
@@ -11,7 +10,7 @@ namespace RwandaMotor.Application.Features.ServiceRecords.Commands;
 /// </summary>
 public record DeleteAllServiceRecordsCommand(
     string? Search,
-    ServiceType? ServiceType,
+    string? ServiceType,
     DateTime? DateFrom,
     DateTime? DateTo
 ) : IRequest<int>;
@@ -35,7 +34,7 @@ public class DeleteAllServiceRecordsCommandHandler : IRequestHandler<DeleteAllSe
                 (sr.InvoiceNumber != null && sr.InvoiceNumber.ToLower().Contains(s)));
         }
 
-        if (cmd.ServiceType.HasValue)
+        if (!string.IsNullOrWhiteSpace(cmd.ServiceType))
             query = query.Where(sr => sr.ServiceType == cmd.ServiceType);
 
         if (cmd.DateFrom.HasValue)

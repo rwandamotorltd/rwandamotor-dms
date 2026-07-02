@@ -7,7 +7,7 @@ namespace RwandaMotor.Application.Features.JobCards.Commands;
 
 public record UpdateJobCardCommand(
     Guid Id,
-    ServiceType ServiceType,
+    string ServiceType,
     Guid? TechnicianId,
     FuelLevel FuelLevel,
     int Mileage,

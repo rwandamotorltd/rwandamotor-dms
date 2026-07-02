@@ -81,7 +81,7 @@ public record JobCardDetailDto(
     string? CustomerAddress,
     Guid? TechnicianId,
     string? TechnicianName,
-    ServiceType ServiceType,
+    string ServiceType,
     JobCardStatus Status,
     string? Notes,
     string? AdditionalInfo,

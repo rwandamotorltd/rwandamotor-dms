@@ -2,7 +2,6 @@ using MediatR;
 using Microsoft.EntityFrameworkCore;
 using RwandaMotor.Application.Common.Interfaces;
 using RwandaMotor.Application.Common.Models;
-using RwandaMotor.Domain.Enums;
 
 namespace RwandaMotor.Application.Features.ServiceRecords.Queries;
 
@@ -11,7 +10,7 @@ public record GetServiceRecordsQuery(
     Guid? CustomerId,
     Guid? TechnicianId,
     Guid? BayId,
-    ServiceType? ServiceType,
+    string? ServiceType,
     DateTime? DateFrom,
     DateTime? DateTo,
     string? Search,
@@ -38,7 +37,7 @@ public class GetServiceRecordsQueryHandler : IRequestHandler<GetServiceRecordsQu
         if (q.VehicleId.HasValue) query = query.Where(s => s.VehicleId == q.VehicleId);
         if (q.TechnicianId.HasValue) query = query.Where(s => s.TechnicianId == q.TechnicianId);
         if (q.BayId.HasValue) query = query.Where(s => s.BayId == q.BayId);
-        if (q.ServiceType.HasValue) query = query.Where(s => s.ServiceType == q.ServiceType);
+        if (!string.IsNullOrWhiteSpace(q.ServiceType)) query = query.Where(s => s.ServiceType == q.ServiceType);
         if (q.DateFrom.HasValue) query = query.Where(s => s.ServiceDate >= q.DateFrom);
         if (q.DateTo.HasValue) query = query.Where(s => s.ServiceDate <= q.DateTo);
         if (!string.IsNullOrWhiteSpace(q.Search))
@@ -91,7 +90,7 @@ public record ServiceRecordListItemDto(
     string? CustomerName,
     DateTime ServiceDate,
     int MileageAtService,
-    ServiceType ServiceType,
+    string ServiceType,
     Guid? TechnicianId,
     string? TechnicianName,
     string? BayName,

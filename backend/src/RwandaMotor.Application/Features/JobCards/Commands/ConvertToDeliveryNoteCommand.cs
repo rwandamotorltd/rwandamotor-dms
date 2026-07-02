@@ -86,7 +86,7 @@ public class ConvertToDeliveryNoteCommandHandler : IRequestHandler<ConvertToDeli
         }
 
         // If PDI -> create SalesHistory + auto-schedule welcome call follow-up
-        if (jobCard.ServiceType == ServiceType.PDI)
+        if (jobCard.ServiceType == "PDI")
         {
             _db.SalesHistories.Add(new SalesHistory
             {
@@ -145,7 +145,7 @@ public class ConvertToDeliveryNoteCommandHandler : IRequestHandler<ConvertToDeli
             string html;
             string subject;
 
-            if (jobCard.ServiceType == ServiceType.PDI)
+            if (jobCard.ServiceType == "PDI")
             {
                 html    = PdiWelcomeEmailBuilder.Build(jobCard, brandName, modelName, nextService, settings.EmailDeliveryNoteMessage);
                 subject = $"Welcome to the RWANDAMOTOR Family — {brandName} {modelName}".Trim();

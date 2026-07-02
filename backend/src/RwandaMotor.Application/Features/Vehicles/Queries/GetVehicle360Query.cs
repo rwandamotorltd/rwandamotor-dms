@@ -169,7 +169,7 @@ public record Vehicle360Dto(
     List<JobCard360Dto> JobCards);
 
 public record ServiceTimelineItemDto(
-    Guid Id, DateTime ServiceDate, ServiceType ServiceType,
+    Guid Id, DateTime ServiceDate, string ServiceType,
     int Mileage, string? TechnicianName, string? InvoiceNumber,
     decimal? TotalCost, bool IsWarrantyJob, string? Notes,
     string? ServiceDescription, List<ServicePartDto> Parts);
@@ -192,7 +192,7 @@ public record JobCard360Dto(
     string JobCardNumber,
     string? VIN,
     string? PlateNumber,
-    ServiceType ServiceType,
+    string ServiceType,
     JobCardStatus Status,
     int Mileage,
     Guid? TechnicianId,

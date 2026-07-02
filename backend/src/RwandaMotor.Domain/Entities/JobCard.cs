@@ -28,7 +28,7 @@ public class JobCard : BaseEntity
     public string? CustomerPhone { get; set; }
 
     // Service
-    public ServiceType ServiceType { get; set; }
+    public string ServiceType { get; set; } = string.Empty;
     public string? Notes { get; set; }
     public string? AdditionalInfo { get; set; }
 

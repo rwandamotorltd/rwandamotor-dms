@@ -2,7 +2,6 @@ using FluentValidation;
 using MediatR;
 using RwandaMotor.Application.Common.Interfaces;
 using RwandaMotor.Domain.Entities;
-using RwandaMotor.Domain.Enums;
 
 namespace RwandaMotor.Application.Features.ServiceRecords.Commands;
 
@@ -12,7 +11,7 @@ public record CreateServiceRecordCommand(
     Guid? BayId,
     DateTime ServiceDate,
     int MileageAtService,
-    ServiceType ServiceType,
+    string ServiceType,
     string? ServiceDescription,
     string? InvoiceNumber,
     decimal? LaborCost,

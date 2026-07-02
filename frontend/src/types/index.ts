@@ -5,9 +5,7 @@
 export type RetentionStatus = 'Active' | 'DueSoon' | 'Overdue' | 'Lost' | 'Recovered' | 'External';
 export type JobCardStatus = 'Open' | 'Closed';
 export type FuelLevel = 'Empty' | 'Quarter' | 'Half' | 'ThreeQuarter' | 'Full';
-export type ServiceType = 'RoutineMaintenance' | 'OilChange' | 'MajorService' | 'TyreRotation' |
-  'BrakeService' | 'TransmissionService' | 'AirConditioningService' | 'ElectricalDiagnostics' |
-  'BodyRepair' | 'WarrantyRepair' | 'RecallRepair' | 'PDI' | 'EmergencyRepair' | 'Inspection' | 'Other';
+export type ServiceType = string;
 export type CustomerCategory = 'Retail' | 'Corporate' | 'Government' | 'NGO' | 'Fleet' | 'VIP' | 'External';
 export type ContactMethod = 'Phone' | 'SMS' | 'Email' | 'WhatsApp' | 'InPerson';
 export type FollowUpStatus = 'Pending' | 'Contacted' | 'AppointmentBooked' | 'Recovered' | 'Unreachable' | 'Declined' | 'Closed';

@@ -4,7 +4,6 @@ using Microsoft.AspNetCore.Mvc;
 using RwandaMotor.Application.Common.Models;
 using RwandaMotor.Application.Features.ServiceRecords.Commands;
 using RwandaMotor.Application.Features.ServiceRecords.Queries;
-using RwandaMotor.Domain.Enums;
 
 namespace RwandaMotor.API.Controllers;
 
@@ -22,7 +21,7 @@ public class ServiceRecordsController : ControllerBase
         [FromQuery] Guid? vehicleId,
         [FromQuery] Guid? technicianId,
         [FromQuery] Guid? bayId,
-        [FromQuery] ServiceType? serviceType,
+        [FromQuery] string? serviceType,
         [FromQuery] DateTime? dateFrom,
         [FromQuery] DateTime? dateTo,
         [FromQuery] string? search,
@@ -72,7 +71,7 @@ public class ServiceRecordsController : ControllerBase
     [Authorize(Policy = "Admin")]
     public async Task<IActionResult> DeleteAllServiceRecords(
         [FromQuery] string? search,
-        [FromQuery] ServiceType? serviceType,
+        [FromQuery] string? serviceType,
         [FromQuery] DateTime? dateFrom,
         [FromQuery] DateTime? dateTo)
     {

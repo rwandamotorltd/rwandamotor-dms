@@ -651,8 +651,7 @@ public class ProcessImportCommandHandler
                 var mileage = (!string.IsNullOrWhiteSpace(mileageStr) && int.TryParse(mileageStr, out var parsedMileage) && parsedMileage >= 0)
                     ? parsedMileage : 0;
 
-                if (!Enum.TryParse<ServiceType>(serviceTypeStr, ignoreCase: true, out var serviceType))
-                    serviceType = ServiceType.RoutineMaintenance;
+                var serviceType = !string.IsNullOrWhiteSpace(serviceTypeStr) ? serviceTypeStr.Trim() : "RoutineMaintenance";
 
                 Technician? technician = null;
                 if (!string.IsNullOrWhiteSpace(technicianName))
@@ -754,8 +753,7 @@ public class ProcessImportCommandHandler
                 var mileage = (!string.IsNullOrWhiteSpace(mileageStr) && int.TryParse(mileageStr, out var parsedMileage) && parsedMileage >= 0)
                     ? parsedMileage : 0;
 
-                if (!Enum.TryParse<ServiceType>(serviceTypeStr, ignoreCase: true, out var serviceType))
-                    serviceType = ServiceType.RoutineMaintenance;
+                var serviceType = !string.IsNullOrWhiteSpace(serviceTypeStr) ? serviceTypeStr.Trim() : "RoutineMaintenance";
 
                 if (!Enum.TryParse<FuelLevel>(fuelLevelStr, ignoreCase: true, out var fuelLevel))
                     fuelLevel = FuelLevel.Half;

@@ -1,5 +1,4 @@
 using RwandaMotor.Domain.Common;
-using RwandaMotor.Domain.Enums;
 
 namespace RwandaMotor.Domain.Entities;
 
@@ -11,7 +10,7 @@ public class ServiceRecord : BaseEntity
 
     public DateTime ServiceDate { get; set; }
     public int MileageAtService { get; set; }
-    public ServiceType ServiceType { get; set; }
+    public string ServiceType { get; set; } = string.Empty;
     public string? ServiceDescription { get; set; }
 
     public string? InvoiceNumber { get; set; }

@@ -240,6 +240,66 @@ using (var scope = app.Services.CreateScope())
     }
     catch (Exception ex) { Log.Error(ex, "BrandColors table patch failed"); }
 
+    // Belt-and-suspenders: convert ServiceType columns from integer to text
+    try
+    {
+        await db.Database.ExecuteSqlRawAsync(@"
+            DO $$
+            BEGIN
+                IF EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_name = 'JobCards' AND column_name = 'ServiceType'
+                      AND data_type = 'integer'
+                ) THEN
+                    ALTER TABLE ""JobCards"" ALTER COLUMN ""ServiceType"" TYPE text
+                    USING CASE ""ServiceType""
+                        WHEN 1  THEN 'RoutineMaintenance'
+                        WHEN 2  THEN 'OilChange'
+                        WHEN 3  THEN 'MajorService'
+                        WHEN 4  THEN 'TyreRotation'
+                        WHEN 5  THEN 'BrakeService'
+                        WHEN 6  THEN 'TransmissionService'
+                        WHEN 7  THEN 'AirConditioningService'
+                        WHEN 8  THEN 'ElectricalDiagnostics'
+                        WHEN 9  THEN 'BodyRepair'
+                        WHEN 10 THEN 'WarrantyRepair'
+                        WHEN 11 THEN 'RecallRepair'
+                        WHEN 12 THEN 'PDI'
+                        WHEN 13 THEN 'EmergencyRepair'
+                        WHEN 14 THEN 'Inspection'
+                        WHEN 99 THEN 'Other'
+                        ELSE 'Other'
+                    END;
+                END IF;
+                IF EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_name = 'ServiceRecords' AND column_name = 'ServiceType'
+                      AND data_type = 'integer'
+                ) THEN
+                    ALTER TABLE ""ServiceRecords"" ALTER COLUMN ""ServiceType"" TYPE text
+                    USING CASE ""ServiceType""
+                        WHEN 1  THEN 'RoutineMaintenance'
+                        WHEN 2  THEN 'OilChange'
+                        WHEN 3  THEN 'MajorService'
+                        WHEN 4  THEN 'TyreRotation'
+                        WHEN 5  THEN 'BrakeService'
+                        WHEN 6  THEN 'TransmissionService'
+                        WHEN 7  THEN 'AirConditioningService'
+                        WHEN 8  THEN 'ElectricalDiagnostics'
+                        WHEN 9  THEN 'BodyRepair'
+                        WHEN 10 THEN 'WarrantyRepair'
+                        WHEN 11 THEN 'RecallRepair'
+                        WHEN 12 THEN 'PDI'
+                        WHEN 13 THEN 'EmergencyRepair'
+                        WHEN 14 THEN 'Inspection'
+                        WHEN 99 THEN 'Other'
+                        ELSE 'Other'
+                    END;
+                END IF;
+            END $$;");
+    }
+    catch (Exception ex) { Log.Error(ex, "ServiceType column conversion failed"); }
+
     // Belt-and-suspenders: create AppRoles + DocumentTemplates if migrations failed
     try
     {

@@ -30,7 +30,7 @@ public class JobCardsController : ControllerBase
     public async Task<IActionResult> GetJobCards(
         [FromQuery] string? search,
         [FromQuery] JobCardStatus? status,
-        [FromQuery] ServiceType? serviceType,
+        [FromQuery] string? serviceType,
         [FromQuery] DateTime? dateFrom,
         [FromQuery] DateTime? dateTo,
         [FromQuery] int pageNumber = 1,
@@ -112,7 +112,7 @@ public class JobCardsController : ControllerBase
     public async Task<IActionResult> DeleteAll(
         [FromQuery] string? search,
         [FromQuery] JobCardStatus? status,
-        [FromQuery] ServiceType? serviceType)
+        [FromQuery] string? serviceType)
     {
         var count = await _mediator.Send(new DeleteAllJobCardsCommand(search, status, serviceType));
         return Ok(ApiResponse<int>.Ok(count, $"{count} job card(s) deleted"));
@@ -176,7 +176,7 @@ file static class JobCardEmailBuilder
             + $"<tr><td style='{TDL}'>Plate Number</td><td style='{TD};font-weight:500'>{E(jc.PlateNumber)}</td></tr>"
             + $"<tr><td style='{TDL}'>Vehicle</td><td style='{TD};font-weight:500'>{E($"{jc.Year} {jc.BrandName} {jc.ModelName}")}</td></tr>"
             + $"<tr><td style='{TDL}'>Customer</td><td style='{TD};font-weight:500'>{E(jc.CustomerName)}</td></tr>"
-            + $"<tr><td style='{TDL}'>Service Type</td><td style='{TD};font-weight:500'>{E(jc.ServiceType.ToString())}</td></tr>"
+            + $"<tr><td style='{TDL}'>Service Type</td><td style='{TD};font-weight:500'>{E(jc.ServiceType)}</td></tr>"
             + $"<tr><td style='{TDL}'>Mileage In</td><td style='{TD};font-weight:500'>{jc.Mileage:N0} km</td></tr>"
             + $"<tr><td style='{TDL}'>Technician</td><td style='{TD};font-weight:500'>{E(jc.TechnicianName)}</td></tr>"
             + $"<tr><td style='{TDL}'>Status</td><td style='{TD};font-weight:500'>{jc.Status}</td></tr>"

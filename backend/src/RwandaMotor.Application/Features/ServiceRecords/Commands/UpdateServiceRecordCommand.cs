@@ -2,14 +2,13 @@ using FluentValidation;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using RwandaMotor.Application.Common.Interfaces;
-using RwandaMotor.Domain.Enums;
 
 namespace RwandaMotor.Application.Features.ServiceRecords.Commands;
 
 public record UpdateServiceRecordCommand(
     Guid Id,
     int? MileageAtService,
-    ServiceType? ServiceType,
+    string? ServiceType,
     Guid? TechnicianId,
     string? InvoiceNumber,
     string? ServiceDescription,
@@ -56,8 +55,8 @@ public class UpdateServiceRecordCommandHandler : IRequestHandler<UpdateServiceRe
             record.MileageAtService = cmd.MileageAtService.Value;
             mileageChanged = true;
         }
-        if (cmd.ServiceType.HasValue)
-            record.ServiceType = cmd.ServiceType.Value;
+        if (!string.IsNullOrWhiteSpace(cmd.ServiceType))
+            record.ServiceType = cmd.ServiceType;
         if (cmd.TechnicianId.HasValue)
             record.TechnicianId = cmd.TechnicianId.Value;
         if (cmd.InvoiceNumber is not null)

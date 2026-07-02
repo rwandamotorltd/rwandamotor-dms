@@ -8,7 +8,7 @@ namespace RwandaMotor.Application.Features.JobCards.Commands;
 public record DeleteAllJobCardsCommand(
     string? Search,
     JobCardStatus? Status,
-    ServiceType? ServiceType
+    string? ServiceType
 ) : IRequest<int>;
 
 public class DeleteAllJobCardsCommandHandler : IRequestHandler<DeleteAllJobCardsCommand, int>
@@ -24,8 +24,8 @@ public class DeleteAllJobCardsCommandHandler : IRequestHandler<DeleteAllJobCards
         if (cmd.Status.HasValue)
             query = query.Where(j => j.Status == cmd.Status.Value);
 
-        if (cmd.ServiceType.HasValue)
-            query = query.Where(j => j.ServiceType == cmd.ServiceType.Value);
+        if (!string.IsNullOrWhiteSpace(cmd.ServiceType))
+            query = query.Where(j => j.ServiceType == cmd.ServiceType);
 
         if (!string.IsNullOrWhiteSpace(cmd.Search))
         {

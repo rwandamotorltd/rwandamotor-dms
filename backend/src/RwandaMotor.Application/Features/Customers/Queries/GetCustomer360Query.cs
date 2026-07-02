@@ -153,7 +153,7 @@ public record CustomerServiceHistoryDto(
     string VehicleLabel,
     DateTime ServiceDate,
     int MileageAtService,
-    ServiceType ServiceType,
+    string ServiceType,
     string? TechnicianName,
     string? InvoiceNumber,
     decimal? TotalCost,
