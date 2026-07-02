@@ -40,7 +40,7 @@ public class GetJobCardQueryHandler : IRequestHandler<GetJobCardQuery, JobCardDe
             j.Vehicle.Model.Name,
             j.CustomerId,
             j.CustomerName,
-            j.CustomerPhone,
+            j.CustomerPhone ?? j.Customer?.Phone,
             j.Customer?.Email,
             j.Customer?.Address,
             j.TechnicianId,

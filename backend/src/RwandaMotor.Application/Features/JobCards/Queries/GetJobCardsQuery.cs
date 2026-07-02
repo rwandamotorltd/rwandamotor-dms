@@ -59,7 +59,7 @@ public class GetJobCardsQueryHandler : IRequestHandler<GetJobCardsQuery, Paginat
                 j.PlateNumber,
                 j.Year,
                 j.CustomerName,
-                j.CustomerPhone,
+                j.CustomerPhone ?? j.Customer!.Phone,
                 j.ServiceType,
                 j.Status,
                 j.FuelLevel,
