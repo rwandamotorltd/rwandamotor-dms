@@ -263,22 +263,22 @@ using (var scope = app.Services.CreateScope())
                 -- Seed standard colors if list is still empty
                 IF NOT EXISTS (SELECT 1 FROM ""VehicleColors"") THEN
                     INSERT INTO ""VehicleColors"" (""Id"", ""Name"", ""SortOrder"") VALUES
-                        ('vc000001-0000-0000-0000-000000000001', 'White',      1),
-                        ('vc000001-0000-0000-0000-000000000002', 'Black',      2),
-                        ('vc000001-0000-0000-0000-000000000003', 'Silver',     3),
-                        ('vc000001-0000-0000-0000-000000000004', 'Gray',       4),
-                        ('vc000001-0000-0000-0000-000000000005', 'Dark Gray',  5),
-                        ('vc000001-0000-0000-0000-000000000006', 'Blue',       6),
-                        ('vc000001-0000-0000-0000-000000000007', 'Dark Blue',  7),
-                        ('vc000001-0000-0000-0000-000000000008', 'Red',        8),
-                        ('vc000001-0000-0000-0000-000000000009', 'Orange',     9),
-                        ('vc000001-0000-0000-0000-000000000010', 'Green',     10),
-                        ('vc000001-0000-0000-0000-000000000011', 'Yellow',    11),
-                        ('vc000001-0000-0000-0000-000000000012', 'Beige',     12),
-                        ('vc000001-0000-0000-0000-000000000013', 'Brown',     13),
-                        ('vc000001-0000-0000-0000-000000000014', 'Gold',      14),
-                        ('vc000001-0000-0000-0000-000000000015', 'Maroon',    15),
-                        ('vc000001-0000-0000-0000-000000000016', 'Purple',    16);
+                        (gen_random_uuid(), 'White',      1),
+                        (gen_random_uuid(), 'Black',      2),
+                        (gen_random_uuid(), 'Silver',     3),
+                        (gen_random_uuid(), 'Gray',       4),
+                        (gen_random_uuid(), 'Dark Gray',  5),
+                        (gen_random_uuid(), 'Blue',       6),
+                        (gen_random_uuid(), 'Dark Blue',  7),
+                        (gen_random_uuid(), 'Red',        8),
+                        (gen_random_uuid(), 'Orange',     9),
+                        (gen_random_uuid(), 'Green',     10),
+                        (gen_random_uuid(), 'Yellow',    11),
+                        (gen_random_uuid(), 'Beige',     12),
+                        (gen_random_uuid(), 'Brown',     13),
+                        (gen_random_uuid(), 'Gold',      14),
+                        (gen_random_uuid(), 'Maroon',    15),
+                        (gen_random_uuid(), 'Purple',    16);
                 END IF;
 
                 -- Import any existing vehicle colors from the Vehicles table not already in the list

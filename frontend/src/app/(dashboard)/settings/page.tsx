@@ -2261,6 +2261,9 @@ function VehicleColorsCard() {
     queryFn: () => vehicleColorsApi.list(),
   });
 
+  const apiErr = (e: unknown) =>
+    (e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? "Request failed";
+
   const createMut = useMutation({
     mutationFn: (name: string) => vehicleColorsApi.create({ name }),
     onSuccess: res => {
@@ -2270,6 +2273,7 @@ function VehicleColorsCard() {
       setNewName("");
       toast.success("Vehicle color added");
     },
+    onError: (e: unknown) => toast.error(apiErr(e)),
   });
 
   const updateMut = useMutation({
@@ -2280,6 +2284,7 @@ function VehicleColorsCard() {
       setEditingColor(null);
       toast.success("Color updated");
     },
+    onError: (e: unknown) => toast.error(apiErr(e)),
   });
 
   const deleteMut = useMutation({
@@ -2289,6 +2294,7 @@ function VehicleColorsCard() {
       qc.invalidateQueries({ queryKey: ["vehicle-colors"] });
       toast.success("Color deleted");
     },
+    onError: (e: unknown) => toast.error(apiErr(e)),
   });
 
   return (
