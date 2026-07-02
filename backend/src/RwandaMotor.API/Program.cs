@@ -246,6 +246,7 @@ using (var scope = app.Services.CreateScope())
         await db.Database.ExecuteSqlRawAsync(@"
             DO $$
             BEGIN
+                -- Create table if it doesn't exist
                 IF NOT EXISTS (
                     SELECT 1 FROM pg_catalog.pg_class c
                     JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
@@ -257,6 +258,10 @@ using (var scope = app.Services.CreateScope())
                         ""SortOrder"" integer NOT NULL DEFAULT 0,
                         CONSTRAINT ""PK_VehicleColors"" PRIMARY KEY (""Id"")
                     );
+                END IF;
+
+                -- Seed standard colors if list is still empty
+                IF NOT EXISTS (SELECT 1 FROM ""VehicleColors"") THEN
                     INSERT INTO ""VehicleColors"" (""Id"", ""Name"", ""SortOrder"") VALUES
                         ('vc000001-0000-0000-0000-000000000001', 'White',      1),
                         ('vc000001-0000-0000-0000-000000000002', 'Black',      2),
@@ -275,6 +280,19 @@ using (var scope = app.Services.CreateScope())
                         ('vc000001-0000-0000-0000-000000000015', 'Maroon',    15),
                         ('vc000001-0000-0000-0000-000000000016', 'Purple',    16);
                 END IF;
+
+                -- Import any existing vehicle colors from the Vehicles table not already in the list
+                INSERT INTO ""VehicleColors"" (""Id"", ""Name"", ""SortOrder"")
+                SELECT gen_random_uuid(), TRIM(v.""Color""), 50
+                FROM (
+                    SELECT DISTINCT TRIM(""Color"") AS ""Color""
+                    FROM ""Vehicles""
+                    WHERE ""Color"" IS NOT NULL AND TRIM(""Color"") <> ''
+                ) v
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM ""VehicleColors"" vc
+                    WHERE LOWER(vc.""Name"") = LOWER(TRIM(v.""Color""))
+                );
             END $$;");
     }
     catch (Exception ex) { Log.Error(ex, "VehicleColors table patch failed"); }
