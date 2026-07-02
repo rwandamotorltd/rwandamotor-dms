@@ -14,7 +14,7 @@ import {
   Pencil, Check, X, Layers, CheckSquare, SquareDashed,
   Save, AlertTriangle, Trash2, Download, Plus, UserPlus
 } from "lucide-react";
-import { vehiclesApi, brandsApi, customersApi, type UpdateVehiclePayload, type BulkUpdatePayload } from "@/lib/api";
+import { vehiclesApi, brandsApi, customersApi, vehicleColorsApi, type UpdateVehiclePayload, type BulkUpdatePayload } from "@/lib/api";
 import type { VehicleListItem, RetentionStatus } from "@/types";
 import { toast } from "sonner";
 import { RetentionBadge } from "@/components/shared/retention-badge";
@@ -158,6 +158,7 @@ function CreateVehicleDialog({ open, onClose, onCreated }: {
   }, [open]);
 
   const { data: brands } = useQuery({ queryKey: ["brands"], queryFn: () => brandsApi.list() });
+  const { data: vehicleColors } = useQuery({ queryKey: ["vehicle-colors"], queryFn: () => vehicleColorsApi.list() });
   const selectedBrand = brands?.find(b => b.id === brandId);
   const models = selectedBrand?.models ?? [];
 
@@ -274,7 +275,17 @@ function CreateVehicleDialog({ open, onClose, onCreated }: {
             </div>
             <div className="space-y-1">
               <Label>Color</Label>
-              <Input value={color} onChange={e => setColor(e.target.value)} placeholder="White" />
+              <Select value={color} onValueChange={v => setColor(v === "__none__" ? "" : (v ?? ""))}>
+                <SelectTrigger className="w-full">
+                  <span className={`flex flex-1 text-left${!color ? " text-muted-foreground" : ""}`}>
+                    {color || "Select color"}
+                  </span>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">— None —</SelectItem>
+                  {vehicleColors?.map(c => <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-1">
               <Label>Mileage (km)</Label>

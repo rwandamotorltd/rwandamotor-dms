@@ -1,5 +1,5 @@
 import axios, { AxiosInstance } from 'axios';
-import type { ApiResponse, AuthResponse, DashboardKpis, PaginatedResult, RetentionAnalytics, VisitFrequencyCohort, CohortVehicle, RetentionStatus, Vehicle360, Customer360, VehicleListItem, CustomerListItem, ServiceRecordListItem, ServicePolicy, JobCardListItem, JobCardDetail, JobCardStatus, ServiceType, FuelLevel, CompanySettings, BrandColor } from '@/types';
+import type { ApiResponse, AuthResponse, DashboardKpis, PaginatedResult, RetentionAnalytics, VisitFrequencyCohort, CohortVehicle, RetentionStatus, Vehicle360, Customer360, VehicleListItem, CustomerListItem, ServiceRecordListItem, ServicePolicy, JobCardListItem, JobCardDetail, JobCardStatus, ServiceType, FuelLevel, CompanySettings, BrandColor, VehicleColor } from '@/types';
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5000/api';
 
@@ -470,6 +470,26 @@ export const brandColorsApi = {
 
   delete: (id: string) =>
     api.delete<ApiResponse<boolean>>('/admin/brand-colors/' + id).then(r => r.data),
+};
+
+// ============================================================
+// Admin — Vehicle Colors
+// ============================================================
+export interface CreateVehicleColorPayload { name: string; sortOrder?: number; }
+export interface UpdateVehicleColorPayload { id: string; name: string; sortOrder: number; }
+
+export const vehicleColorsApi = {
+  list: () =>
+    api.get<ApiResponse<VehicleColor[]>>('/admin/vehicle-colors').then(r => r.data.data!),
+
+  create: (payload: CreateVehicleColorPayload) =>
+    api.post<ApiResponse<VehicleColor>>('/admin/vehicle-colors', payload).then(r => r.data),
+
+  update: (payload: UpdateVehicleColorPayload) =>
+    api.put<ApiResponse<boolean>>('/admin/vehicle-colors/' + payload.id, payload).then(r => r.data),
+
+  delete: (id: string) =>
+    api.delete<ApiResponse<boolean>>('/admin/vehicle-colors/' + id).then(r => r.data),
 };
 
 // ============================================================

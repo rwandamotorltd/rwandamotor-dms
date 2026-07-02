@@ -425,6 +425,12 @@ export interface BrandColor {
   sortOrder: number;
 }
 
+export interface VehicleColor {
+  id: string;
+  name: string;
+  sortOrder: number;
+}
+
 export interface ServiceTypeItem {
   value: string;
   label: string;

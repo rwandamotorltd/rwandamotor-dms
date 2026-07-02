@@ -9,7 +9,7 @@ import {
   CheckCircle2, Calendar, Gauge, Bell,
   Phone, Mail, Star, Pencil, X, FileText, Users, Search
 } from "lucide-react";
-import { vehiclesApi, servicePoliciesApi, brandsApi, customersApi, type UpdateVehiclePayload, type BrandDto } from "@/lib/api";
+import { vehiclesApi, servicePoliciesApi, brandsApi, customersApi, vehicleColorsApi, type UpdateVehiclePayload, type BrandDto } from "@/lib/api";
 import { useAuth } from "@/contexts/auth-context";
 import { RetentionBadge } from "@/components/shared/retention-badge";
 import { KpiCard } from "@/components/shared/kpi-card";
@@ -73,6 +73,7 @@ interface EditModalProps {
   policies: ServicePolicy[];
   brands: BrandDto[];
   brandsLoading: boolean;
+  vehicleColors: { id: string; name: string }[];
   currentBrandName: string;
   currentModelName: string;
   onChange: (patch: Partial<EditFormState>) => void;
@@ -82,7 +83,7 @@ interface EditModalProps {
   error: string | null;
 }
 
-function EditVehicleModal({ form, policies, brands, brandsLoading, currentBrandName, currentModelName, onChange, onSave, onClose, saving, error }: EditModalProps) {
+function EditVehicleModal({ form, policies, brands, brandsLoading, vehicleColors, currentBrandName, currentModelName, onChange, onSave, onClose, saving, error }: EditModalProps) {
   const selectedBrand = brands.find(b => b.id === form.brandId);
   const modelsForBrand = selectedBrand?.models ?? [];
 
@@ -178,11 +179,17 @@ function EditVehicleModal({ form, policies, brands, brandsLoading, currentBrandN
             </div>
             <div className="space-y-1.5">
               <Label>Color</Label>
-              <Input
-                value={form.color}
-                onChange={e => onChange({ color: e.target.value })}
-                placeholder="e.g. Silver"
-              />
+              <Select value={form.color || "__none__"} onValueChange={v => onChange({ color: v === "__none__" ? "" : (v ?? "") })}>
+                <SelectTrigger className="w-full">
+                  <span className={`flex flex-1 text-left${!form.color ? " text-muted-foreground" : ""}`}>
+                    {form.color || "Select color"}
+                  </span>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">— None —</SelectItem>
+                  {vehicleColors.map(c => <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
@@ -501,6 +508,12 @@ export default function Vehicle360Page({ params }: { params: Promise<{ id: strin
     queryKey: ["brands"],
     queryFn: () => brandsApi.list(),
     enabled: canEdit,
+    staleTime: 10 * 60 * 1000,
+  });
+
+  const { data: vehicleColors = [] } = useQuery({
+    queryKey: ["vehicle-colors"],
+    queryFn: () => vehicleColorsApi.list(),
     staleTime: 10 * 60 * 1000,
   });
 
@@ -1066,6 +1079,7 @@ export default function Vehicle360Page({ params }: { params: Promise<{ id: strin
           policies={policies}
           brands={brands}
           brandsLoading={brandsLoading}
+          vehicleColors={vehicleColors}
           currentBrandName={vehicle?.brandName ?? ""}
           currentModelName={vehicle?.modelName ?? ""}
           onChange={patch => setEditForm(f => f ? { ...f, ...patch } : f)}

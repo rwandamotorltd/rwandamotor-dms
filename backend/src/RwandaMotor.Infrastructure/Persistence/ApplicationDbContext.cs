@@ -40,6 +40,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>, IApplica
     public DbSet<DocumentTemplate> DocumentTemplates => Set<DocumentTemplate>();
     public DbSet<AppRole> AppRoles => Set<AppRole>();
     public DbSet<BrandColor> BrandColors => Set<BrandColor>();
+    public DbSet<VehicleColor> VehicleColors => Set<VehicleColor>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {

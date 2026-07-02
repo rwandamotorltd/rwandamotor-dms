@@ -117,6 +117,40 @@ public class AdminController : ControllerBase
         return Ok(ApiResponse<bool>.Ok(true));
     }
 
+    // ── Vehicle Colors ────────────────────────────────────────────────────────
+
+    [HttpGet("vehicle-colors")]
+    [AllowAnonymous]
+    public async Task<IActionResult> GetVehicleColors()
+    {
+        var result = await _mediator.Send(new GetVehicleColorsQuery());
+        return Ok(ApiResponse<List<VehicleColorDto>>.Ok(result));
+    }
+
+    [HttpPost("vehicle-colors")]
+    public async Task<IActionResult> CreateVehicleColor([FromBody] CreateVehicleColorCommand command)
+    {
+        var result = await _mediator.Send(command);
+        return Ok(ApiResponse<VehicleColorDto>.Ok(result, "Color created"));
+    }
+
+    [HttpPut("vehicle-colors/{id:guid}")]
+    public async Task<IActionResult> UpdateVehicleColor(Guid id, [FromBody] UpdateVehicleColorCommand command)
+    {
+        var cmd = command with { Id = id };
+        var (success, error) = await _mediator.Send(cmd);
+        if (!success) return BadRequest(ApiResponse<bool>.Fail(error ?? "Failed"));
+        return Ok(ApiResponse<bool>.Ok(true));
+    }
+
+    [HttpDelete("vehicle-colors/{id:guid}")]
+    public async Task<IActionResult> DeleteVehicleColor(Guid id)
+    {
+        var (success, error) = await _mediator.Send(new DeleteVehicleColorCommand(id));
+        if (!success) return BadRequest(ApiResponse<bool>.Fail(error ?? "Failed"));
+        return Ok(ApiResponse<bool>.Ok(true));
+    }
+
     // ── Catalogue — Brands ────────────────────────────────────────────────────
 
     [HttpGet("catalogue/brands")]

@@ -240,6 +240,45 @@ using (var scope = app.Services.CreateScope())
     }
     catch (Exception ex) { Log.Error(ex, "BrandColors table patch failed"); }
 
+    // Belt-and-suspenders: create VehicleColors table if migrations failed
+    try
+    {
+        await db.Database.ExecuteSqlRawAsync(@"
+            DO $$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1 FROM pg_catalog.pg_class c
+                    JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+                    WHERE c.relname = 'VehicleColors' AND n.nspname = 'public'
+                ) THEN
+                    CREATE TABLE ""VehicleColors"" (
+                        ""Id""        uuid    NOT NULL,
+                        ""Name""      text    NOT NULL,
+                        ""SortOrder"" integer NOT NULL DEFAULT 0,
+                        CONSTRAINT ""PK_VehicleColors"" PRIMARY KEY (""Id"")
+                    );
+                    INSERT INTO ""VehicleColors"" (""Id"", ""Name"", ""SortOrder"") VALUES
+                        ('vc000001-0000-0000-0000-000000000001', 'White',      1),
+                        ('vc000001-0000-0000-0000-000000000002', 'Black',      2),
+                        ('vc000001-0000-0000-0000-000000000003', 'Silver',     3),
+                        ('vc000001-0000-0000-0000-000000000004', 'Gray',       4),
+                        ('vc000001-0000-0000-0000-000000000005', 'Dark Gray',  5),
+                        ('vc000001-0000-0000-0000-000000000006', 'Blue',       6),
+                        ('vc000001-0000-0000-0000-000000000007', 'Dark Blue',  7),
+                        ('vc000001-0000-0000-0000-000000000008', 'Red',        8),
+                        ('vc000001-0000-0000-0000-000000000009', 'Orange',     9),
+                        ('vc000001-0000-0000-0000-000000000010', 'Green',     10),
+                        ('vc000001-0000-0000-0000-000000000011', 'Yellow',    11),
+                        ('vc000001-0000-0000-0000-000000000012', 'Beige',     12),
+                        ('vc000001-0000-0000-0000-000000000013', 'Brown',     13),
+                        ('vc000001-0000-0000-0000-000000000014', 'Gold',      14),
+                        ('vc000001-0000-0000-0000-000000000015', 'Maroon',    15),
+                        ('vc000001-0000-0000-0000-000000000016', 'Purple',    16);
+                END IF;
+            END $$;");
+    }
+    catch (Exception ex) { Log.Error(ex, "VehicleColors table patch failed"); }
+
     // Belt-and-suspenders: convert ServiceType columns from integer to text
     try
     {

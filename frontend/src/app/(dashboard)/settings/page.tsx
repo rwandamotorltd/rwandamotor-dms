@@ -13,14 +13,14 @@ import { useAuth } from "@/contexts/auth-context";
 import { useRouter } from "next/navigation";
 import {
   adminApi, permissionGroupsApi, companySettingsApi, catalogueApi, templatesApi, rolesApi,
-  brandColorsApi,
+  brandColorsApi, vehicleColorsApi,
   type UserItem, type CreateUserPayload, type UpdateUserPayload,
   type PermissionGroupItem, type CreatePermissionGroupPayload,
   type CatalogueBrandDto, type CatalogueModelDto, type BulkImportCatalogueResult,
   type CataloguePreviewResult, type CataloguePreviewRow,
   type RoleItem, type CreateBrandColorPayload,
 } from "@/lib/api";
-import type { BrandColor } from "@/types";
+import type { BrandColor, VehicleColor } from "@/types";
 import { DOCUMENT_TYPE_LABELS } from "@/types/templates";
 import { jobCardsApi } from "@/lib/api";
 import type { CompanySettings, ServiceTypeItem } from "@/types";
@@ -2385,7 +2385,117 @@ function ColorsTab() {
           )}
         </CardContent>
       </Card>
+
+      <VehicleColorsCard />
     </div>
+  );
+}
+
+function VehicleColorsCard() {
+  const qc = useQueryClient();
+  const [showForm, setShowForm] = useState(false);
+  const [editingColor, setEditingColor] = useState<VehicleColor | null>(null);
+  const [newName, setNewName] = useState("");
+
+  const { data: colors = [], isLoading } = useQuery({
+    queryKey: ["vehicle-colors"],
+    queryFn: () => vehicleColorsApi.list(),
+  });
+
+  const createMut = useMutation({
+    mutationFn: (name: string) => vehicleColorsApi.create({ name }),
+    onSuccess: res => {
+      if (!res.success) { toast.error(res.message ?? "Failed"); return; }
+      qc.invalidateQueries({ queryKey: ["vehicle-colors"] });
+      setShowForm(false);
+      setNewName("");
+      toast.success("Vehicle color added");
+    },
+  });
+
+  const updateMut = useMutation({
+    mutationFn: (c: VehicleColor) => vehicleColorsApi.update({ id: c.id, name: c.name, sortOrder: c.sortOrder }),
+    onSuccess: res => {
+      if (!res.success) { toast.error(res.message ?? "Failed"); return; }
+      qc.invalidateQueries({ queryKey: ["vehicle-colors"] });
+      setEditingColor(null);
+      toast.success("Color updated");
+    },
+  });
+
+  const deleteMut = useMutation({
+    mutationFn: (id: string) => vehicleColorsApi.delete(id),
+    onSuccess: res => {
+      if (!res.success) { toast.error(res.message ?? "Failed"); return; }
+      qc.invalidateQueries({ queryKey: ["vehicle-colors"] });
+      toast.success("Color deleted");
+    },
+  });
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base flex items-center gap-2">
+          <Car className="w-4 h-4 text-muted-foreground" /> Vehicle Colors
+        </CardTitle>
+        <CardDescription>
+          Manage the color options available when adding or editing vehicles.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {isLoading ? (
+          <div className="space-y-2">{[...Array(4)].map((_, i) => <Skeleton key={i} className="h-9 w-full" />)}</div>
+        ) : (
+          <div className="space-y-2">
+            {colors.map(c => (
+              <div key={c.id} className="flex items-center gap-3 p-2 rounded-lg border bg-muted/30">
+                {editingColor?.id === c.id ? (
+                  <div className="flex flex-1 items-center gap-2">
+                    <Input
+                      className="h-7 text-sm flex-1"
+                      value={editingColor.name}
+                      onChange={e => setEditingColor(ec => ec ? { ...ec, name: e.target.value } : ec)}
+                      onKeyDown={e => { if (e.key === "Enter") updateMut.mutate(editingColor); if (e.key === "Escape") setEditingColor(null); }}
+                    />
+                    <Button size="sm" className="h-7 text-xs" onClick={() => updateMut.mutate(editingColor)} disabled={updateMut.isPending || !editingColor.name.trim()}>Save</Button>
+                    <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setEditingColor(null)}><X className="w-3 h-3" /></Button>
+                  </div>
+                ) : (
+                  <>
+                    <span className="flex-1 text-sm font-medium">{c.name}</span>
+                    <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setEditingColor(c)}>
+                      <Pencil className="w-3 h-3" />
+                    </Button>
+                    <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => deleteMut.mutate(c.id)} disabled={deleteMut.isPending}>
+                      <Trash2 className="w-3 h-3" />
+                    </Button>
+                  </>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {showForm ? (
+          <div className="flex items-center gap-2 p-3 border rounded-lg bg-muted/20">
+            <Input
+              className="h-8 text-sm flex-1"
+              placeholder="Color name (e.g. Pearl White)"
+              value={newName}
+              onChange={e => setNewName(e.target.value)}
+              onKeyDown={e => { if (e.key === "Enter" && newName.trim()) createMut.mutate(newName.trim()); }}
+              autoFocus
+            />
+            <Button size="sm" onClick={() => createMut.mutate(newName.trim())} disabled={!newName.trim() || createMut.isPending}>Add</Button>
+            <Button size="sm" variant="ghost" onClick={() => { setShowForm(false); setNewName(""); }}><X className="w-3.5 h-3.5" /></Button>
+          </div>
+        ) : (
+          <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setShowForm(true)}>
+            <Plus className="w-3.5 h-3.5" /> Add Color
+          </Button>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
