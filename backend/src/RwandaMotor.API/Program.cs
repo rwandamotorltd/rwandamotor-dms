@@ -196,9 +196,49 @@ using (var scope = app.Services.CreateScope())
                 ) THEN
                     ALTER TABLE ""CompanySettings"" ADD COLUMN ""PwaOrientation"" text NOT NULL DEFAULT 'portrait';
                 END IF;
+
+                IF NOT EXISTS (
+                    SELECT 1 FROM pg_catalog.pg_attribute a
+                    JOIN pg_catalog.pg_class c ON c.oid = a.attrelid
+                    JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+                    WHERE c.relname = 'CompanySettings' AND n.nspname = 'public'
+                      AND a.attname = 'PrimaryColor' AND a.attnum > 0 AND NOT a.attisdropped
+                ) THEN
+                    ALTER TABLE ""CompanySettings"" ADD COLUMN ""PrimaryColor"" text NOT NULL DEFAULT '#3b82f6';
+                END IF;
             END $$;");
     }
     catch (Exception ex) { Log.Error(ex, "Schema column patch failed"); }
+
+    // Belt-and-suspenders: create BrandColors table if migrations failed
+    try
+    {
+        await db.Database.ExecuteSqlRawAsync(@"
+            DO $$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1 FROM pg_catalog.pg_class c
+                    JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+                    WHERE c.relname = 'BrandColors' AND n.nspname = 'public'
+                ) THEN
+                    CREATE TABLE ""BrandColors"" (
+                        ""Id""        uuid    NOT NULL,
+                        ""Name""      text    NOT NULL,
+                        ""HexValue""  text    NOT NULL,
+                        ""SortOrder"" integer NOT NULL DEFAULT 0,
+                        CONSTRAINT ""PK_BrandColors"" PRIMARY KEY (""Id"")
+                    );
+                    INSERT INTO ""BrandColors"" (""Id"", ""Name"", ""HexValue"", ""SortOrder"") VALUES
+                        ('b1000001-0000-0000-0000-000000000001', 'Blue',    '#3b82f6', 1),
+                        ('b1000001-0000-0000-0000-000000000002', 'Indigo',  '#6366f1', 2),
+                        ('b1000001-0000-0000-0000-000000000003', 'Emerald', '#10b981', 3),
+                        ('b1000001-0000-0000-0000-000000000004', 'Rose',    '#f43f5e', 4),
+                        ('b1000001-0000-0000-0000-000000000005', 'Amber',   '#f59e0b', 5),
+                        ('b1000001-0000-0000-0000-000000000006', 'Violet',  '#8b5cf6', 6);
+                END IF;
+            END $$;");
+    }
+    catch (Exception ex) { Log.Error(ex, "BrandColors table patch failed"); }
 
     // Belt-and-suspenders: create AppRoles + DocumentTemplates if migrations failed
     try

@@ -20,7 +20,8 @@ public record UpdateCompanySettingsCommand(
     string? EmailJobCardMessage,
     string? EmailDeliveryNoteMessage,
     string? ServiceTypesConfig,
-    string PwaOrientation = "portrait"
+    string PwaOrientation = "portrait",
+    string PrimaryColor = "#3b82f6"
 ) : IRequest<bool>;
 
 public class UpdateCompanySettingsCommandHandler : IRequestHandler<UpdateCompanySettingsCommand, bool>
@@ -55,6 +56,7 @@ public class UpdateCompanySettingsCommandHandler : IRequestHandler<UpdateCompany
         settings.EmailDeliveryNoteMessage  = request.EmailDeliveryNoteMessage;
         settings.ServiceTypesConfig        = request.ServiceTypesConfig;
         settings.PwaOrientation            = request.PwaOrientation;
+        settings.PrimaryColor              = request.PrimaryColor;
         settings.UpdatedAt                 = DateTime.UtcNow;
 
         await _db.SaveChangesAsync(ct);

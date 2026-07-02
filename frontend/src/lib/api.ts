@@ -1,5 +1,5 @@
 import axios, { AxiosInstance } from 'axios';
-import type { ApiResponse, AuthResponse, DashboardKpis, PaginatedResult, RetentionAnalytics, VisitFrequencyCohort, CohortVehicle, RetentionStatus, Vehicle360, Customer360, VehicleListItem, CustomerListItem, ServiceRecordListItem, ServicePolicy, JobCardListItem, JobCardDetail, JobCardStatus, ServiceType, FuelLevel, CompanySettings } from '@/types';
+import type { ApiResponse, AuthResponse, DashboardKpis, PaginatedResult, RetentionAnalytics, VisitFrequencyCohort, CohortVehicle, RetentionStatus, Vehicle360, Customer360, VehicleListItem, CustomerListItem, ServiceRecordListItem, ServicePolicy, JobCardListItem, JobCardDetail, JobCardStatus, ServiceType, FuelLevel, CompanySettings, BrandColor } from '@/types';
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5000/api';
 
@@ -37,6 +37,9 @@ const api = createApiClient();
 export const authApi = {
   login: (email: string, password: string) =>
     api.post<ApiResponse<AuthResponse>>('/auth/login', { email, password }).then(r => r.data),
+
+  me: () =>
+    api.get<ApiResponse<AuthResponse>>('/auth/me').then(r => r.data),
 };
 
 // ============================================================
@@ -447,6 +450,26 @@ export const adminApi = {
 
   purgeData: () =>
     api.post<ApiResponse<boolean>>('/admin/purge-data').then(r => r.data),
+};
+
+// ============================================================
+// Admin — Brand Colors
+// ============================================================
+export interface CreateBrandColorPayload { name: string; hexValue: string; sortOrder?: number; }
+export interface UpdateBrandColorPayload { id: string; name: string; hexValue: string; sortOrder: number; }
+
+export const brandColorsApi = {
+  list: () =>
+    api.get<ApiResponse<BrandColor[]>>('/admin/brand-colors').then(r => r.data.data!),
+
+  create: (payload: CreateBrandColorPayload) =>
+    api.post<ApiResponse<BrandColor>>('/admin/brand-colors', payload).then(r => r.data),
+
+  update: (payload: UpdateBrandColorPayload) =>
+    api.put<ApiResponse<boolean>>('/admin/brand-colors/' + payload.id, payload).then(r => r.data),
+
+  delete: (id: string) =>
+    api.delete<ApiResponse<boolean>>('/admin/brand-colors/' + id).then(r => r.data),
 };
 
 // ============================================================

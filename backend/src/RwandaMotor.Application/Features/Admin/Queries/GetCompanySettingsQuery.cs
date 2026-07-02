@@ -22,7 +22,8 @@ public record CompanySettingsDto(
     string? EmailJobCardMessage,
     string? EmailDeliveryNoteMessage,
     string? ServiceTypesConfig,
-    string PwaOrientation
+    string PwaOrientation,
+    string PrimaryColor
 );
 
 public class GetCompanySettingsQueryHandler : IRequestHandler<GetCompanySettingsQuery, CompanySettingsDto>
@@ -52,7 +53,8 @@ public class GetCompanySettingsQueryHandler : IRequestHandler<GetCompanySettings
             settings.EmailJobCardMessage,
             settings.EmailDeliveryNoteMessage,
             settings.ServiceTypesConfig,
-            settings.PwaOrientation
+            settings.PwaOrientation,
+            settings.PrimaryColor
         );
     }
 }

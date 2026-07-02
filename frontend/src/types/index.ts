@@ -416,6 +416,15 @@ export interface CompanySettings {
   emailJobCardMessage: string | null;
   emailDeliveryNoteMessage: string | null;
   serviceTypesConfig: string | null;
+  pwaOrientation?: string;
+  primaryColor?: string;
+}
+
+export interface BrandColor {
+  id: string;
+  name: string;
+  hexValue: string;
+  sortOrder: number;
 }
 
 export interface ServiceTypeItem {

@@ -28,6 +28,7 @@ public interface IApplicationDbContext
     DbSet<Notification> Notifications { get; }
     DbSet<DocumentTemplate> DocumentTemplates { get; }
     DbSet<AppRole> AppRoles { get; }
+    DbSet<BrandColor> BrandColors { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

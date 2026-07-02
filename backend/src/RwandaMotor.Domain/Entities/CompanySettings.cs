@@ -44,5 +44,8 @@ public class CompanySettings
     // PWA orientation: "portrait" | "landscape" | "any"
     public string PwaOrientation { get; set; } = "portrait";
 
+    // Brand primary color (hex, e.g. "#3b82f6")
+    public string PrimaryColor { get; set; } = "#3b82f6";
+
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 }

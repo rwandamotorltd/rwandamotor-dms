@@ -10,6 +10,7 @@ interface AuthContextValue {
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
+  refreshUser: () => Promise<void>;
   hasPermission: (key: string) => boolean;
 }
 
@@ -46,6 +47,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     router.push("/dashboard");
   };
 
+  const refreshUser = async () => {
+    try {
+      const res = await authApi.me();
+      if (!res.success || !res.data) return;
+      const { accessToken, userId, fullName, email: userEmail, role, permissions = [] } = res.data;
+      localStorage.setItem("access_token", accessToken);
+      const authUser: AuthUser = { userId, fullName, email: userEmail, role, permissions };
+      localStorage.setItem("auth_user", JSON.stringify(authUser));
+      setUser(authUser);
+    } catch { /* ignore — stale token stays */ }
+  };
+
   const logout = () => {
     localStorage.removeItem("access_token");
     localStorage.removeItem("auth_user");
@@ -61,7 +74,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, logout, hasPermission }}>
+    <AuthContext.Provider value={{ user, isLoading, login, logout, refreshUser, hasPermission }}>
       {children}
     </AuthContext.Provider>
   );

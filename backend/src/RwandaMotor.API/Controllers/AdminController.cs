@@ -84,6 +84,39 @@ public class AdminController : ControllerBase
         return Ok(ApiResponse<bool>.Ok(true, "Company settings updated successfully"));
     }
 
+    // ── Brand Colors ──────────────────────────────────────────────────────────
+
+    [HttpGet("brand-colors")]
+    public async Task<IActionResult> GetBrandColors()
+    {
+        var result = await _mediator.Send(new GetBrandColorsQuery());
+        return Ok(ApiResponse<List<BrandColorDto>>.Ok(result));
+    }
+
+    [HttpPost("brand-colors")]
+    public async Task<IActionResult> CreateBrandColor([FromBody] CreateBrandColorCommand command)
+    {
+        var result = await _mediator.Send(command);
+        return Ok(ApiResponse<BrandColorDto>.Ok(result, "Color created"));
+    }
+
+    [HttpPut("brand-colors/{id:guid}")]
+    public async Task<IActionResult> UpdateBrandColor(Guid id, [FromBody] UpdateBrandColorCommand command)
+    {
+        if (id != command.Id) return BadRequest(ApiResponse<bool>.Fail("ID mismatch"));
+        var (success, error) = await _mediator.Send(command);
+        if (!success) return BadRequest(ApiResponse<bool>.Fail(error ?? "Failed"));
+        return Ok(ApiResponse<bool>.Ok(true));
+    }
+
+    [HttpDelete("brand-colors/{id:guid}")]
+    public async Task<IActionResult> DeleteBrandColor(Guid id)
+    {
+        var (success, error) = await _mediator.Send(new DeleteBrandColorCommand(id));
+        if (!success) return BadRequest(ApiResponse<bool>.Fail(error ?? "Failed"));
+        return Ok(ApiResponse<bool>.Ok(true));
+    }
+
     // ── Catalogue — Brands ────────────────────────────────────────────────────
 
     [HttpGet("catalogue/brands")]

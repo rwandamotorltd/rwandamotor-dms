@@ -7,18 +7,20 @@ import {
   Settings, Hash, AlertTriangle, Users, ShieldCheck,
   Plus, Pencil, Trash2, X, Eye, EyeOff, KeyRound, Building2, Save,
   ChevronDown, ChevronRight, Database, Car, Wrench, Upload, Download,
-  FileText, ExternalLink, Loader2,
+  FileText, ExternalLink, Loader2, Palette,
 } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
 import { useRouter } from "next/navigation";
 import {
   adminApi, permissionGroupsApi, companySettingsApi, catalogueApi, templatesApi, rolesApi,
+  brandColorsApi,
   type UserItem, type CreateUserPayload, type UpdateUserPayload,
   type PermissionGroupItem, type CreatePermissionGroupPayload,
   type CatalogueBrandDto, type CatalogueModelDto, type BulkImportCatalogueResult,
   type CataloguePreviewResult, type CataloguePreviewRow,
-  type RoleItem,
+  type RoleItem, type CreateBrandColorPayload,
 } from "@/lib/api";
+import type { BrandColor } from "@/types";
 import { DOCUMENT_TYPE_LABELS } from "@/types/templates";
 import { jobCardsApi } from "@/lib/api";
 import type { CompanySettings, ServiceTypeItem } from "@/types";
@@ -576,7 +578,7 @@ function PermissionGroupModal({
 
 function UsersTab({ groups }: { groups: PermissionGroupItem[] }) {
   const qc = useQueryClient();
-  const { user: currentUser } = useAuth();
+  const { user: currentUser, refreshUser } = useAuth();
   const { data: roleItems = [] } = useQuery({ queryKey: ["app-roles"], queryFn: () => rolesApi.list() });
   const roleNames = roleItems.length > 0 ? roleItems.map(r => r.name) : ROLES_FALLBACK;
 
@@ -609,11 +611,13 @@ function UsersTab({ groups }: { groups: PermissionGroupItem[] }) {
 
   const updateMutation = useMutation({
     mutationFn: (p: UpdateUserPayload) => adminApi.updateUser(p),
-    onSuccess: res => {
+    onSuccess: async (res, variables) => {
       if (!res.success) { setEditError(res.message ?? "Failed"); return; }
       qc.invalidateQueries({ queryKey: ["admin-users"] });
       setEditingUser(null); setEditError(null);
       toast.success("User updated");
+      // If admin just edited themselves, refresh the JWT so the new name is immediate
+      if (variables.userId === currentUser?.userId) await refreshUser();
     },
     onError: (e: { response?: { data?: { message?: string } } }) =>
       setEditError(e?.response?.data?.message ?? "Failed to update user"),
@@ -990,6 +994,7 @@ const EMPTY_COMPANY: CompanySettings = {
   emailJobCardMessage: DEFAULT_JC_MSG,
   emailDeliveryNoteMessage: DEFAULT_DN_MSG,
   serviceTypesConfig: null,
+  primaryColor: "#3b82f6",
 };
 
 function CompanyTab() {
@@ -2235,6 +2240,155 @@ function DataTab() {
   );
 }
 
+// ─── Brand Colors Tab ─────────────────────────────────────────────────────────
+
+function ColorsTab() {
+  const qc = useQueryClient();
+  const [showForm, setShowForm] = useState(false);
+  const [editingColor, setEditingColor] = useState<BrandColor | null>(null);
+  const [form, setForm] = useState<CreateBrandColorPayload>({ name: "", hexValue: "#3b82f6" });
+
+  const { data: colors = [], isLoading } = useQuery({
+    queryKey: ["brand-colors"],
+    queryFn: () => brandColorsApi.list(),
+  });
+
+  const { data: settings } = useQuery({
+    queryKey: ["company-settings"],
+    queryFn: () => companySettingsApi.get(),
+  });
+
+  const createMut = useMutation({
+    mutationFn: (p: CreateBrandColorPayload) => brandColorsApi.create(p),
+    onSuccess: res => {
+      if (!res.success) { toast.error(res.message ?? "Failed"); return; }
+      qc.invalidateQueries({ queryKey: ["brand-colors"] });
+      setShowForm(false);
+      setForm({ name: "", hexValue: "#3b82f6" });
+      toast.success("Color added");
+    },
+  });
+
+  const updateMut = useMutation({
+    mutationFn: (c: BrandColor) => brandColorsApi.update({ id: c.id, name: c.name, hexValue: c.hexValue, sortOrder: c.sortOrder }),
+    onSuccess: res => {
+      if (!res.success) { toast.error(res.message ?? "Failed"); return; }
+      qc.invalidateQueries({ queryKey: ["brand-colors"] });
+      setEditingColor(null);
+      toast.success("Color updated");
+    },
+  });
+
+  const deleteMut = useMutation({
+    mutationFn: (id: string) => brandColorsApi.delete(id),
+    onSuccess: res => {
+      if (!res.success) { toast.error(res.message ?? "Failed"); return; }
+      qc.invalidateQueries({ queryKey: ["brand-colors"] });
+      toast.success("Color deleted");
+    },
+  });
+
+  const selectColorMut = useMutation({
+    mutationFn: (hex: string) =>
+      companySettingsApi.update({ ...EMPTY_COMPANY, ...settings, primaryColor: hex }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["company-settings"] });
+      toast.success("Primary color updated — reload to see full effect");
+    },
+  });
+
+  return (
+    <div className="space-y-6 max-w-2xl">
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Palette className="w-4 h-4 text-muted-foreground" /> Brand Colors
+          </CardTitle>
+          <CardDescription>
+            Manage your color palette. Click a color to set it as the active primary color.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {isLoading ? (
+            <div className="space-y-2">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}</div>
+          ) : (
+            <div className="space-y-2">
+              {colors.map(c => (
+                <div key={c.id} className="flex items-center gap-3 p-2 rounded-lg border bg-muted/30">
+                  <button
+                    className="w-8 h-8 rounded-full border-2 border-border flex-shrink-0 shadow-sm cursor-pointer hover:scale-110 transition-transform"
+                    style={{ backgroundColor: c.hexValue }}
+                    title={`Set "${c.name}" as primary color`}
+                    onClick={() => selectColorMut.mutate(c.hexValue)}
+                  />
+                  {editingColor?.id === c.id ? (
+                    <div className="flex flex-1 items-center gap-2">
+                      <Input
+                        className="h-7 text-xs w-32"
+                        value={editingColor.name}
+                        onChange={e => setEditingColor(ec => ec ? { ...ec, name: e.target.value } : ec)}
+                      />
+                      <input
+                        type="color"
+                        className="w-8 h-7 rounded cursor-pointer border border-border"
+                        value={editingColor.hexValue}
+                        onChange={e => setEditingColor(ec => ec ? { ...ec, hexValue: e.target.value } : ec)}
+                      />
+                      <span className="text-xs text-muted-foreground font-mono">{editingColor.hexValue}</span>
+                      <Button size="sm" className="h-7 text-xs" onClick={() => updateMut.mutate(editingColor)} disabled={updateMut.isPending}>Save</Button>
+                      <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setEditingColor(null)}><X className="w-3 h-3" /></Button>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex-1">
+                        <span className="text-sm font-medium">{c.name}</span>
+                        <span className="ml-2 text-xs text-muted-foreground font-mono">{c.hexValue}</span>
+                        {settings?.primaryColor === c.hexValue && (
+                          <span className="ml-2 text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded">Active</span>
+                        )}
+                      </div>
+                      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setEditingColor(c)}>
+                        <Pencil className="w-3 h-3" />
+                      </Button>
+                      <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => deleteMut.mutate(c.id)} disabled={deleteMut.isPending}>
+                        <Trash2 className="w-3 h-3" />
+                      </Button>
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {showForm ? (
+            <div className="flex items-center gap-2 p-3 border rounded-lg bg-muted/20">
+              <input
+                type="color"
+                className="w-8 h-8 rounded cursor-pointer border border-border flex-shrink-0"
+                value={form.hexValue}
+                onChange={e => setForm(f => ({ ...f, hexValue: e.target.value }))}
+              />
+              <Input
+                className="h-8 text-sm flex-1"
+                placeholder="Color name (e.g. Brand Blue)"
+                value={form.name}
+                onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+              />
+              <span className="text-xs text-muted-foreground font-mono w-20">{form.hexValue}</span>
+              <Button size="sm" onClick={() => createMut.mutate(form)} disabled={!form.name.trim() || createMut.isPending}>Add</Button>
+              <Button size="sm" variant="ghost" onClick={() => { setShowForm(false); setForm({ name: "", hexValue: "#3b82f6" }); }}><X className="w-3.5 h-3.5" /></Button>
+            </div>
+          ) : (
+            <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setShowForm(true)}>
+              <Plus className="w-3.5 h-3.5" /> Add Color
+            </Button>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 export default function SettingsPage() {
   const { user } = useAuth();
   const router = useRouter();
@@ -2273,6 +2427,7 @@ export default function SettingsPage() {
           <TabsTrigger value="catalogue" className="gap-1.5 text-xs sm:text-sm"><Database className="w-3.5 h-3.5" /><span>Catalogue</span></TabsTrigger>
           <TabsTrigger value="templates" className="gap-1.5 text-xs sm:text-sm"><FileText className="w-3.5 h-3.5" /><span>Templates</span></TabsTrigger>
           <TabsTrigger value="roles" className="gap-1.5 text-xs sm:text-sm"><KeyRound className="w-3.5 h-3.5" /><span>Roles</span></TabsTrigger>
+          <TabsTrigger value="colors" className="gap-1.5 text-xs sm:text-sm"><Palette className="w-3.5 h-3.5" /><span>Colors</span></TabsTrigger>
           <TabsTrigger value="data" className="gap-1.5 text-xs sm:text-sm text-red-600 dark:text-red-400 data-[state=active]:text-red-700"><AlertTriangle className="w-3.5 h-3.5" /><span>Data</span></TabsTrigger>
         </TabsList>
 
@@ -2302,6 +2457,10 @@ export default function SettingsPage() {
 
         <TabsContent value="roles">
           <RolesTab />
+        </TabsContent>
+
+        <TabsContent value="colors">
+          <ColorsTab />
         </TabsContent>
 
         <TabsContent value="data">
